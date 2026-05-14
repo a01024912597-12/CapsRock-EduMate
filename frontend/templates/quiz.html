@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>예상 문제 및 모범 답안</h2>
+
+<p><strong>강의 제목:</strong> {{ lecture.title }}</p>
+
+<div style="background: #f8f9fa; border-left: 5px solid #e67e22; padding: 15px; border-radius: 8px; margin: 20px 0;">
+    <p style="margin: 0;">
+        이 예상 문제는 강의 요약 내용을 바탕으로 생성됩니다.
+        같은 강의에 대해 여러 차수의 문제를 생성할 수 있으며, 각 차수는 DB에 저장되어 다시 확인할 수 있습니다.
+        모범 답안은 처음에는 가려져 있고, 버튼을 누르면 확인할 수 있습니다.
+    </p>
+</div>
+
+<div style="background: white; border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-bottom: 25px;">
+    <h3 style="margin-top: 0;">퀴즈 차수 선택</h3>
+
+    <div style="margin-bottom: 15px;">
+        {% for quiz in quizzes %}
+            <a href="{% url 'quiz' %}?lecture_id={{ lecture.id }}&generation={{ quiz.generation_number }}"
+               style="
+                    display: inline-block;
+                    padding: 8px 14px;
+                    margin-right: 8px;
+                    margin-bottom: 8px;
+                    border-radius: 6px;
+                    text-decoration: none;
+                    {% if selected_quiz.id == quiz.id %}
+                        background-color: #273c75;
+                        color: white;
+                    {% else %}
+                        background-color: #dcdde1;
+                        color: #2f3640;
+                    {% endif %}
+               ">
+                {{ quiz.generation_number }}차 문제
+            </a>
+        {% endfor %}
+    </div>
+
+    <form method="post" style="margin-top: 15px;">
+        {% csrf_token %}
+        <button type="submit" style="background-color: #e67e22; padding: 10px 18px;">
+            새 차수 문제 생성
+        </button>
+        <span style="font-size: 13px; color: #7f8c8d; margin-left: 10px;">
+            새 차수를 생성하면 API가 다시 호출됩니다.
+        </span>
+    </form>
+</div>
+
+{% if selected_quiz %}
+    <h3>{{ selected_quiz.generation_number }}차 예상 문제</h3>
+{% endif %}
+
+{% if quiz_items %}
+    {% for item in quiz_items %}
+        <div style="background: white; border: 1px solid #ddd; border-radius: 12px; padding: 22px; margin-top: 20px;">
+            <h3 style="margin-top: 0; color: #273c75;">{{ item.number }}번 문제</h3>
+
+            <div style="background: #f1f3f5; padding: 15px; border-radius: 8px; line-height: 1.7; white-space: pre-wrap;">
+                {{ item.question }}
+            </div>
+
+            <button type="button"
+                    onclick="toggleAnswer('answer-{{ forloop.counter }}', this)"
+                    style="margin-top: 15px; background-color: #e67e22; padding: 10px 16px;">
+                모범 답안 보기
+            </button>
+
+            <div id="answer-{{ forloop.counter }}"
+                 style="display: none; margin-top: 15px; background: #fff8e1; border-left: 5px solid #f39c12; padding: 15px; border-radius: 8px; line-height: 1.7; white-space: pre-wrap;">
+                <strong>모범 답안</strong><br><br>
+                {{ item.answer }}
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <div style="background: white; border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-top: 20px;">
+        <pre style="white-space: pre-wrap; line-height: 1.7; font-family: inherit;">{{ quiz_text }}</pre>
+    </div>
+{% endif %}
+
+<div style="margin-top: 30px; text-align: center;">
+    <button onclick="location.href='{% url 'history' %}'" style="background-color: #7f8c8d; padding: 12px 24px;">
+        히스토리로 돌아가기
+    </button>
+
+    <button onclick="location.href='{% url 'feedback' %}?lecture_id={{ lecture.id }}'" style="background-color: #44bd32; padding: 12px 24px; margin-left: 10px;">
+        학습 피드백 보기
+    </button>
+</div>
+
+<script>
+    function toggleAnswer(answerId, button) {
+        const answerBox = document.getElementById(answerId);
+
+        if (answerBox.style.display === "none") {
+            answerBox.style.display = "block";
+            button.textContent = "모범 답안 숨기기";
+            button.style.backgroundColor = "#c0392b";
+        } else {
+            answerBox.style.display = "none";
+            button.textContent = "모범 답안 보기";
+            button.style.backgroundColor = "#e67e22";
+        }
+    }
+</script>
+{% endblock %}

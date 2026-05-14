@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h2>에듀메이트에 오신 것을 환영합니다.</h2>
+    <p>강의 영상을 업로드하고 AI 요약, 문제 생성, 학습 피드백 기능을 이용할 수 있습니다.</p>
+
+    {% if user.is_authenticated %}
+        <div style="margin-top: 30px;">
+            <button onclick="location.href='{% url 'upload' %}'">강의 업로드 하러 가기</button>
+            <button onclick="location.href='{% url 'history' %}'" style="margin-left: 10px;">내 히스토리 보기</button>
+        </div>
+    {% else %}
+        <p style="margin-top: 20px;">로그인 후 강의 업로드와 히스토리 기능을 사용할 수 있습니다.</p>
+    {% endif %}
+{% endblock %}
