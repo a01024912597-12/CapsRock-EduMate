@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>EduMate</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f6fa;
+        }
+        header {
+            background-color: #2f3640;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        nav {
+            background-color: #dcdde1;
+            padding: 10px;
+            text-align: center;
+        }
+        nav a {
+            margin: 0 15px;
+            text-decoration: none;
+            color: #2f3640;
+            font-weight: bold;
+        }
+        .container {
+            width: 80%;
+            margin: 30px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        button {
+            padding: 10px 16px;
+            border: none;
+            background-color: #273c75;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0 20px 0;
+            box-sizing: border-box;
+        }
+
+        /* 모달 배경 (어둡게 처리) */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); /* 배경 흐림 효과 */
+        }
+
+        /* 모달 박스 */
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 40px;
+            border-radius: 12px;
+            width: 360px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            position: relative;
+            animation: fadeIn 0.3s ease-out; /* 나타날 때 애니메이션 */
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 닫기 버튼 */
+        .close-btn {
+            position: absolute;
+            right: 20px;
+            top: 15px;
+            cursor: pointer;
+            font-size: 28px;
+            color: #aaa;
+        }
+
+        .close-btn:hover {
+            color: #000;
+        }
+
+        /* 내부 요소 스타일 */
+        .modal-title {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #2f3640;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .login-submit-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #273c75;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .login-submit-btn:hover {
+            background-color: #1e2d5a;
+        }
+
+        .alert.error {
+            background-color: #e84118; /* 빨간색 경고 */
+            color: white;
+            padding: 15px;
+            margin: 10px auto;
+            width: 80%;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: bold;
+            animation: slideDown 0.5s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>EduMate</h1>
+        <p>AI 기반 강의 이해도 분석 및 학습 지원 시스템</p>
+    </header>
+
+    <nav>
+    <a href="{% url 'home' %}">홈</a>
+    {% if user.is_authenticated %}
+        <a href="{% url 'upload' %}">강의 업로드</a>
+        <a href="{% url 'history' %}">내 히스토리</a>
+        <a href="{% url 'logout' %}" style="color: #c23616;">로그아웃</a>
+    {% else %}
+        <a href="javascript:void(0);" onclick="openLogin()">로그인</a>
+        <a href="{% url 'signup' %}">회원가입</a>
+    {% endif %}
+    </nav>
+
+    {% if messages %}
+        <div id="message-container" style="width: 80%; margin: 10px auto; position: relative; z-index: 10000;">
+            {% for message in messages %}
+                <div class="alert {{ message.tags }}" style="
+                        padding: 15px;
+                        margin-bottom: 10px;
+                        border-radius: 6px;
+                        color: white;
+                        font-weight: bold;
+                        text-align: center;
+                        /* 성공은 초록색, 나머지는 빨간색 */
+                        background-color: {% if message.tags == 'success' %}#2ecc71{% else %}#e84118{% endif %};
+                        animation: slideDown 0.5s ease-out;
+                        ">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="container">
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <div id="loginModal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeLogin()">&times;</span>
+            <h2 class="modal-title">EduMate 로그인</h2>
+
+            <form id="modalLoginForm" method="post" action="{% url 'login' %}">
+                {% csrf_token %}
+                <div class="input-group">
+                    <label>아이디</label>
+                    <input type="text" name="username" placeholder="아이디를 입력하세요" required>
+                </div>
+                <div class="input-group">
+                    <label>비밀번호</label>
+                    <input type="password" name="password" placeholder="비밀번호를 입력하세요" required>
+                </div>
+                <button type="submit" class="login-submit-btn">로그인</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openLogin() {
+            document.getElementById('loginModal').style.display = 'block';
+        }
+
+        function closeLogin() {
+            document.getElementById('loginModal').style.display = 'none';
+        }
+
+        // 모달 바깥 영역 클릭 시 닫기
+        window.onclick = function (event) {
+            const modal = document.getElementById('loginModal');
+            if (event.target == modal) {
+                closeLogin();
+            }
+        }
+
+        // 메시지가 있을 경우 3초 뒤에 사라지게 함
+        setTimeout(function () {
+            const msgContainer = document.getElementById('message-container');
+            if (msgContainer) {
+                msgContainer.style.transition = "opacity 0.5s ease";
+                msgContainer.style.opacity = "0";
+                setTimeout(() => msgContainer.remove(), 500);
+            }
+        }, 3000);
+    </script>
+</body>
+</html>

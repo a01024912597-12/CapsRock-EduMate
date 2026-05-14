@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>CapsRock - 로그인</title>
+</head>
+<body>
+    <h2>CapsRock 서비스 로그인</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">로그인</button>
+    </form>
+    <p>계정이 없으신가요? 관리자에게 문의하세요.</p>
+</body>
+</html>

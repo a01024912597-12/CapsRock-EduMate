@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <!-- 강의 기본 정보 영역 -->
+    <h2>강의 요약</h2>
+
+    <p><strong>강의 제목:</strong> {{ lecture_title }}</p>
+    <p><strong>유튜브 링크:</strong> {{ youtube_link }}</p>
+
+    {% if video_id %}
+        <!-- 유튜브 임베드 영역: 16:9 비율 고정 -->
+        <h3>강의 영상</h3>
+        <div style="position: relative; width: 100%; max-width: 960px; margin: 0 auto; aspect-ratio: 16 / 9;">
+            <iframe
+                src="https://www.youtube-nocookie.com/embed/{{ video_id }}"
+                title="YouTube video player"
+                referrerpolicy="strict-origin-when-cross-origin"
+                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; border-radius: 10px;"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowfullscreen>
+            </iframe>
+        </div>
+    {% else %}
+        <!-- video_id를 추출하지 못한 경우 안내 메시지 -->
+        <p>유튜브 영상 ID를 확인할 수 없어 재생할 수 없습니다.</p>
+    {% endif %}
+
+    <!-- AI 요약 결과 영역 -->
+    <div style="margin-top: 30px;">
+        <h3 style="font-size: 18px; color: #2f3640; margin-bottom: 15px;">📋 AI 요약</h3>
+
+        <div id="analysis-container"
+             style="background: white; border: 1px solid #dcdde1; padding: 25px; border-radius: 10px; line-height: 1.8; white-space: pre-wrap; font-size: 15px; color: #353b48; min-height: 200px;">
+            <div id="loading-area" style="text-align: center; padding: 40px;">
+                <!-- 분석 요청 중 로딩 UI -->
+                <div class="loader"
+                     style="border: 6px solid #f3f3f3; border-top: 6px solid #273c75; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px auto;"></div>
+                <p id="status-text" style="font-weight: bold; color: #7f8c8d;">
+                    AI가 강의 내용을 분석 중입니다... <br>
+                    <span style="font-size: 12px; font-weight: normal;">(영상 길이에 따라 최대 몇 분이 소요될 수 있습니다)</span>
+                </p>
+            </div>
+
+            <div id="result-text" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- 페이지 이동 버튼 -->
+    <div style="margin-top: 40px; text-align: center;">
+        <button onclick="location.href='{% url 'upload' %}'" style="background-color: #7f8c8d; padding: 12px 24px;">
+            새로운 강의 분석
+        </button>
+
+        <button onclick="location.href='{% url 'quiz' %}?lecture_id={{ lecture_id }}'" style="padding: 12px 24px; margin-left: 10px;">
+            예상 문제 풀기
+        </button>
+    </div>
+
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
+    <script>
+        // 페이지가 열리면 자동으로 강의 분석 API를 호출해 결과를 표시한다.
+        document.addEventListener('DOMContentLoaded', function () {
+            const lectureId = "{{ lecture_id }}";
+            const loadingArea = document.getElementById('loading-area');
+            const resultArea = document.getElementById('result-text');
+
+            fetch(`/analyze-api/?lecture_id=${lectureId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // 응답 수신 후 로딩 숨김, 결과 표시
+                    loadingArea.style.display = 'none';
+                    resultArea.style.display = 'block';
+
+                    if (data.status === 'success') {
+                        // 정상 처리 시 요약 결과 렌더링
+                        resultArea.innerText = data.result;
+                    } else {
+                        // 서버 내부 처리 실패 메시지 표시
+                        resultArea.innerHTML = `<span style="color: #e84118; font-weight: bold;">${data.message}</span>`;
+                    }
+                })
+                .catch(error => {
+                    // 네트워크/통신 오류 처리
+                    loadingArea.style.display = 'none';
+                    resultArea.style.display = 'block';
+                    resultArea.innerText = "서버 통신 중 오류가 발생했습니다.";
+                    console.error('Error:', error);
+                });
+        });
+    </script>
+{% endblock %}

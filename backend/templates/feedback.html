@@ -1,0 +1,387 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="feedback-wrap">
+    <section class="feedback-header">
+        <p class="page-label">학습 피드백</p>
+        <h2>{{ lecture.title }}</h2>
+        <p class="page-desc">
+            사용자가 제출한 퀴즈 답안을 기준으로 Sentence Transformers 유사도 점수와
+            시스템 1차 판단 결과를 확인합니다.
+        </p>
+    </section>
+
+    {% if not has_summary %}
+        <div class="empty-box">
+            아직 이 강의의 요약이 생성되지 않았습니다.
+        </div>
+
+    {% elif not has_quiz %}
+        <div class="empty-box">
+            아직 이 강의의 예상 문제가 생성되지 않았습니다.
+        </div>
+
+    {% elif total_answer_count == 0 %}
+        <div class="empty-box">
+            아직 제출된 사용자 답안이 없습니다.<br>
+            퀴즈 페이지에서 답안을 입력한 뒤 다시 확인해주세요.
+        </div>
+
+    {% else %}
+        <section class="summary-grid">
+            <div class="summary-card">
+                <span>제출 답안 수</span>
+                <strong>{{ total_answer_count }}개</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>평균 유사도</span>
+                <strong>{{ average_similarity }}%</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>정답 가능성 높음</span>
+                <strong>{{ correct_like_count }}개</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>검토 필요</span>
+                <strong>{{ review_needed_count }}개</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>오답 가능성 높음</span>
+                <strong>{{ wrong_like_count }}개</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>사람 검토 완료</span>
+                <strong>{{ reviewed_count }}개</strong>
+            </div>
+        </section>
+
+        {% if review_agreement_rate is not None %}
+            <section class="review-summary">
+                <h3>사람 검토 기준 일치율</h3>
+                <p>
+                    검토 완료 답안 {{ reviewed_count }}개 중
+                    시스템 판단과 사람 판단이 일치한 답안은 {{ review_agree_count }}개입니다.
+                </p>
+                <strong>{{ review_agreement_rate }}%</strong>
+            </section>
+        {% else %}
+            <section class="review-summary muted">
+                <h3>사람 검토 데이터 없음</h3>
+                <p>
+                    아직 관리자 페이지에서 human_score 또는 human_label이 입력된 답안이 없습니다.
+                    일부 답안을 사람이 검토하면 평가 기준 보정용 데이터로 활용할 수 있습니다.
+                </p>
+            </section>
+        {% endif %}
+
+        <section class="answer-list">
+            <h3>문제별 답안 분석</h3>
+
+            {% for item in answer_items %}
+                <article class="answer-card">
+                    <div class="answer-top">
+                        <div>
+                            <span class="badge">{{ item.generation_number }}차</span>
+                            <span class="badge blue">{{ item.question_number }}번 문제</span>
+                        </div>
+                        <div class="score">
+                            유사도 {{ item.similarity_percent }}%
+                        </div>
+                    </div>
+
+                    <div class="answer-block">
+                        <h4>문제</h4>
+                        <p>{{ item.question_text }}</p>
+                    </div>
+
+                    <div class="answer-block">
+                        <h4>사용자 답안</h4>
+                        <p>{{ item.user_answer|default:"입력된 답안 없음" }}</p>
+                    </div>
+
+                    <div class="answer-block">
+                        <h4>모범 답안</h4>
+                        <p>{{ item.model_answer }}</p>
+                    </div>
+
+                    <div class="result-grid">
+                        <div>
+                            <span>시스템 1차 판단</span>
+                            <strong>{{ item.predicted_label|default:"판단 없음" }}</strong>
+                        </div>
+
+                        <div>
+                            <span>사람 검토 점수</span>
+                            {% if item.human_score is not None %}
+                                <strong>{{ item.human_score }}점</strong>
+                            {% else %}
+                                <strong class="muted-text">미검토</strong>
+                            {% endif %}
+                        </div>
+
+                        <div>
+                            <span>사람 검토 라벨</span>
+                            {% if item.human_label %}
+                                <strong>{{ item.human_label }}</strong>
+                            {% else %}
+                                <strong class="muted-text">미검토</strong>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if item.predicted_label == "정답 가능성 높음" and not item.is_reviewed %}
+                        <p class="notice">
+                            ※ 유사도 기반 판단은 최종 채점이 아니므로,
+                            키워드는 비슷하지만 의미가 반대인 답안은 사람 검토가 필요할 수 있습니다.
+                        </p>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </section>
+    {% endif %}
+
+    <div class="button-row">
+        <button type="button" onclick="location.href='{% url 'history' %}'">
+            히스토리로 돌아가기
+        </button>
+
+        <button type="button" onclick="location.href='/quiz/?lecture_id={{ lecture.id }}'">
+            퀴즈 페이지로 이동
+        </button>
+    </div>
+</div>
+
+<style>
+    .feedback-wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 32px 20px 60px;
+    }
+
+    .feedback-header {
+        margin-bottom: 28px;
+    }
+
+    .page-label {
+        margin: 0 0 8px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #4f46e5;
+    }
+
+    .feedback-header h2 {
+        margin: 0 0 12px;
+        font-size: 30px;
+    }
+
+    .page-desc {
+        margin: 0;
+        color: #666;
+        line-height: 1.6;
+    }
+
+    .empty-box {
+        padding: 28px;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        background: #f9fafb;
+        color: #555;
+        line-height: 1.7;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .summary-card {
+        padding: 20px;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        background: #ffffff;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+    }
+
+    .summary-card span {
+        display: block;
+        margin-bottom: 8px;
+        color: #666;
+        font-size: 14px;
+    }
+
+    .summary-card strong {
+        font-size: 24px;
+    }
+
+    .review-summary {
+        margin-bottom: 32px;
+        padding: 22px;
+        border-radius: 16px;
+        background: #eef2ff;
+        border: 1px solid #c7d2fe;
+    }
+
+    .review-summary.muted {
+        background: #f9fafb;
+        border-color: #e5e7eb;
+    }
+
+    .review-summary h3 {
+        margin: 0 0 8px;
+        font-size: 20px;
+    }
+
+    .review-summary p {
+        margin: 0 0 10px;
+        color: #444;
+        line-height: 1.6;
+    }
+
+    .review-summary strong {
+        font-size: 24px;
+    }
+
+    .answer-list h3 {
+        margin: 0 0 18px;
+        font-size: 22px;
+    }
+
+    .answer-card {
+        margin-bottom: 20px;
+        padding: 24px;
+        border: 1px solid #e5e7eb;
+        border-radius: 18px;
+        background: #ffffff;
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.04);
+    }
+
+    .answer-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 700;
+        background: #f3f4f6;
+        color: #333;
+    }
+
+    .badge.blue {
+        background: #eef2ff;
+        color: #3730a3;
+    }
+
+    .score {
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-weight: 700;
+        background: #ecfdf5;
+        color: #047857;
+        white-space: nowrap;
+    }
+
+    .answer-block {
+        margin-bottom: 16px;
+    }
+
+    .answer-block h4 {
+        margin: 0 0 6px;
+        font-size: 15px;
+    }
+
+    .answer-block p {
+        margin: 0;
+        line-height: 1.7;
+        color: #333;
+        white-space: pre-line;
+    }
+
+    .result-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 18px;
+        padding-top: 16px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .result-grid > div {
+        padding: 14px;
+        border-radius: 12px;
+        background: #f9fafb;
+    }
+
+    .result-grid span {
+        display: block;
+        margin-bottom: 6px;
+        color: #666;
+        font-size: 13px;
+    }
+
+    .muted-text {
+        color: #888;
+    }
+
+    .notice {
+        margin: 16px 0 0;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: #fff7ed;
+        color: #9a3412;
+        line-height: 1.6;
+    }
+
+    .button-row {
+        display: flex;
+        gap: 10px;
+        margin-top: 28px;
+    }
+
+    .button-row button {
+        border: none;
+        border-radius: 10px;
+        padding: 12px 20px;
+        background: #4f46e5;
+        color: #fff;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .button-row button:first-child {
+        background: #7f8c8d;
+    }
+
+    @media (max-width: 800px) {
+        .summary-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .answer-top {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .result-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .button-row {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}
