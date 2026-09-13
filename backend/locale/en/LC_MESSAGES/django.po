@@ -1,0 +1,1250 @@
+# EduMate UI translations
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: EduMate\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-29 00:00+0900\n"
+"PO-Revision-Date: 2026-08-29 00:00+0900\n"
+"Last-Translator: \n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "AI 학습 플랫폼"
+msgstr "AI learning platform"
+
+msgid "홈 대시보드"
+msgstr "Home dashboard"
+
+msgid "강의 업로드"
+msgstr "Upload lecture"
+
+msgid "내 히스토리"
+msgstr "My history"
+
+msgid "학습 관리"
+msgstr "Learning admin"
+
+msgid "언어"
+msgstr "Language"
+
+msgid "다크 모드"
+msgstr "Dark mode"
+
+msgid "라이트 모드"
+msgstr "Light mode"
+
+msgid "로그아웃"
+msgstr "Log out"
+
+msgid "페이지"
+msgstr "Page"
+
+msgid "님"
+msgstr "​"
+
+msgid "AI 기반 강의 이해도 분석 및 학습 지원 시스템"
+msgstr "AI-powered lecture comprehension and learning support"
+
+msgid "로그인"
+msgstr "Log in"
+
+msgid "회원가입"
+msgstr "Sign up"
+
+msgid "EduMate 로그인"
+msgstr "EduMate log in"
+
+msgid "아이디"
+msgstr "Username"
+
+msgid "아이디를 입력하세요"
+msgstr "Enter your username"
+
+msgid "비밀번호"
+msgstr "Password"
+
+msgid "비밀번호를 입력하세요"
+msgstr "Enter your password"
+
+msgid "서술형 피드백"
+msgstr "Written feedback"
+
+msgid "객관식 오답을 기반으로 생성된 서술형 문제를 풀고, 자동 채점 결과를 확인할 수 있습니다."
+msgstr "Solve written questions generated from multiple-choice mistakes and review auto-grading results."
+
+msgid "아직 이 강의의 요약이 생성되지 않았습니다."
+msgstr "A summary has not been generated for this lecture yet."
+
+msgid "객관식 오답 정보가 없는 경우 강의 요약의 핵심 개념을 기반으로 서술형 문제가 생성됩니다."
+msgstr "If there are no multiple-choice mistakes, written questions are generated from the lecture summary."
+
+msgid "서술형 피드백 문제 생성"
+msgstr "Generate written feedback questions"
+
+msgid "피드백 차수 선택"
+msgstr "Select feedback round"
+
+msgid "차 피드백"
+msgstr " feedback"
+
+msgid "아직 생성된 서술형 피드백 문제가 없습니다."
+msgstr "No written feedback questions have been generated yet."
+
+msgid "위의 「서술형 피드백 문제 생성」 버튼을 눌러 문제를 생성해주세요."
+msgstr "Press Generate written feedback questions above to create questions."
+
+msgid "차 서술형 피드백 문제"
+msgstr " written feedback questions"
+
+msgid "차"
+msgstr "​"
+
+msgid "번 문제"
+msgstr ". Question"
+
+msgid "관련 객관식 오답 :"
+msgstr "Related multiple-choice mistakes:"
+
+msgid "정보 없음"
+msgstr "No information"
+
+msgid "서술형 문제"
+msgstr "Written question"
+
+msgid "모범 답안"
+msgstr "Model answer"
+
+msgid "내 서술형 답안"
+msgstr "My written answer"
+
+msgid "여기에 서술형 답안을 입력하세요."
+msgstr "Enter your written answer here."
+
+msgid "답안을 제출하면 자동 채점 결과를 확인할 수 있습니다."
+msgstr "Submit your answer to see auto-grading results."
+
+msgid "관련 영상 다시보기"
+msgstr "Rewatch related video"
+
+msgid "문제 형식이 자동 분해되지 않은 경우, 여기에 답을 자유롭게 입력하세요."
+msgstr "If the question was not parsed automatically, enter your answer freely here."
+
+msgid "서술형 답안 저장 및 자동 채점"
+msgstr "Save written answers and auto-grade"
+
+msgid "제출 답안 수"
+msgstr "Submitted answers"
+
+msgid "개"
+msgstr "​"
+
+msgid "평균 자동 채점 점수"
+msgstr "Average auto-grade score"
+
+msgid "정답 가능성 높음"
+msgstr "Likely correct"
+
+msgid "검토 필요"
+msgstr "Needs review"
+
+msgid "오답 가능성 높음"
+msgstr "Likely incorrect"
+
+msgid "자동 채점 결과"
+msgstr "Auto-grading results"
+
+msgid "자동 채점 점수"
+msgstr "Auto-grade score"
+
+msgid "문제"
+msgstr "Question"
+
+msgid "사용자 답안"
+msgstr "Student answer"
+
+msgid "입력된 답안 없음"
+msgstr "No answer entered"
+
+msgid "시스템 1차 판단"
+msgstr "System first judgment"
+
+msgid "판단 없음"
+msgstr "No judgment"
+
+msgid "사람 검토 점수"
+msgstr "Human review score"
+
+msgid "점"
+msgstr " pts"
+
+msgid "미검토"
+msgstr "Not reviewed"
+
+msgid "사람 검토 라벨"
+msgstr "Human review label"
+
+msgid "아직 제출된 서술형 답안이 없습니다."
+msgstr "No written answers have been submitted yet."
+
+msgid "위 문제에 답안을 입력한 뒤 「서술형 답안 저장 및 자동 채점」을 눌러주세요."
+msgstr "Enter answers above, then press Save written answers and auto-grade."
+
+msgid "히스토리로 돌아가기"
+msgstr "Back to history"
+
+msgid "객관식 문제로 이동"
+msgstr "Go to multiple-choice questions"
+
+msgid "관련 문제 정보"
+msgstr "Related question info"
+
+msgid "번 서술형 문제"
+msgstr ". Written question"
+
+msgid "관련 구간 :"
+msgstr "Related segment:"
+
+msgid "관련 정보 없음"
+msgstr "No related information"
+
+msgid "유튜브 영상 ID를 확인할 수 없어 재생할 수 없습니다."
+msgstr "Cannot play the video because the YouTube ID could not be found."
+
+msgid "현재 %(objective_generation)s차 객관식 오답을 기반으로 서술형 피드백 문제를 생성할 수 있습니다."
+msgstr "You can generate written feedback from round %(objective_generation)s multiple-choice mistakes."
+
+msgid "내 강의 히스토리"
+msgstr "My lecture history"
+
+msgid "업로드한 강의의 요약·예상 문제·학습 피드백을 한곳에서 확인하세요."
+msgstr "Review summaries, practice questions, and learning feedback in one place."
+
+msgid "검색 결과 또는 강의 없음"
+msgstr "No search results or lectures"
+
+msgid "최신 등록순"
+msgstr "Newest first"
+
+msgid "오래된순"
+msgstr "Oldest first"
+
+msgid "강의 제목순"
+msgstr "By lecture title"
+
+msgid "퀴즈 전체"
+msgstr "All quizzes"
+
+msgid "예상 문제 생성 완료"
+msgstr "Practice questions generated"
+
+msgid "예상 문제 미생성"
+msgstr "Practice questions not generated"
+
+msgid "영상 길이 전체"
+msgstr "All durations"
+
+msgid "10분 미만 (숏폼/핵심)"
+msgstr "Under 10 min (short/key points)"
+
+msgid "10분 ~ 30분 (일반)"
+msgstr "10–30 min (standard)"
+
+msgid "30분 초과 (장편 특강)"
+msgstr "Over 30 min (long lecture)"
+
+msgid "과목 전체"
+msgstr "All subjects"
+
+msgid "역사/인문학"
+msgstr "History / humanities"
+
+msgid "프로그래밍/IT"
+msgstr "Programming / IT"
+
+msgid "수학/과학"
+msgstr "Math / science"
+
+msgid "일반 강의"
+msgstr "General lecture"
+
+msgid "강의 제목 검색"
+msgstr "Search lecture titles"
+
+msgid "적용"
+msgstr "Apply"
+
+msgid "초기화"
+msgstr "Reset"
+
+msgid "등록 시간:"
+msgstr "Registered:"
+
+msgid "분석 완료"
+msgstr "Analysis complete"
+
+msgid "분석 중"
+msgstr "Analyzing"
+
+msgid "요약 상태"
+msgstr "Summary status"
+
+msgid "완료"
+msgstr "Done"
+
+msgid "미완료"
+msgstr "Incomplete"
+
+msgid "예상 문제"
+msgstr "Practice questions"
+
+msgid "미생성"
+msgstr "Not generated"
+
+msgid "요약 다시 보기"
+msgstr "View summary"
+
+msgid "PDF 다운로드"
+msgstr "Download PDF"
+
+msgid "예상 문제 풀기"
+msgstr "Solve practice questions"
+
+msgid "모범 답안 확인하기"
+msgstr "View model answers"
+
+msgid "학습 피드백"
+msgstr "Learning feedback"
+
+msgid "처음"
+msgstr "First"
+
+msgid "이전"
+msgstr "Previous"
+
+msgid "다음"
+msgstr "Next"
+
+msgid "마지막"
+msgstr "Last"
+
+msgid "해당 조건의 강의 내역을 찾을 수 없습니다."
+msgstr "No lectures match these filters."
+
+msgid "총 %(page_obj.paginator.count)s개 강의"
+msgstr "%(page_obj.paginator.count)s lectures"
+
+msgid "%(page_obj.start_index)s–%(page_obj.end_index)s번째 표시"
+msgstr "Showing %(page_obj.start_index)s–%(page_obj.end_index)s"
+
+msgid "%(title)s 썸네일"
+msgstr "%(title)s thumbnail"
+
+msgid "생성 완료 / %(lecture.quiz_count)s차까지 생성"
+msgstr "Generated through round %(lecture.quiz_count)s"
+
+msgid "홈"
+msgstr "Home"
+
+msgid "에듀메이트에 오신 것을 환영합니다."
+msgstr "Welcome to EduMate."
+
+msgid "강의 영상을 업로드하고 AI 요약, 문제 생성, 학습 피드백 기능을 이용할 수 있습니다."
+msgstr "Upload a lecture video to use AI summaries, question generation, and learning feedback."
+
+msgid "강의 업로드 하기"
+msgstr "Upload a lecture"
+
+msgid "AI 요약"
+msgstr "AI summary"
+
+msgid "문제 생성"
+msgstr "Generate questions"
+
+msgid "내 히스토리 보기"
+msgstr "View my history"
+
+msgid "팁: 강의 영상을 업로드하면 AI가 핵심 내용을 요약하고 문제를 만들어 학습을 도와줘요."
+msgstr "Tip: Upload a lecture and AI will summarize key points and create questions to help you study."
+
+msgid "업로드한 강의"
+msgstr "Uploaded lectures"
+
+msgid "풀어본 문제"
+msgstr "Questions solved"
+
+msgid "학습 연속일"
+msgstr "Study streak"
+
+msgid "오늘 첫 학습을 시작해보세요!"
+msgstr "Start your first study session today!"
+
+msgid "최근 학습"
+msgstr "Recent study"
+
+msgid "전체 보기"
+msgstr "View all"
+
+msgid "파일"
+msgstr "File"
+
+msgid "업로드"
+msgstr "Uploaded"
+
+msgid "요약 완료"
+msgstr "Summary ready"
+
+msgid "요약"
+msgstr "Summary"
+
+msgid "퀴즈"
+msgstr "Quiz"
+
+msgid "아직 업로드한 강의가 없습니다."
+msgstr "You have not uploaded any lectures yet."
+
+msgid "첫 강의를 업로드하고 학습을 시작해 보세요."
+msgstr "Upload your first lecture and start studying."
+
+msgid "학습 캘린더"
+msgstr "Study calendar"
+
+msgid "강의 업로드·문제 풀이가 있었던 날을 표시합니다."
+msgstr "Days with lecture uploads or quizzes are marked."
+
+msgid "캘린더 보기 전환"
+msgstr "Switch calendar view"
+
+msgid "주간"
+msgstr "Week"
+
+msgid "월간"
+msgstr "Month"
+
+msgid "이전 주"
+msgstr "Previous week"
+
+msgid "다음 주"
+msgstr "Next week"
+
+msgid "날짜를 선택하세요"
+msgstr "Select a date"
+
+msgid "캘린더에서 날짜를 클릭하면 해당 일의 학습 내역을 확인할 수 있습니다."
+msgstr "Click a date to see that day's study activity."
+
+msgid "학습 메모"
+msgstr "Study memo"
+
+msgid "이 날의 학습 계획이나 복습 내용을 적어보세요."
+msgstr "Write a study plan or review notes for this day."
+
+msgid "삭제"
+msgstr "Delete"
+
+msgid "저장"
+msgstr "Save"
+
+msgid "문제 풀이"
+msgstr "Quiz"
+
+msgid "메모"
+msgstr "Memo"
+
+msgid "일"
+msgstr "Sun"
+
+msgid "월"
+msgstr "Mon"
+
+msgid "화"
+msgstr "Tue"
+
+msgid "수"
+msgstr "Wed"
+
+msgid "목"
+msgstr "Thu"
+
+msgid "금"
+msgstr "Fri"
+
+msgid "토"
+msgstr "Sat"
+
+msgid "년"
+msgstr "​"
+
+msgid "이 날은 학습 활동이 없습니다."
+msgstr "No study activity on this day."
+
+msgid "푼 문제"
+msgstr "Questions solved"
+
+msgid "저장 중..."
+msgstr "Saving..."
+
+msgid "저장에 실패했습니다."
+msgstr "Save failed."
+
+msgid "메모를 삭제했습니다."
+msgstr "Memo deleted."
+
+msgid "저장되었습니다."
+msgstr "Saved."
+
+msgid "이전 달"
+msgstr "Previous month"
+
+msgid "다음 달"
+msgstr "Next month"
+
+msgid "이 날짜의 메모를 삭제할까요?"
+msgstr "Delete the memo for this date?"
+
+msgid "로그인 후 강의 업로드와 히스토리 기능을 사용할 수 있습니다."
+msgstr "Log in to upload lectures and use history."
+
+msgid "이번 달 %(lectures_this_month)s개 추가"
+msgstr "%(lectures_this_month)s added this month"
+
+msgid "정답률 %(accuracy_rate)s%"
+msgstr "Accuracy %(accuracy_rate)s%"
+
+msgid "%(study_streak)s일"
+msgstr "%(study_streak)s days"
+
+msgid "최고 %(best_streak)s일"
+msgstr "Best %(best_streak)s days"
+
+msgid "퀴즈 %(lecture.quiz_count)s차"
+msgstr "Quiz round %(lecture.quiz_count)s"
+
+msgid "CapsRock 서비스 로그인"
+msgstr "CapsRock service log in"
+
+msgid "계정이 없으신가요? 관리자에게 문의하세요."
+msgstr "Don't have an account? Contact an administrator."
+
+msgid "객관식 문제 풀이"
+msgstr "Multiple-choice quiz"
+
+msgid "강의 제목:"
+msgstr "Lecture title:"
+
+msgid "강의 요약 내용을 바탕으로 생성된 객관식 문제입니다. 답안을 선택한 뒤 「내 답안 저장 및 채점」을 누르면 정답 및 오답 확인 화면으로 이동합니다."
+msgstr "These multiple-choice questions are based on the lecture summary. Choose answers, then press Save and grade my answers to see results."
+
+msgid "퀴즈 차수 목록"
+msgstr "Quiz rounds"
+
+msgid "차 문제"
+msgstr " questions"
+
+msgid "선택됨"
+msgstr "Selected"
+
+msgid "생성된 문제 없음"
+msgstr "No questions generated"
+
+msgid "새 객관식 문제 생성"
+msgstr "Generate new multiple-choice questions"
+
+msgid "차 객관식 문제"
+msgstr " multiple-choice questions"
+
+msgid "객관식 문제가 없습니다."
+msgstr "There are no multiple-choice questions."
+
+msgid "새 객관식 문제 생성 버튼을 눌러 문제를 생성해주세요."
+msgstr "Press Generate new multiple-choice questions to create questions."
+
+msgid "내 답안 저장 및 채점"
+msgstr "Save and grade my answers"
+
+msgid "정답 및 오답 확인하기"
+msgstr "Review correct and incorrect answers"
+
+msgid "정답 및 오답 확인"
+msgstr "Correct and incorrect answers"
+
+msgid "차 객관식 채점 결과"
+msgstr " multiple-choice results"
+
+msgid "객관식 채점 결과"
+msgstr "Multiple-choice results"
+
+msgid "시험 점수"
+msgstr "Score"
+
+msgid "정답 개수"
+msgstr "Correct"
+
+msgid "오답 개수"
+msgstr "Incorrect"
+
+msgid "제출된 객관식 답안이 없습니다."
+msgstr "No multiple-choice answers have been submitted."
+
+msgid "먼저 객관식 문제 풀이 화면에서 답안을 제출해주세요."
+msgstr "Submit answers on the multiple-choice quiz page first."
+
+msgid "퀴즈 차수 변경"
+msgstr "Change quiz round"
+
+msgid "차 결과"
+msgstr " results"
+
+msgid "현재"
+msgstr "Current"
+
+msgid "보기"
+msgstr "View"
+
+msgid "문항별 채점 대조표"
+msgstr "Per-question score sheet"
+
+msgid "정답"
+msgstr "Correct"
+
+msgid "오답"
+msgstr "Incorrect"
+
+msgid "내 선택"
+msgstr "My choice"
+
+msgid "내가 선택한 답"
+msgstr "My answer"
+
+msgid "번"
+msgstr "​"
+
+msgid "미선택"
+msgstr "Not selected"
+
+msgid "관련 키워드"
+msgstr "Related keywords"
+
+msgid "근거 없음"
+msgstr "No source"
+
+msgid "해설"
+msgstr "Explanation"
+
+msgid "객관식 문제로 돌아가기"
+msgstr "Back to multiple-choice questions"
+
+msgid "오답 기반 서술형 피드백 받기"
+msgstr "Get written feedback from mistakes"
+
+msgid "EduMate 회원가입"
+msgstr "EduMate sign up"
+
+msgid "서비스 이용을 위해 정보를 입력해주세요."
+msgstr "Enter your information to use the service."
+
+msgid "기본 계정 정보"
+msgstr "Account details"
+
+msgid "비밀번호 확인"
+msgstr "Confirm password"
+
+msgid "사용자 상세 정보"
+msgstr "Profile details"
+
+msgid "이름"
+msgstr "Name"
+
+msgid "이름을 입력하세요"
+msgstr "Enter your name"
+
+msgid "나이"
+msgstr "Age"
+
+msgid "나이를 입력하세요"
+msgstr "Enter your age"
+
+msgid "전화번호"
+msgstr "Phone number"
+
+msgid "학습 프로필"
+msgstr "Learning profile"
+
+msgid "준비 중인 자격증"
+msgstr "Certifications in progress"
+
+msgid "예: 정보처리기사, ADsP"
+msgstr "e.g. information processing engineer, ADsP"
+
+msgid "가입 이유"
+msgstr "Reason for joining"
+
+msgid "관심 분야"
+msgstr "Interests"
+
+msgid "예: 파이썬, 장고, 정보처리기사, NLP"
+msgstr "e.g. Python, Django, certifications, NLP"
+
+msgid "회원가입 완료"
+msgstr "Complete sign up"
+
+msgid "이미 계정이 있으신가요?"
+msgstr "Already have an account?"
+
+msgid "✓ 8자 이상 충족"
+msgstr "✓ 8 or more characters"
+
+msgid "✗ 8자 이상 입력해주세요"
+msgstr "✗ Please enter at least 8 characters"
+
+msgid "✓ 비밀번호가 일치합니다"
+msgstr "✓ Passwords match"
+
+msgid "✗ 비밀번호가 일치하지 않습니다"
+msgstr "✗ Passwords do not match"
+
+msgid "강의 요약"
+msgstr "Lecture summary"
+
+msgid "업로드 파일:"
+msgstr "Uploaded file:"
+
+msgid "강의 영상"
+msgstr "Lecture video"
+
+msgid "영상 불러오는 중…"
+msgstr "Loading video…"
+
+msgid "브라우저가 video 태그를 지원하지 않습니다."
+msgstr "Your browser does not support the video tag."
+
+msgid "업로드된 영상 파일을 불러올 수 없습니다."
+msgstr "The uploaded video file could not be loaded."
+
+msgid "유튜브 링크:"
+msgstr "YouTube link:"
+
+msgid "AI가 강의 내용을 분석 중입니다..."
+msgstr "AI is analyzing the lecture..."
+
+msgid "(영상 길이에 따라 최대 몇 분이 소요될 수 있습니다)"
+msgstr "(This may take several minutes depending on video length)"
+
+msgid "새로운 강의 분석"
+msgstr "Analyze a new lecture"
+
+msgid "분석 중 오류가 발생했습니다."
+msgstr "An error occurred during analysis."
+
+msgid "서버 통신 중 오류가 발생했습니다."
+msgstr "A server communication error occurred."
+
+msgid "유튜브 링크 또는 영상 파일을 업로드하면 AI가 강의를 분석하고 학습 자료를 자동 생성합니다."
+msgstr "Upload a YouTube link or video file and AI will analyze the lecture and generate study materials."
+
+msgid "AI 분석"
+msgstr "AI analysis"
+
+msgid "30초 완성"
+msgstr "Ready in 30 seconds"
+
+msgid "무제한"
+msgstr "Unlimited"
+
+msgid "누적 강의 수"
+msgstr "Total lectures"
+
+msgid "평균 이해도"
+msgstr "Average comprehension"
+
+msgid "최근 5개 강의 기준"
+msgstr "Based on the last 5 lectures"
+
+msgid "생성된 퀴즈"
+msgstr "Quizzes generated"
+
+msgid "누적 퀴즈 문항 수"
+msgstr "Total quiz questions"
+
+msgid "새 강의 분석"
+msgstr "Analyze a new lecture"
+
+msgid "강의 업로드 방식"
+msgstr "Lecture upload method"
+
+msgid "유튜브 링크 업로드"
+msgstr "Upload YouTube link"
+
+msgid "파일 업로드"
+msgstr "Upload file"
+
+msgid "강의 제목"
+msgstr "Lecture title"
+
+msgid "필수"
+msgstr "Required"
+
+msgid "예) 운영체제 2주차 — 프로세스 관리"
+msgstr "e.g. Operating Systems week 2 — process management"
+
+msgid "유튜브 링크"
+msgstr "YouTube link"
+
+msgid "링크를 입력하면"
+msgstr "Enter a link to see a"
+
+msgid "미리보기"
+msgstr "preview"
+
+msgid "가 표시됩니다"
+msgstr " "
+
+msgid "강의 영상 파일"
+msgstr "Lecture video file"
+
+msgid "클릭"
+msgstr "Click"
+
+msgid "하거나 영상 파일을"
+msgstr " or "
+
+msgid "드래그"
+msgstr "drag"
+
+msgid "하세요"
+msgstr " a video file"
+
+msgid "MP4, MOV, AVI, MKV, WEBM · 최대 500MB"
+msgstr "MP4, MOV, AVI, MKV, WEBM · max 500MB"
+
+msgid "선택 파일 제거"
+msgstr "Remove selected file"
+
+msgid "MP4, MOV, AVI, MKV, WEBM 형식 · 최대 500MB"
+msgstr "MP4, MOV, AVI, MKV, WEBM · max 500MB"
+
+msgid "분석 옵션 설정"
+msgstr "Analysis options"
+
+msgid "PC 성능, 정확도, 강의 과목에 맞춰 분석 방식을 선택할 수 있습니다."
+msgstr "Choose an analysis method based on PC performance, accuracy, and subject."
+
+msgid "Whisper 모델 선택"
+msgstr "Whisper model"
+
+msgid "base 모델은 가장 빠르게 분석할 수 있어 테스트용이나 짧은 강의에 적합합니다."
+msgstr "The base model is fastest and works well for tests or short lectures."
+
+msgid "base — 빠른 분석"
+msgstr "base — fastest"
+
+msgid "small — 속도/정확도 균형"
+msgstr "small — balanced speed/accuracy"
+
+msgid "medium — 높은 정확도"
+msgstr "medium — higher accuracy"
+
+msgid "작업 스레드 수 설정"
+msgstr "Worker threads"
+
+msgid "3개는 기본 권장값입니다. CPU 사용량은 늘어나지만 여러 구간을 동시에 처리할 수 있습니다."
+msgstr "3 is the recommended default. CPU use is higher, but multiple segments can be processed at once."
+
+msgid "1개 — 저사양 PC 권장"
+msgstr "1 — recommended for low-spec PCs"
+
+msgid "2개 — 안정적인 병렬 처리"
+msgstr "2 — stable parallel processing"
+
+msgid "3개 — 기본 권장값"
+msgstr "3 — recommended default"
+
+msgid "4개 — 고성능 PC용"
+msgstr "4 — for high-performance PCs"
+
+msgid "과목 유형 선택"
+msgstr "Subject type"
+
+msgid "일반 강의는 과목이 명확하지 않은 영상에 적합하며, 핵심 주제와 전체 흐름을 중심으로 요약합니다."
+msgstr "General lecture fits videos without a clear subject and summarizes key topics and overall flow."
+
+msgid "일반 강의 — 범용 요약"
+msgstr "General lecture — general summary"
+
+msgid "역사/인문학 — 사건 흐름과 인과관계 중심"
+msgstr "History / humanities — events and cause-and-effect"
+
+msgid "프로그래밍/IT — 코드 흐름과 실습 중심"
+msgstr "Programming / IT — code flow and practice"
+
+msgid "수학/과학 — 개념, 공식, 풀이 과정 중심"
+msgstr "Math / science — concepts, formulas, and solutions"
+
+msgid "요약 API 선택"
+msgstr "Summary API"
+
+msgid "Gemini API는 기존 EduMate 요약 방식입니다. Gemini 사용량이 많거나 503 오류가 반복될 경우 GPT API를 선택할 수 있습니다."
+msgstr "Gemini is the original EduMate summary API. Choose GPT if Gemini usage is high or 503 errors keep occurring."
+
+msgid "Gemini API — 기존 요약 방식"
+msgstr "Gemini API — original method"
+
+msgid "GPT API — OpenAI 기반 요약 방식"
+msgstr "GPT API — OpenAI-based summaries"
+
+msgid "각 설정에 맞는 설명은 아이콘에 마우스를 올리면 표시됩니다. 요약 API는 Gemini 또는 GPT 중 선택할 수 있으며, 이후 객관식 문제 생성과 서술형 피드백은 생성된 요약문을 기반으로 진행됩니다."
+msgstr "Hover the info icons for details. Choose Gemini or GPT for summaries; later quizzes and written feedback use the generated summary."
+
+msgid "AI 분석 시작"
+msgstr "Start AI analysis"
+
+msgid "자동 요약"
+msgstr "Auto summary"
+
+msgid "퀴즈 생성"
+msgstr "Quiz generation"
+
+msgid "핵심 키워드"
+msgstr "Key keywords"
+
+msgid "타임라인 분석"
+msgstr "Timeline analysis"
+
+msgid "이해도 측정"
+msgstr "Comprehension check"
+
+msgid "영상 ID:"
+msgstr "Video ID:"
+
+msgid "제출 시 분석이 시작됩니다"
+msgstr "Analysis starts when you submit"
+
+msgid "분석할 영상 파일을 선택해 주세요."
+msgstr "Please select a video file to analyze."
+
+msgid "base 모델은 가장 빠르게 분석할 수 있어 테스트용이나 짧은 강의에 적합합니다. 정확도는 small, medium보다 낮을 수 있습니다."
+msgstr "The base model is fastest and works well for tests or short lectures. Accuracy may be lower than small or medium."
+
+msgid "small 모델은 속도와 정확도의 균형이 좋아 일반적인 강의 분석에 적합합니다. base보다 느리지만 전사 품질이 더 안정적입니다."
+msgstr "The small model balances speed and accuracy for typical lectures. It is slower than base but more stable."
+
+msgid "medium 모델은 정확도가 높지만 CPU 환경에서는 분석 시간이 크게 증가할 수 있습니다. 고성능 PC 또는 정확도가 중요한 강의에 적합합니다."
+msgstr "The medium model is more accurate but can be much slower on CPU. Use it on a high-spec PC or when accuracy matters."
+
+msgid "1개는 가장 안정적이며 저사양 PC에 적합합니다. 대신 분석 시간이 길어질 수 있습니다."
+msgstr "1 worker is the most stable and fits low-spec PCs, but analysis may take longer."
+
+msgid "2개는 안정성과 속도의 균형이 좋아 노트북 환경에서 무난하게 사용할 수 있습니다."
+msgstr "2 workers balance stability and speed well on laptops."
+
+msgid "4개는 고성능 PC에 적합합니다. CPU와 메모리 사용량이 높아질 수 있습니다."
+msgstr "4 workers fit high-spec PCs. CPU and memory use may be high."
+
+msgid "역사/인문학은 인물, 사건, 시대 배경, 인과관계를 중심으로 요약합니다."
+msgstr "History / humanities summaries focus on people, events, context, and cause-and-effect."
+
+msgid "프로그래밍/IT는 기술 스택, 코드 흐름, 함수, 실습 과정, 오류 해결을 중심으로 요약합니다."
+msgstr "Programming / IT summaries focus on stacks, code flow, functions, practice, and troubleshooting."
+
+msgid "수학/과학은 핵심 개념, 공식, 원리, 문제 풀이 과정을 중심으로 요약합니다."
+msgstr "Math / science summaries focus on concepts, formulas, principles, and solutions."
+
+msgid "GPT API는 OpenAI 기반 요약 방식입니다. 기존 요약 구조와 출력 형식은 유지하고, 요약 호출 API만 GPT로 변경합니다."
+msgstr "The GPT API uses OpenAI for summaries while keeping the existing structure and output format."
+
+msgid "답안 검수"
+msgstr "Answer review"
+
+msgid "학습 관리로"
+msgstr "Back to learning admin"
+
+msgid "자동 채점된 답안을 검토하고 사람 라벨·점수를 부여하세요."
+msgstr "Review auto-graded answers and assign human labels and scores."
+
+msgid "검색 결과"
+msgstr "Search results"
+
+msgid "건"
+msgstr "​"
+
+msgid "검수"
+msgstr "Reviewed"
+
+msgid "검색"
+msgstr "Search"
+
+msgid "사용자 / 강의 / 문제 / 답안 내용"
+msgstr "User / lecture / question / answer"
+
+msgid "강의"
+msgstr "Lecture"
+
+msgid "전체"
+msgstr "All"
+
+msgid "차수"
+msgstr "Round"
+
+msgid "자동 라벨"
+msgstr "Auto label"
+
+msgid "검수 상태"
+msgstr "Review status"
+
+msgid "검수 대기"
+msgstr "Pending review"
+
+msgid "검수 완료"
+msgstr "Review complete"
+
+msgid "표시"
+msgstr "shown"
+
+msgid "전체 검수 진행:"
+msgstr "Overall review progress:"
+
+msgid "사용자"
+msgstr "User"
+
+msgid "제출 답안"
+msgstr "Submitted answer"
+
+msgid "점수"
+msgstr "Score"
+
+msgid "제출 시각"
+msgstr "Submitted at"
+
+msgid "(빈 답안)"
+msgstr "(empty answer)"
+
+msgid "미판정"
+msgstr "Unlabeled"
+
+msgid "사람 라벨"
+msgstr "Human label"
+
+msgid "미검수"
+msgstr "Not reviewed"
+
+msgid "사람 점수"
+msgstr "Human score"
+
+msgid "조건에 맞는 답안이 없습니다."
+msgstr "No answers match these filters."
+
+msgid "답안 목록 페이지"
+msgstr "Answer list pages"
+
+msgid "학습 데이터 현황과 답안 검수를 한곳에서 관리합니다."
+msgstr "Review learning stats and grade answers in one place."
+
+msgid "전체 강의"
+msgstr "All lectures"
+
+msgid "분석 완료 강의"
+msgstr "Analyzed lectures"
+
+msgid "전체 문제"
+msgstr "All questions"
+
+msgid "제출된 답안"
+msgstr "Submitted answers"
+
+msgid "최근 제출된 답안"
+msgstr "Recent submitted answers"
+
+msgid "강의 / 차수 / 번호"
+msgstr "Lecture / round / number"
+
+msgid "자동 점수"
+msgstr "Auto score"
+
+msgid "검수됨"
+msgstr "Reviewed"
+
+msgid "대기"
+msgstr "Pending"
+
+msgid "아직 제출된 답안이 없습니다."
+msgstr "No answers have been submitted yet."
+
+msgid "사용자 목록"
+msgstr "User list"
+
+msgid "등록된 사용자와 프로필 정보를 확인·수정합니다."
+msgstr "View and edit registered users and profiles."
+
+msgid "명"
+msgstr "​"
+
+msgid "아이디 / 이름 / 이메일"
+msgstr "Username / name / email"
+
+msgid "권한"
+msgstr "Role"
+
+msgid "강의 수"
+msgstr "Lectures"
+
+msgid "가입일"
+msgstr "Joined"
+
+msgid "관리"
+msgstr "Manage"
+
+msgid "관리자"
+msgstr "Admin"
+
+msgid "일반"
+msgstr "Regular"
+
+msgid "비활성"
+msgstr "Inactive"
+
+msgid "프로필 수정"
+msgstr "Edit profile"
+
+msgid "답안"
+msgstr "Answers"
+
+msgid "본인 권한은 변경할 수 없습니다."
+msgstr "You cannot change your own role."
+
+msgid "실명 또는 표시 이름"
+msgstr "Real or display name"
+
+msgid "예) 25"
+msgstr "e.g. 25"
+
+msgid "연락처"
+msgstr "Contact"
+
+msgid "자격/전공"
+msgstr "Certification / major"
+
+msgid "자격증, 전공, 직무 등"
+msgstr "Certification, major, job, etc."
+
+msgid "가입 목적"
+msgstr "Purpose for joining"
+
+msgid "서비스 이용 목적"
+msgstr "Why you use the service"
+
+msgid "관심 있는 학습 주제"
+msgstr "Topics you want to study"
+
+msgid "닫기"
+msgstr "Close"
+
+msgid "프로필이 없습니다. 저장 시 새로 생성됩니다."
+msgstr "No profile yet. Saving will create one."
+
+msgid "조건에 맞는 사용자가 없습니다."
+msgstr "No users match these filters."
+
+msgid "사용자 목록 페이지"
+msgstr "User list pages"
+
+msgid "일반 사용자"
+msgstr "Regular user"
+
+msgid "운영자"
+msgstr "Staff"
+
+msgid "비활성화"
+msgstr "Inactive"
+
+msgid "POST만 허용됩니다."
+msgstr "POST only."
+
+msgid "잘못된 요청입니다."
+msgstr "Invalid request."
+
+msgid "날짜 형식이 올바르지 않습니다."
+msgstr "Invalid date format."
+
+msgid "메모는 500자까지 입력할 수 있습니다."
+msgstr "Memos can be up to 500 characters."
+
+msgid "%(username)s님, 환영합니다!"
+msgstr "Welcome, %(username)s!"
+
+msgid "아이디 또는 비밀번호가 올바르지 않습니다."
+msgstr "Username or password is incorrect."
+
+msgid "회원가입이 완료되었습니다. 로그인해주세요."
+msgstr "Sign up is complete. Please log in."
+
+msgid "회원가입에 실패했습니다. 입력값을 다시 확인해주세요."
+msgstr "Sign up failed. Please check your input."
+
+msgid "지원하지 않는 영상 형식입니다. (%(ext)s)"
+msgstr "Unsupported video format. (%(ext)s)"
+
+msgid "확장자 없음"
+msgstr "no extension"
+
+msgid "영상 파일은 500MB 이하여야 합니다."
+msgstr "Video files must be 500MB or smaller."
+
+msgid "제목 없는 강의"
+msgstr "Untitled lecture"
+
+msgid "유튜브 링크를 입력해 주세요."
+msgstr "Please enter a YouTube link."
+
+msgid "요약이 아직 없습니다."
+msgstr "There is no summary yet."
+
+msgid "PDF 생성에 실패했습니다. static/fonts/NotoSansKR-Regular.ttf 파일을 확인해 주세요."
+msgstr "PDF generation failed. Check static/fonts/NotoSansKR-Regular.ttf."
+
+msgid "올바르지 않은 권한 값입니다."
+msgstr "Invalid role value."
+
+msgid "본인 계정은 비활성화할 수 없습니다."
+msgstr "You cannot deactivate your own account."
+
+msgid "본인 계정의 관리자 권한은 해제할 수 없습니다."
+msgstr "You cannot remove admin access from your own account."
+
+msgid "%(username)s님의 답안 검수 결과를 저장했습니다."
+msgstr "Saved review results for %(username)s."
+
+msgid "%(username)s님의 프로필과 권한을 저장했습니다."
+msgstr "Saved profile and role for %(username)s."
+
+msgid "부분 정답"
+msgstr "Partially correct"
+
+msgid "lecture_id가 전달되지 않았습니다."
+msgstr "lecture_id was not provided."
+
+msgid "오디오 추출 또는 분할에 실패했습니다."
+msgstr "Audio extraction or splitting failed."
+
+msgid "일부 구간 STT에 실패했습니다: %(names)s"
+msgstr "STT failed for some segments: %(names)s"
+
+msgid "STT 결과가 비어 있습니다."
+msgstr "The speech-to-text result is empty."
+
+msgid "클릭하면 이 시점부터 영상이 재생됩니다"
+msgstr "Click to play the video from this timestamp"
+
+msgid "메모 내용"
+msgstr "Memo text"
+
+msgctxt "date-month-suffix"
+msgid "월"
+msgstr "​"
+
+msgctxt "date-day-suffix"
+msgid "일"
+msgstr "​"
+

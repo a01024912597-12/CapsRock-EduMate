@@ -1,267 +1,267 @@
+{% load i18n static %}
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="UTF-8">
-    <title>EduMate</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f5f6fa;
-        }
-        header {
-            background-color: #2f3640;
-            color: white;
-            padding: 20px;
-            text-align: center;
-        }
-        nav {
-            background-color: #dcdde1;
-            padding: 10px;
-            text-align: center;
-        }
-        nav a {
-            margin: 0 15px;
-            text-decoration: none;
-            color: #2f3640;
-            font-weight: bold;
-        }
-        .container {
-            width: 80%;
-            margin: 30px auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-        }
-        h2 {
-            margin-top: 0;
-        }
-        button {
-            padding: 10px 16px;
-            border: none;
-            background-color: #273c75;
-            color: white;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-        input, textarea {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0 20px 0;
-            box-sizing: border-box;
-        }
-
-        /* 모달 배경 (어둡게 처리) */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            z-index: 9999;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.6); /* 배경 흐림 효과 */
-        }
-
-        /* 모달 박스 */
-        .modal-content {
-            background-color: white;
-            margin: 10% auto;
-            padding: 40px;
-            border-radius: 12px;
-            width: 360px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            position: relative;
-            animation: fadeIn 0.3s ease-out; /* 나타날 때 애니메이션 */
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* 닫기 버튼 */
-        .close-btn {
-            position: absolute;
-            right: 20px;
-            top: 15px;
-            cursor: pointer;
-            font-size: 28px;
-            color: #aaa;
-        }
-
-        .close-btn:hover {
-            color: #000;
-        }
-
-        /* 내부 요소 스타일 */
-        .modal-title {
-            text-align: center;
-            margin-bottom: 25px;
-            color: #2f3640;
-        }
-
-        .input-group {
-            margin-bottom: 15px;
-            text-align: left;
-        }
-
-        .input-group label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
-
-        .login-submit-btn {
-            width: 100%;
-            padding: 12px;
-            background-color: #273c75;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-
-        .login-submit-btn:hover {
-            background-color: #1e2d5a;
-        }
-
-        .alert.error {
-            background-color: #e84118; /* 빨간색 경고 */
-            color: white;
-            padding: 15px;
-            margin: 10px auto;
-            width: 80%;
-            border-radius: 6px;
-            text-align: center;
-            font-weight: bold;
-            animation: slideDown 0.5s ease-out;
-        }
-
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-    </style>
-</head>
-
-<body>
-    <header>
-        <h1>EduMate</h1>
-        <p>AI 기반 강의 이해도 분석 및 학습 지원 시스템</p>
-    </header>
-
-    <nav>
-    <a href="{% url 'home' %}">홈</a>
-    {% if user.is_authenticated %}
-        <a href="{% url 'upload' %}">강의 업로드</a>
-        <a href="{% url 'history' %}">내 히스토리</a>
-        <a href="{% url 'logout' %}" style="color: #c23616;">로그아웃</a>
-    {% else %}
-        <a href="javascript:void(0);" onclick="openLogin()">로그인</a>
-        <a href="{% url 'signup' %}">회원가입</a>
-    {% endif %}
-    </nav>
-
-    {% if messages %}
-        <div id="message-container" style="width: 80%; margin: 10px auto; position: relative; z-index: 10000;">
-            {% for message in messages %}
-                <div class="alert {{ message.tags }}" style="
-                        padding: 15px;
-                        margin-bottom: 10px;
-                        border-radius: 6px;
-                        color: white;
-                        font-weight: bold;
-                        text-align: center;
-                        /* 성공은 초록색, 나머지는 빨간색 */
-                        background-color: {% if message.tags == 'success' %}#2ecc71{% else %}#e84118{% endif %};
-                        animation: slideDown 0.5s ease-out;
-                        ">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        </div>
-    {% endif %}
-
-    <div class="container">
-        {% block content %}
-        {% endblock %}
-    </div>
-
-    <div id="loginModal" class="modal-overlay">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeLogin()">&times;</span>
-            <h2 class="modal-title">EduMate 로그인</h2>
-
-            <form id="modalLoginForm" method="post" action="{% url 'login' %}">
-                {% csrf_token %}
-                <div class="input-group">
-                    <label>아이디</label>
-                    <input type="text" name="username" placeholder="아이디를 입력하세요" required>
-                </div>
-                <div class="input-group">
-                    <label>비밀번호</label>
-                    <input type="password" name="password" placeholder="비밀번호를 입력하세요" required>
-                </div>
-                <button type="submit" class="login-submit-btn">로그인</button>
-            </form>
-        </div>
-    </div>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}EduMate{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/edumate-gradient.css' %}?v=20260909">
     <script>
-        function openLogin() {
-            document.getElementById('loginModal').style.display = 'block';
-        }
-
-        function closeLogin() {
-            document.getElementById('loginModal').style.display = 'none';
-        }
-
-        // 모달 바깥 영역 클릭 시 닫기
-        window.onclick = function (event) {
-            const modal = document.getElementById('loginModal');
-            if (event.target == modal) {
-                closeLogin();
-            }
-        }
-
-        // 메시지가 있을 경우 3초 뒤에 사라지게 함
-        setTimeout(function () {
-            const msgContainer = document.getElementById('message-container');
-            if (msgContainer) {
-                msgContainer.style.transition = "opacity 0.5s ease";
-                msgContainer.style.opacity = "0";
-                setTimeout(() => msgContainer.remove(), 500);
-            }
-        }, 3000);
+        (function () {
+            try {
+                if (localStorage.getItem('edumate-theme') === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                }
+            } catch (e) {}
+        })();
     </script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="edumate-app">
+
+{% if user.is_authenticated %}
+    <aside class="sidebar">
+        <a href="{% url 'home' %}" class="sidebar-logo">
+            <div class="sidebar-logo-icon"><i class="fas fa-graduation-cap"></i></div>
+            <div class="sidebar-logo-text">
+                <strong>EduMate</strong>
+                <span>{% trans "AI 학습 플랫폼" %}</span>
+            </div>
+        </a>
+        <nav class="sidebar-nav">
+            <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                <i class="fas fa-home"></i> {% trans "홈 대시보드" %}
+            </a>
+            <a href="{% url 'upload' %}" class="{% if request.resolver_match.url_name == 'upload' %}active{% endif %}">
+                <i class="fas fa-cloud-upload-alt"></i> {% trans "강의 업로드" %}
+            </a>
+            <a href="{% url 'history' %}" class="{% if request.resolver_match.url_name == 'history' %}active{% endif %}">
+                <i class="fas fa-history"></i> {% trans "내 히스토리" %}
+            </a>
+            {% if user.is_staff %}
+            <a href="{% url 'manage_dashboard' %}" class="{% if request.resolver_match.url_name == 'manage_dashboard' or request.resolver_match.url_name == 'manage_answers' or request.resolver_match.url_name == 'manage_users' %}active{% endif %}">
+                <i class="fas fa-tasks"></i> {% trans "학습 관리" %}
+            </a>
+            {% endif %}
+        </nav>
+        <div class="sidebar-bottom">
+            {% get_current_language as CURRENT_LANG %}
+            <form action="{% url 'set_language' %}" method="post" class="language-select-form" id="languageForm">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <div class="language-picker">
+                    <button type="button" class="language-picker-toggle" id="languagePickerToggle"
+                            aria-expanded="false" aria-controls="languagePickerMenu" aria-haspopup="listbox"
+                            aria-label="{% trans '언어' %}">
+                        <span class="lang-flag">
+                            {% if CURRENT_LANG == 'en' %}
+                                {% include 'includes/lang_flag.html' with code='en' %}
+                            {% elif CURRENT_LANG == 'zh-hans' %}
+                                {% include 'includes/lang_flag.html' with code='zh' %}
+                            {% else %}
+                                {% include 'includes/lang_flag.html' with code='ko' %}
+                            {% endif %}
+                        </span>
+                        <span class="language-picker-label">
+                            {% if CURRENT_LANG == 'en' %}English
+                            {% elif CURRENT_LANG == 'zh-hans' %}中文
+                            {% else %}한국어{% endif %}
+                        </span>
+                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                    </button>
+                    <ul class="language-picker-menu" id="languagePickerMenu" role="listbox" hidden>
+                        <li role="none">
+                            <button type="submit" name="language" value="ko" role="option"
+                                    {% if CURRENT_LANG == 'ko' %}aria-selected="true" class="is-selected"{% else %}aria-selected="false"{% endif %}>
+                                <span class="lang-flag">{% include 'includes/lang_flag.html' with code='ko' %}</span>
+                                한국어
+                            </button>
+                        </li>
+                        <li role="none">
+                            <button type="submit" name="language" value="en" role="option"
+                                    {% if CURRENT_LANG == 'en' %}aria-selected="true" class="is-selected"{% else %}aria-selected="false"{% endif %}>
+                                <span class="lang-flag">{% include 'includes/lang_flag.html' with code='en' %}</span>
+                                English
+                            </button>
+                        </li>
+                        <li role="none">
+                            <button type="submit" name="language" value="zh-hans" role="option"
+                                    {% if CURRENT_LANG == 'zh-hans' %}aria-selected="true" class="is-selected"{% else %}aria-selected="false"{% endif %}>
+                                <span class="lang-flag">{% include 'includes/lang_flag.html' with code='zh' %}</span>
+                                中文
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+            <button type="button" id="themeToggle" class="theme-toggle" onclick="toggleTheme()"
+                    data-label-dark="{% trans '다크 모드' %}"
+                    data-label-light="{% trans '라이트 모드' %}">
+                <i class="fas fa-moon"></i>
+                <span>{% trans "다크 모드" %}</span>
+            </button>
+            <a href="{% url 'logout' %}"><i class="fas fa-sign-out-alt"></i> {% trans "로그아웃" %}</a>
+        </div>
+    </aside>
+
+    <div class="page-wrapper">
+        <header class="topbar">
+            <div class="topbar-breadcrumb">
+                <a href="{% url 'home' %}">EduMate</a>
+                <span class="sep">›</span>
+                <span class="current">{% block breadcrumb %}{% trans "페이지" %}{% endblock %}</span>
+            </div>
+            <div class="topbar-right">
+                <div class="user-badge">
+                    <div class="user-avatar">{{ user_display_initial }}</div>
+                    {{ user_display_name }} {% trans "님" %}
+                </div>
+            </div>
+        </header>
+
+        <div class="page-content{% block page_content_class %}{% endblock %}">
+{% else %}
+    <div class="guest-wrap">
+        <div class="sidebar-logo-icon" style="width:56px;height:56px;font-size:24px;margin-bottom:20px;">
+            <i class="fas fa-graduation-cap"></i>
+        </div>
+        <h1>EduMate</h1>
+        <p>{% trans "AI 기반 강의 이해도 분석 및 학습 지원 시스템" %}</p>
+{% endif %}
+
+            {% if messages %}
+            <div id="message-container" class="message-container{% if not user.is_authenticated %} message-container--guest{% endif %}">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if not user.is_authenticated %}
+            <div class="guest-actions">
+                <button type="button" class="btn-primary" style="flex:0 1 auto;padding:12px 28px;" onclick="openLogin()">
+                    <i class="fas fa-sign-in-alt"></i> {% trans "로그인" %}
+                </button>
+                <a href="{% url 'signup' %}" class="btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
+                    {% trans "회원가입" %}
+                </a>
+            </div>
+            {% endif %}
+
+            {% block page_header %}{% endblock %}
+
+            {% block content_area %}
+            <div class="legacy-content{% if not user.is_authenticated %} legacy-content--guest{% endif %}">
+                {% block content %}{% endblock %}
+            </div>
+            {% endblock %}
+
+{% if user.is_authenticated %}
+        </div>
+    </div>
+{% else %}
+    </div>
+{% endif %}
+
+<div id="loginModal" class="modal-overlay">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeLogin()">&times;</span>
+        <h2 class="modal-title">{% trans "EduMate 로그인" %}</h2>
+        <form id="modalLoginForm" method="post" action="{% url 'login' %}">
+            {% csrf_token %}
+            <div class="input-group">
+                <label>{% trans "아이디" %}</label>
+                <input type="text" name="username" placeholder="{% trans '아이디를 입력하세요' %}" required>
+            </div>
+            <div class="input-group">
+                <label>{% trans "비밀번호" %}</label>
+                <input type="password" name="password" placeholder="{% trans '비밀번호를 입력하세요' %}" required>
+            </div>
+            <button type="submit" class="login-submit-btn">{% trans "로그인" %}</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    function toggleTheme() {
+        const html = document.documentElement;
+        const isDark = html.getAttribute('data-theme') === 'dark';
+        if (isDark) {
+            html.removeAttribute('data-theme');
+            try { localStorage.setItem('edumate-theme', 'light'); } catch (e) {}
+        } else {
+            html.setAttribute('data-theme', 'dark');
+            try { localStorage.setItem('edumate-theme', 'dark'); } catch (e) {}
+        }
+        updateThemeToggle();
+    }
+
+    function updateThemeToggle() {
+        const btn = document.getElementById('themeToggle');
+        if (!btn) return;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        btn.querySelector('i').className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+        btn.querySelector('span').textContent = isDark
+            ? (btn.dataset.labelLight || '라이트 모드')
+            : (btn.dataset.labelDark || '다크 모드');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        updateThemeToggle();
+
+        const toggle = document.getElementById('languagePickerToggle');
+        const menu = document.getElementById('languagePickerMenu');
+        const picker = toggle && toggle.closest('.language-picker');
+        if (!toggle || !menu || !picker) return;
+
+        function closeLanguageMenu() {
+            menu.hidden = true;
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+
+        toggle.addEventListener('click', function (event) {
+            event.stopPropagation();
+            const willOpen = menu.hidden;
+            menu.hidden = !willOpen;
+            toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        });
+
+        picker.addEventListener('click', function (event) {
+            event.stopPropagation();
+        });
+
+        document.addEventListener('click', closeLanguageMenu);
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') closeLanguageMenu();
+        });
+    });
+
+    function openLogin() {
+        document.getElementById('loginModal').style.display = 'block';
+    }
+
+    function closeLogin() {
+        document.getElementById('loginModal').style.display = 'none';
+    }
+
+    window.onclick = function (event) {
+        const modal = document.getElementById('loginModal');
+        if (event.target === modal) {
+            closeLogin();
+        }
+    };
+
+    setTimeout(function () {
+        const msgContainer = document.getElementById('message-container');
+        if (msgContainer) {
+            msgContainer.style.transition = 'opacity 0.5s ease';
+            msgContainer.style.opacity = '0';
+            setTimeout(function () { msgContainer.remove(); }, 500);
+        }
+    }, 3000);
+</script>
+{% block extra_scripts %}{% endblock %}
 </body>
 </html>

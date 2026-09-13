@@ -1,105 +1,534 @@
 {% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "정답 및 오답 확인" %} — EduMate{% endblock %}
+{% block breadcrumb %}{% trans "정답 및 오답 확인" %}{% endblock %}
 
 {% block content %}
-<h2>모범 답안 확인하기</h2>
+<style>
+    .answer-result-header {
+        background: var(--bg-card);
+        color: var(--text-main);
+        border-radius: 18px;
+        padding: 30px;
+        text-align: center;
+        box-shadow: var(--shadow-md);
+        margin-bottom: 28px;
+        border: 1px solid var(--border2);
+    }
 
-<p><strong>강의 제목:</strong> {{ lecture.title }}</p>
+    .answer-result-header .lecture-pill {
+        background: var(--grad-soft2);
+        color: var(--accent);
+        border: 1px solid rgba(99, 102, 241, 0.25);
+        padding: 6px 13px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 800;
+        display: inline-block;
+        margin-bottom: 14px;
+    }
 
-<div style="background: #f8f9fa; border-left: 5px solid #44bd32; padding: 15px; border-radius: 8px; margin: 20px 0;">
-    <p style="margin: 0;">
-        현재 차수의 저장해 둔 내 답안과 모범 답안을 확인할 수 있습니다.
-    </p>
-</div>
+    .answer-result-header h2 {
+        margin: 0 0 18px;
+        font-size: 28px;
+        font-weight: 850;
+        color: var(--text-main);
+    }
 
-{% if selected_quiz %}
-<div style="background: white; border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-bottom: 25px;">
-    <h3 style="margin-top: 0;">퀴즈 차수 선택</h3>
-    <div style="margin-bottom: 0;">
-        {% for quiz in quizzes %}
-            <a href="{% url 'quiz_answer' %}?lecture_id={{ lecture.id }}&generation={{ quiz.generation_number }}"
-               style="
-                    display: inline-block;
-                    padding: 8px 14px;
-                    margin-right: 8px;
-                    margin-bottom: 8px;
-                    border-radius: 6px;
-                    text-decoration: none;
-                    {% if selected_quiz.id == quiz.id %}
-                        background-color: #273c75;
-                        color: white;
-                    {% else %}
-                        background-color: #dcdde1;
-                        color: #2f3640;
-                    {% endif %}
-               ">
-                {{ quiz.generation_number }}차 답안
-            </a>
-        {% endfor %}
-    </div>
-</div>
+    .answer-score-row {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 18px;
+    }
 
-<h3>{{ selected_quiz.generation_number }}차 모범 답안</h3>
-{% endif %}
+    .answer-score-box {
+        background: var(--bg-card2);
+        border: 1px solid var(--border2);
+        padding: 16px 30px;
+        border-radius: 14px;
+        min-width: 130px;
+    }
 
-{% if quiz_items %}
-    {% for item in quiz_items %}
-        <div style="background: white; border: 1px solid #ddd; border-radius: 12px; padding: 22px; margin-top: 20px;">
-            <h3 style="margin-top: 0; color: #273c75;">{{ item.number }}번 문제</h3>
+    .answer-score-box span {
+        display: block;
+        font-size: 14px;
+        color: var(--text-sub);
+        margin-bottom: 6px;
+    }
 
-            <div style="background: #f1f3f5; padding: 15px; border-radius: 8px; line-height: 1.7; white-space: pre-wrap;">
-                {{ item.question }}
-            </div>
+    .answer-score-box strong {
+        font-size: 31px;
+        font-weight: 900;
+        color: #22c55e;
+    }
 
-            <div style="margin-top: 16px; background: #e8f4fc; border-left: 4px solid #3498db; padding: 14px; border-radius: 8px; line-height: 1.7;">
-                <strong style="color: #2c3e50;">내가 입력한 답안</strong>
-                <div style="margin-top: 8px; white-space: pre-wrap; color: #2f3640;">{% if item.saved_answer %}{{ item.saved_answer }}{% else %}저장된 답이 없습니다. 예상 문제 화면에서 답 입력 후 내 답안 저장을 눌러 주세요.{% endif %}</div>
-            </div>
+    .answer-layout {
+        display: grid;
+        grid-template-columns: 250px minmax(0, 1fr);
+        gap: 28px;
+        align-items: start;
+    }
 
-            <button type="button"
-                    onclick="toggleAnswer('answer-{{ forloop.counter }}', this)"
-                    style="margin-top: 15px; background-color: #e67e22; padding: 10px 16px;">
-                모범 답안 보기
-            </button>
+    .answer-side-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border2);
+        border-radius: 18px;
+        overflow: hidden;
+        position: sticky;
+        top: 20px;
+        box-shadow: var(--shadow-sm);
+    }
 
-            <div id="answer-{{ forloop.counter }}"
-                style="display: none; margin-top: 15px; background: #fff8e1; border-left: 5px solid #f39c12; padding: 15px; border-radius: 8px; line-height: 1.7; white-space: pre-wrap;">
-                <strong>모범 답안</strong><br><br>
-                {{ item.answer }}
-            </div>
-        </div>
-    {% endfor %}
-{% else %}
-    <div style="background: white; border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-top: 20px;">
-        <pre style="white-space: pre-wrap; line-height: 1.7; font-family: inherit;">{{ quiz_text }}</pre>
-        <div style="margin-top: 16px; background: #e8f4fc; border-left: 4px solid #3498db; padding: 14px; border-radius: 8px; line-height: 1.7;">
-            <strong style="color: #2c3e50;">내가 입력한 답안</strong>
-            <div style="margin-top: 8px; white-space: pre-wrap; color: #2f3640;">{% if raw_user_answer %}{{ raw_user_answer }}{% else %}저장된 답이 없습니다.{% endif %}</div>
-        </div>
-    </div>
-{% endif %}
+    .answer-side-title {
+        background: #334155;
+        color: #ffffff;
+        padding: 15px 18px;
+        font-weight: 800;
+        font-size: 14px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    }
 
-<div style="margin-top: 30px; text-align: center;">
-    <button onclick="location.href='{% url 'quiz' %}?lecture_id={{ lecture.id }}{% if selected_quiz %}&generation={{ selected_quiz.generation_number }}{% endif %}'" style="background-color: #273c75; padding: 12px 24px;">
-        예상 문제로 돌아가기
-    </button>
-    <button onclick="location.href='{% url 'feedback' %}?lecture_id={{ lecture.id }}'" style="background-color: #44bd32; padding: 12px 24px; margin-left: 10px;">
-        학습 피드백 보기
-    </button>
-</div>
+    .answer-generation-link {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border);
+        text-decoration: none;
+        color: var(--accent);
+        font-size: 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: 0.18s ease;
+        background: var(--bg-card);
+    }
 
-<script>
-    function toggleAnswer(answerId, button) {
-        const answerBox = document.getElementById(answerId);
+    .answer-generation-link:hover {
+        background: var(--bg-card2);
+        color: var(--text-main);
+    }
 
-        if (answerBox.style.display === "none") {
-            answerBox.style.display = "block";
-            button.textContent = "모범 답안 숨기기";
-            button.style.backgroundColor = "#c0392b";
-        } else {
-            answerBox.style.display = "none";
-            button.textContent = "모범 답안 보기";
-            button.style.backgroundColor = "#e67e22";
+    .answer-generation-link.active {
+        background: rgba(59, 130, 246, 0.12);
+        color: #2563eb;
+        font-weight: 800;
+        border-left: 4px solid #3b82f6;
+    }
+
+    .answer-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border2);
+        border-radius: 18px;
+        margin-bottom: 26px;
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+    }
+
+    .answer-card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        font-weight: 850;
+    }
+
+    .answer-card-head.correct {
+        background: #dcfce7;
+        color: #166534;
+        border-bottom: 1px solid #bbf7d0;
+    }
+
+    .answer-card-head.wrong {
+        background: #fee2e2;
+        color: #991b1b;
+        border-bottom: 1px solid #fecaca;
+    }
+
+    .answer-badge {
+        color: white;
+        padding: 4px 11px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 850;
+    }
+
+    .answer-badge.correct {
+        background: #16a34a;
+    }
+
+    .answer-badge.wrong {
+        background: #dc2626;
+    }
+
+    .answer-card-body {
+        padding: 22px 24px 24px;
+        background: var(--bg-card);
+    }
+
+    .answer-question-text {
+        color: var(--text-main);
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.85;
+        margin: 0 0 20px;
+        white-space: pre-wrap;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+    }
+
+    .answer-choice-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .answer-choice {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        align-items: center;
+        column-gap: 13px;
+        padding: 15px 18px;
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        color: #1f2937;
+        font-size: 15px;
+        line-height: 1.55;
+    }
+
+    .answer-choice.correct-choice {
+        background: #e8f5e9;
+        border-color: #a5d6a7;
+        color: #1b5e20;
+        font-weight: 800;
+    }
+
+    .answer-choice.user-wrong-choice {
+        background: #ffebee;
+        border-color: #ef9a9a;
+        color: #c62828;
+        font-weight: 800;
+    }
+
+    .answer-choice-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        background: #a0aec0;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 850;
+    }
+
+    .answer-choice.correct-choice .answer-choice-num {
+        background: #16a34a;
+    }
+
+    .answer-choice.user-wrong-choice .answer-choice-num {
+        background: #dc2626;
+    }
+
+    .choice-labels {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .choice-mini-badge {
+        font-size: 12px;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .choice-mini-badge.correct {
+        background: #16a34a;
+    }
+
+    .choice-mini-badge.user {
+        background: #dc2626;
+    }
+
+    .answer-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+    }
+
+    .answer-detail-box {
+        border: 1px solid var(--border2);
+        border-radius: 14px;
+        padding: 13px 14px;
+        background: var(--bg-card2);
+    }
+
+    .answer-detail-box span {
+        display: block;
+        color: var(--text-sub);
+        font-size: 13px;
+        margin-bottom: 6px;
+    }
+
+    .answer-detail-box strong {
+        color: var(--text-main);
+        font-size: 14px;
+        word-break: keep-all;
+    }
+
+    .answer-explanation {
+        margin-top: 16px;
+        background: var(--bg-card2);
+        border: 1px solid var(--border2);
+        border-radius: 14px;
+        padding: 15px 16px;
+        color: var(--text-sub);
+        line-height: 1.7;
+    }
+
+    .answer-explanation h4 {
+        margin: 0 0 8px;
+        color: var(--text-main);
+        font-size: 15px;
+    }
+
+    [data-theme="dark"] .answer-result-header {
+        background: #111827;
+        border-color: #253352;
+    }
+
+    [data-theme="dark"] .answer-result-header h2 {
+        color: #f8fafc;
+    }
+
+    [data-theme="dark"] .answer-score-box {
+        background: #1a2236;
+        border-color: #253352;
+    }
+
+    [data-theme="dark"] .answer-side-card,
+    [data-theme="dark"] .answer-card {
+        background: #1e293b;
+        border-color: #334155;
+    }
+
+    [data-theme="dark"] .answer-generation-link {
+        background: #111827;
+        color: #cbd5e1;
+        border-bottom-color: #253352;
+    }
+
+    [data-theme="dark"] .answer-generation-link:hover {
+        background: #1a2236;
+        color: #ffffff;
+    }
+
+    [data-theme="dark"] .answer-generation-link.active {
+        background: rgba(39, 60, 117, 0.30);
+        color: #93c5fd;
+    }
+
+    [data-theme="dark"] .answer-card-body {
+        background: #1e293b;
+    }
+
+    [data-theme="dark"] .answer-question-text {
+        color: #f8fafc;
+    }
+
+    [data-theme="dark"] .answer-detail-box,
+    [data-theme="dark"] .answer-explanation {
+        background: #0f172a;
+        border-color: #334155;
+    }
+
+    [data-theme="dark"] .answer-detail-box strong,
+    [data-theme="dark"] .answer-explanation h4 {
+        color: #f8fafc;
+    }
+
+    [data-theme="dark"] .answer-detail-box span,
+    [data-theme="dark"] .answer-explanation {
+        color: #cbd5e1;
+    }
+
+    @media (max-width: 900px) {
+        .answer-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .answer-side-card {
+            position: static;
+        }
+
+        .answer-detail-grid {
+            grid-template-columns: 1fr;
         }
     }
-</script>
+</style>
+
+<h2 class="app-page-title">
+    <span class="title-icon"><i class="fas fa-list-check"></i></span>
+    {% trans "정답 및 오답 확인" %}
+</h2>
+
+<p class="app-meta-line"><strong>{% trans "강의 제목:" %}</strong> {{ lecture.title }}</p>
+
+<div class="answer-result-header">
+    <span class="lecture-pill">{{ lecture.title }}</span>
+    {% if selected_quiz %}
+        <h2>{{ selected_quiz.generation_number }}{% trans "차 객관식 채점 결과" %}</h2>
+    {% else %}
+        <h2>{% trans "객관식 채점 결과" %}</h2>
+    {% endif %}
+
+    <div class="answer-score-row">
+        <div class="answer-score-box">
+            <span>{% trans "시험 점수" %}</span>
+            <strong>{{ score }}{% trans "점" %}</strong>
+        </div>
+        <div class="answer-score-box">
+            <span>{% trans "정답 개수" %}</span>
+            <strong>{{ correct_count }} / {{ total_count }}</strong>
+        </div>
+        <div class="answer-score-box">
+            <span>{% trans "오답 개수" %}</span>
+            <strong>{{ wrong_count }}</strong>
+        </div>
+    </div>
+</div>
+
+{% if not has_answers %}
+    <div class="app-panel">
+        <h3>{% trans "제출된 객관식 답안이 없습니다." %}</h3>
+        <p class="app-meta-line">
+            {% trans "먼저 객관식 문제 풀이 화면에서 답안을 제출해주세요." %}
+        </p>
+    </div>
+{% else %}
+    <div class="answer-layout">
+        <aside class="answer-side-card">
+            <div class="answer-side-title">
+                {% trans "퀴즈 차수 변경" %}
+            </div>
+
+            {% for quiz in quizzes %}
+                <a href="{% url 'quiz_answer' %}?lecture_id={{ lecture.id }}&generation={{ quiz.generation_number }}"
+                   class="answer-generation-link{% if selected_quiz and selected_quiz.id == quiz.id %} active{% endif %}">
+                    <span>{{ quiz.generation_number }}{% trans "차 결과" %}</span>
+                    {% if selected_quiz and selected_quiz.id == quiz.id %}
+                        <span>{% trans "현재" %}</span>
+                    {% else %}
+                        <span>{% trans "보기" %}</span>
+                    {% endif %}
+                </a>
+            {% endfor %}
+        </aside>
+
+        <main>
+            <h3 style="margin-top:0; margin-bottom:18px; color:var(--text-main);">
+                {% trans "문항별 채점 대조표" %}
+            </h3>
+
+            {% for item in result_items %}
+                <article class="answer-card">
+                    <div class="answer-card-head {% if item.is_correct %}correct{% else %}wrong{% endif %}">
+                        <span>{{ item.q_num }}{% trans "번 문제" %}</span>
+                        {% if item.is_correct %}
+                            <span class="answer-badge correct">{% trans "정답" %}</span>
+                        {% else %}
+                            <span class="answer-badge wrong">{% trans "오답" %}</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="answer-card-body">
+                        <p class="answer-question-text">{{ item.question_text }}</p>
+
+                        <div class="answer-choice-list">
+                            {% for choice in item.choices %}
+                                <div class="answer-choice
+                                            {% if choice.c_num|stringformat:'s' == item.correct_choice|stringformat:'s' %} correct-choice{% endif %}
+                                            {% if choice.c_num|stringformat:'s' == item.user_choice|stringformat:'s' and not item.is_correct %} user-wrong-choice{% endif %}">
+                                    <span class="answer-choice-num">{{ choice.c_num }}</span>
+
+                                    <span>{{ choice.choice_text }}</span>
+
+                                    <span class="choice-labels">
+                                        {% if choice.c_num|stringformat:'s' == item.correct_choice|stringformat:'s' %}
+                                            <span class="choice-mini-badge correct">{% trans "정답" %}</span>
+                                        {% endif %}
+                                        {% if choice.c_num|stringformat:'s' == item.user_choice|stringformat:'s' %}
+                                            <span class="choice-mini-badge user">{% trans "내 선택" %}</span>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="answer-detail-grid">
+                            <div class="answer-detail-box">
+                                <span>{% trans "내가 선택한 답" %}</span>
+                                {% if item.selected_text %}
+                                    <strong>{{ item.user_choice }}{% trans "번" %} · {{ item.selected_text }}</strong>
+                                {% else %}
+                                    <strong>{% trans "미선택" %}</strong>
+                                {% endif %}
+                            </div>
+
+                            <div class="answer-detail-box">
+                                <span>{% trans "정답" %}</span>
+                                <strong>{{ item.correct_choice }}{% trans "번" %} · {{ item.correct_text }}</strong>
+                            </div>
+
+                            <div class="answer-detail-box">
+                                <span>{% trans "관련 키워드" %}</span>
+                                <strong>{% if item.keyword %}{{ item.keyword }}{% else %}{% trans "근거 없음" %}{% endif %}</strong>
+                            </div>
+                        </div>
+
+                        {% if item.explanation %}
+                            <div class="answer-explanation">
+                                <h4>{% trans "해설" %}</h4>
+                                <p style="margin:0;">{{ item.explanation }}</p>
+                            </div>
+                        {% endif %}
+
+                        {% if item.timeline %}
+                            <div class="app-meta-sub" style="margin-top:14px;">
+                                · {% trans "관련 구간 :" %} {{ item.timeline }}
+                            </div>
+                        {% endif %}
+                    </div>
+                </article>
+            {% endfor %}
+        </main>
+    </div>
+{% endif %}
+
+<div class="page-actions page-actions--center">
+    <button type="button"
+            class="btn-app btn-app--primary"
+            onclick="location.href='{% url 'quiz' %}?lecture_id={{ lecture.id }}{% if selected_quiz %}&generation={{ selected_quiz.generation_number }}{% endif %}'">
+        {% trans "객관식 문제로 돌아가기" %}
+    </button>
+
+    {% if selected_quiz %}
+        <button type="button"
+                class="btn-app btn-app--green"
+                onclick="location.href='{% url 'feedback' %}?lecture_id={{ lecture.id }}&objective_generation={{ selected_quiz.generation_number }}&auto_generate_feedback=1'">
+            {% trans "오답 기반 서술형 피드백 받기" %}
+        </button>
+    {% endif %}
+
+    <button type="button"
+            class="btn-app btn-app--muted"
+            onclick="location.href='{% url 'history' %}'">
+        {% trans "히스토리로 돌아가기" %}
+    </button>
+</div>
 {% endblock %}

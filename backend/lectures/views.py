@@ -1,664 +1,342 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse
-from urllib.parse import urlparse, parse_qs
-from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from django.contrib.auth import login, logout
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.conf import settings
-from django.db.models import Exists, OuterRef, Count, Q, Max
-from django.utils import timezone
-from .models import Lecture, UserProfile, Quiz, QuizQuestion, QuizAnswer
-from google import genai
-from kiwipiepy import Kiwi
-from sentence_transformers import SentenceTransformer, util
-
-import yt_dlp
-import whisper
 import os
 import re
-import time
 import json
-import concurrent.futures
-import subprocess
-import glob
-import threading
-
-
-# =========================
-# 기본 경로 및 모델 설정
-# =========================
-
-ffmpeg_dir = os.path.join(settings.BASE_DIR, "tools", "ffmpeg", "bin")
-if ffmpeg_dir not in os.environ.get("PATH", ""):
-    os.environ["PATH"] += os.pathsep + ffmpeg_dir
-
-
-# Whisper 모델명 관리
-# base: 빠름 / small: 속도와 정확도 균형 / medium: 정확도는 높지만 CPU에서 매우 느림
-WHISPER_MODEL_NAME = "base"
-
-
-# 병렬 STT 설정
-# 고성능 환경 기준 base + workers=3 조합이 가장 빠르게 측정됨
-PARALLEL_MAX_WORKERS = 3
-
-# 오디오 분할 단위: 180초 = 3분
-AUDIO_SEGMENT_SECONDS = 180
-
-
-# Gemini API 설정
-GEMINI_MODEL_NAME = getattr(settings, "GEMINI_MODEL_NAME", "gemini-2.5-flash")
-
-_gemini_client = None
-
-
-def get_gemini_client():
-    """Gemini API 클라이언트를 지연 생성한다."""
-    global _gemini_client
-
-    if _gemini_client is None:
-        api_key = getattr(settings, "GEMINI_API_KEY", "").strip()
-
-        if not api_key:
-            raise ValueError(
-                "GEMINI_API_KEY가 설정되지 않았습니다. "
-                "PowerShell에서 $env:GEMINI_API_KEY='키값' 설정 후 서버를 다시 실행하세요."
-            )
-
-        _gemini_client = genai.Client(api_key=api_key)
-
-    return _gemini_client
-
-
-def gemini_generate_text(prompt):
-    """Gemini API를 호출하여 텍스트 응답을 반환한다.
-
-    503 UNAVAILABLE, 일시적 과부하 등에 대비해 재시도한다.
-    """
-    client = get_gemini_client()
-
-    retry_wait_seconds = [3, 7, 15]
-
-    last_error = None
-
-    for attempt, wait_seconds in enumerate(retry_wait_seconds, start=1):
-        try:
-            response = client.models.generate_content(
-                model=GEMINI_MODEL_NAME,
-                contents=prompt,
-            )
-
-            text = getattr(response, "text", "")
-
-            if text:
-                return text.strip()
-
-            print(f"[Gemini 경고] 응답 text가 비어 있습니다. attempt={attempt}")
-            return ""
-
-        except Exception as e:
-            last_error = e
-            error_text = str(e)
-
-            print(f"[Gemini 호출 에러] attempt={attempt} / {error_text}")
-
-            # 503, UNAVAILABLE, high demand 계열은 잠시 기다렸다 재시도
-            if (
-                "503" in error_text
-                or "UNAVAILABLE" in error_text
-                or "high demand" in error_text
-                or "temporarily" in error_text
-            ):
-                print(f"[Gemini 재시도 대기] {wait_seconds}초 후 재시도합니다.")
-                time.sleep(wait_seconds)
-                continue
-
-            # API 키 오류, 권한 오류 등은 재시도해도 의미 없을 수 있으므로 바로 종료
-            raise e
-
-    print(f"[Gemini 최종 실패] 모든 재시도 실패: {last_error}")
-    raise last_error
-
-
-# 각 스레드마다 Whisper 모델을 따로 가지게 하기 위한 저장소
-# 전역 모델 하나를 여러 스레드가 동시에 쓰면 Whisper/PyTorch 내부 오류가 날 수 있음
-thread_local = threading.local()
-
-
-def get_whisper_model():
-    """현재 스레드 전용 Whisper 모델을 가져온다."""
-    if not hasattr(thread_local, "whisper_model"):
-        print(f"[Whisper 로딩] thread 전용 모델 로딩 시작: {WHISPER_MODEL_NAME}")
-        thread_local.whisper_model = whisper.load_model(WHISPER_MODEL_NAME)
-        print(f"[Whisper 로딩] thread 전용 모델 로딩 완료: {WHISPER_MODEL_NAME}")
-
-    return thread_local.whisper_model
-
-
-# Sentence Transformers 모델명 관리
-# 한국어 포함 다국어 문장 유사도 계산용 모델
-SENTENCE_TRANSFORMER_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-sentence_model = SentenceTransformer(SENTENCE_TRANSFORMER_MODEL_NAME)
-
-
-# Kiwi 형태소 분석기
-kiwi = Kiwi()
-
-
-# =========================
-# 공통 유틸
-# =========================
-
-def extract_youtube_video_id(url):
-    """유튜브 URL에서 video_id를 추출한다.
-
-    지원 형식:
-    - https://www.youtube.com/watch?v=VIDEO_ID
-    - https://youtu.be/VIDEO_ID
-    """
-    parsed_url = urlparse(url)
-
-    if parsed_url.hostname in ["www.youtube.com", "youtube.com"]:
-        return parse_qs(parsed_url.query).get("v", [None])[0]
-
-    if parsed_url.hostname == "youtu.be":
-        return parsed_url.path.lstrip("/")
-
-    return None
-
-
-def preprocess_text(text):
-    """Whisper 전사 결과를 문장 단위로 정제한다."""
-    filler_words = ["음", "어", "그니까", "약간", "이제", "뭐랄까"]
-
-    text = re.sub(r"\s+", " ", text).strip()
-
-    raw_sentences = kiwi.split_into_sents(text)
-
-    processed_sentences = []
-    seen_sentences = set()
-
-    for sent in raw_sentences:
-        tokens = kiwi.tokenize(sent.text.strip())
-
-        refined_sent = ""
-
-        for token in tokens:
-            if token.form not in filler_words:
-                if token.tag.startswith("J") or token.tag.startswith("E") or token.tag.startswith("X"):
-                    refined_sent += token.form
-                else:
-                    refined_sent += " " + token.form
-
-        refined_sent = refined_sent.strip()
-        refined_sent = re.sub(r"\s+", " ", refined_sent)
-
-        if len(refined_sent) > 10 and refined_sent not in seen_sentences:
-            processed_sentences.append(refined_sent)
-            seen_sentences.add(refined_sent)
-
-    return processed_sentences
-
-
-def chunk_text(sentences, chunk_size=10):
-    """문장 리스트를 지정 개수 단위의 청크로 묶는다.
-
-    병렬 STT에서는 오디오를 시간 단위로 나누지만,
-    Gemini 요약 단계에서는 전사문을 다시 문장 단위로 나누어 요약한다.
-    """
-    chunks = []
-
-    for i in range(0, len(sentences), chunk_size):
-        chunk = " ".join(sentences[i:i + chunk_size])
-        if chunk.strip():
-            chunks.append(chunk)
-
-    return chunks
-
-
-def cleanup_audio_segments(segments=None):
-    """분석 후 남은 chunk 파일을 정리한다."""
-    base_dir = settings.BASE_DIR
-
-    target_files = []
-
-    if segments:
-        target_files.extend(segments)
-
-    target_files.extend(glob.glob(os.path.join(base_dir, "chunk_*.mp3")))
-
-    for file_path in set(target_files):
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except OSError:
-                pass
-
-
-def summarize_chunk(chunk_text):
-    """단일 청크를 Gemini API로 부분 요약한다.
-
-    팀원 작성 프롬프트를 기반으로 역사 강의의 고유명사와 인과관계를 최대한 보존한다.
-    """
-    try:
-        prompt = f"""너는 역사 교과서를 집필하는 '역사 전공 대학교수' AI이다.
-아래는 역사 강의의 일부 구간이다.
-이 구간에 등장하는 모든 인물, 연도, 지명, 조약, 국가 이름 등 '고유명사'를 하나도 빠짐없이 추출하고 사건의 인과관계를 요약하라.
-
-[요구사항]
-- 인물, 연도, 지명, 조약, 국가 이름 등 구체적인 고유명사를 최대한 빠뜨리지 말 것.
-- 인물, 지명 등 고유명사를 표기할 때 괄호 안에 한자나 영어를 병기하지 말고 오직 한글로만 깔끔하게 표기할 것.
-- 사건의 원인, 전개 과정, 결과가 드러나도록 정리할 것.
-- 모든 문장은 '~했다', '~이다', '~하다' 형식의 객관적인 평어체로 작성할 것.
-- 불필요한 잡담이나 반복 표현은 제거할 것.
-
-[출력 형식]
-1. 구간 핵심 요약
-2. 등장 고유명사 및 핵심 개념
-3. 사건의 인과관계
-4. 시험 포인트
-
-강의 내용:
-{chunk_text}
-"""
-
-        result = gemini_generate_text(prompt)
-
-        if not result:
-            return f"[부분 요약 생성 실패]\n{chunk_text}"
-
-        return result
-
-    except Exception as e:
-        print("Gemini chunk 요약 에러:", e)
-        return f"[부분 요약 생성 실패]\n{chunk_text}"
-
-
-def make_final_summary(chunk_summaries_text):
-    """여러 부분 요약을 하나의 최종 요약으로 통합한다.
-
-    Gemini API를 사용하여 역사 강의용 심층 분석 노트를 생성한다.
-    """
-    try:
-        prompt = f"""당신은 역사 교과서를 집필하는 '역사 전공 대학교수' AI입니다.
-다음은 유튜브 역사 강의 자막을 구간별로 세밀하게 분석한 내용입니다.
-
-이 내용을 바탕으로, 강의의 중요한 디테일을 놓치지 않고 학생이 복습할 수 있는 심층 분석 노트를 작성해 주세요.
-반드시 아래의 [요구사항]과 [출력 양식]을 지켜야 합니다.
-
-[요구사항]
-- 강의에 등장하는 모든 인물, 연도, 지명, 조약, 국가 이름 등의 구체적인 고유명사를 최대한 포함할 것.
-- 인물, 지명 등 고유명사를 표기할 때 괄호 안에 한자나 영어를 병기하지 말고 오직 한글로만 작성할 것.
-- 사건이 일어난 표면적 이유뿐만 아니라, 그 이면에 있는 경제적·정치적 원인까지 인과관계 중심으로 분석할 것.
-- 중복 내용은 줄이고, 강의 전체 흐름이 자연스럽게 이어지도록 정리할 것.
-- 모든 문장의 끝맺음은 '~했다', '~이다', '~하다' 형식의 객관적인 평어체로 통일할 것.
-
-[출력 양식]
-
-1. 심층 배경 및 전체 요약
-- 이 강의가 다루는 시대적 배경과 전체적인 역사적 흐름을 3~5개의 문단으로 서술할 것.
-
-2. 흐름별 상세 전개
-- 시대순 또는 사건의 발생 순서대로 [도입] - [전개] - [위기/절정] - [결말/영향] 단계로 나누어 설명할 것.
-- 각 단계마다 핵심 사건의 원인과 결과를 명확히 밝힐 것.
-
-3. 꼭 알아야 할 필수 개념 및 고유명사 사전
-- 강의에 등장하는 핵심 키워드를 7~10개 정도 선정할 것.
-- 각 키워드는 아래 형식으로 정리할 것.
-
-- 키워드 이름
-  - 구체적 의미 및 발생 원인
-  - 역사적 결과 및 영향
-
-4. 핵심 출제 포인트
-- 인과관계, 연도별 변화, 조약의 결과, 국가 간 관계 변화 등 시험에 나올 만한 내용을 불렛포인트로 정리할 것.
-
-강의 전사문 또는 부분 요약 리스트:
-{chunk_summaries_text}
-"""
-
-        result = gemini_generate_text(prompt)
-
-        if not result:
-            return chunk_summaries_text
-
-        return result
-
-    except Exception as e:
-        print("Gemini 최종 요약 에러:", e)
-        return chunk_summaries_text
-
-
-# =========================
-# 퀴즈 생성 / 파싱 / 저장
-# =========================
-
-def generate_quiz(summary_text, generation_number=1, previous_quiz_texts=""):
-    """요약문을 기반으로 서술형 예상문제 3개와 모범답안을 Gemini API로 생성한다."""
-    try:
-        previous_instruction = ""
-
-        if previous_quiz_texts:
-            previous_instruction = (
-                "\n\n이미 생성된 이전 차수의 문제는 아래와 같다. "
-                "새 문제는 이전 문제와 최대한 겹치지 않게 출제하라.\n"
-                f"{previous_quiz_texts}"
-            )
-
-        prompt = f"""너는 대학 시험 문제 출제자다.
-주어진 강의 요약을 바탕으로 복습용 서술형 예상 문제 3개와 각 문제의 모범 답안을 만들어라.
-
-이번 출력은 {generation_number}차 예상 문제이다.
-
-[출제 조건]
-- 학생이 시험 대비에 활용할 수 있도록 핵심 개념 중심으로 작성할 것.
-- 너무 단순한 암기형 문제보다 원인, 전개 과정, 결과, 의미를 설명하게 하는 문제를 출제할 것.
-- 강의 요약에 포함된 인물, 사건, 연도, 조약, 개념을 적절히 반영할 것.
-- 이전 차수 문제가 제공된 경우, 이전 문제와 최대한 겹치지 않게 출제할 것.
-
-[출력 형식]
-반드시 아래 형식을 그대로 지켜라.
-다른 제목, 불릿포인트, 표, 번호 형식을 추가하지 마라.
-
-1. 문제: ...
-모범 답안: ...
-
-2. 문제: ...
-모범 답안: ...
-
-3. 문제: ...
-모범 답안: ...
-
-{previous_instruction}
-
-강의 요약:
-{summary_text}
-"""
-
-        result = gemini_generate_text(prompt)
-
-        if not result:
-            return "퀴즈 생성 중 오류가 발생했습니다."
-
-        return result
-
-    except Exception as e:
-        print("Gemini 퀴즈 생성 에러:", e)
-        return "퀴즈 생성 중 오류가 발생했습니다."
-
-
-def parse_quiz_text(quiz_text):
-    """AI가 생성한 텍스트를 [문제/모범답안] 구조로 파싱한다."""
-    quiz_items = []
-
-    if not quiz_text:
-        return quiz_items
-
-    pattern = r"(\d+)\.\s*문제\s*:\s*(.*?)(?:\n|\r\n)\s*모범\s*답안\s*:\s*(.*?)(?=\n\s*\d+\.\s*문제\s*:|\Z)"
-    matches = re.findall(pattern, quiz_text, re.DOTALL)
-
-    for number, question, answer in matches:
-        quiz_items.append({
-            "number": number.strip(),
-            "question": question.strip(),
-            "answer": answer.strip(),
-            "explanation": "",
-        })
-
-    return quiz_items
-
-
-def save_quiz_questions_from_text(quiz, quiz_text):
-    """Quiz.quiz_text를 파싱하여 QuizQuestion에 개별 문제로 저장한다."""
-    quiz_items = parse_quiz_text(quiz_text)
-
-    if not quiz_items:
-        print("[퀴즈 저장] 파싱된 문제가 없어 QuizQuestion 저장을 건너뜁니다.")
-        return
-
-    QuizQuestion.objects.filter(quiz=quiz).delete()
-
-    for item in quiz_items:
-        try:
-            number = int(item.get("number", 1))
-        except (TypeError, ValueError):
-            number = 1
-
-        QuizQuestion.objects.create(
-            quiz=quiz,
-            number=number,
-            question_text=item.get("question", ""),
-            model_answer=item.get("answer", ""),
-            explanation=item.get("explanation", ""),
-        )
-
-    print(f"[퀴즈 저장] {quiz.generation_number}차 문제 {len(quiz_items)}개를 QuizQuestion에 저장했습니다.")
-
-
-def ensure_quiz_questions_exist(quiz):
-    """기존 quiz_text만 있고 QuizQuestion이 없는 경우 개별 문제를 생성한다."""
-    if not quiz.questions.exists() and quiz.quiz_text:
-        save_quiz_questions_from_text(quiz, quiz.quiz_text)
-
-
-# =========================
-# 답안 유사도 평가 / 답안 저장
-# =========================
-
-def calculate_similarity_score(model_answer, user_answer):
-    """모범 답안과 사용자 답안의 의미 유사도를 계산한다.
-
-    반환값:
-    - 0.0 ~ 1.0 사이의 유사도 점수
-    """
-    model_answer = (model_answer or "").strip()
-    user_answer = (user_answer or "").strip()
-
-    if not model_answer or not user_answer:
-        return 0.0
-
-    try:
-        embeddings = sentence_model.encode(
-            [model_answer, user_answer],
-            convert_to_tensor=True,
-        )
-        score = util.cos_sim(embeddings[0], embeddings[1]).item()
-        return round(float(score), 4)
-    except Exception as e:
-        print("[유사도 계산 에러]", e)
-        return 0.0
-
-
-def predict_answer_label(similarity_score):
-    """유사도 점수를 기반으로 1차 평가 라벨을 반환한다.
-
-    Sentence Transformers는 최종 채점기가 아니라 의미 유사도 측정 도구이므로,
-    단정적인 정답/오답 대신 가능성 중심의 라벨을 사용한다.
-    """
-    if similarity_score >= 0.75:
-        return "정답 가능성 높음"
-
-    if similarity_score >= 0.45:
-        return "검토 필요"
-
-    return "오답 가능성 높음"
-
-
-def _user_answers_dict(quiz):
-    """기존 호환용: Quiz.answer에 JSON으로 저장된 학습자 답안을 dict로 반환한다."""
-    raw = (getattr(quiz, "answer", None) or "").strip()
-    if not raw:
-        return {}
-
-    try:
-        data = json.loads(raw)
-    except (json.JSONDecodeError, TypeError, ValueError):
-        return {}
-
-    if not isinstance(data, dict):
-        return {}
-
-    return data
-
-
-def get_quiz_answer_dict_from_db(quiz, user):
-    """QuizAnswer 테이블에서 현재 사용자의 답안을 dict 형태로 가져온다."""
-    answer_dict = {}
-
-    answers = (
-        QuizAnswer.objects
-        .filter(user=user, quiz_question__quiz=quiz)
-        .select_related("quiz_question")
+from datetime import timedelta, datetime
+
+from django.conf import settings
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse, FileResponse, HttpResponse, Http404, HttpResponseRedirect
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
+from django.utils.translation import check_for_language, gettext as _, gettext_lazy as _lazy
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.contrib.auth import login, logout
+from django.contrib.auth.models import User
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db.models import Exists, OuterRef, Count, Q, Max, Avg, Value, Subquery
+from django.db.models.functions import Coalesce
+from django.utils import timezone, translation
+from django.urls import reverse, NoReverseMatch
+from django.core.paginator import Paginator
+
+from .models import Lecture, UserProfile, Quiz, QuizQuestion, QuizAnswer, StudyCalendarMemo
+from .lecture_thumbnail import capture_lecture_video_thumbnail
+from .utils.youtube_utils import extract_youtube_video_id
+from .utils.option_utils import (
+    normalize_whisper_model_name,
+    normalize_subject_code,
+    normalize_worker_count,
+    normalize_summary_api,
+)
+from .services.analysis_service import analyze_video_request
+from .services.tf_quiz_service import TF_QUIZ_TYPE, generate_tf_quiz_items, save_tf_questions
+from .services.objective_quiz_service import (
+    OBJECTIVE_QUIZ_TYPE,
+    FEEDBACK_QUIZ_TYPE,
+    generate_objective_quiz,
+    save_objective_questions_from_text,
+    build_objective_items_for_display,
+    get_objective_quizzes_for_lecture,
+)
+from .services.feedback_service import (
+    get_wrong_objective_items_from_quiz,
+    build_feedback_quiz_text_from_wrong_items,
+)
+from .services.subjective_quiz_service import (
+    generate_quiz,
+    save_quiz_questions_from_text,
+    build_quiz_items_for_display,
+    save_user_answers_to_quiz_answer,
+    split_quiz_reference,
+)
+
+# 페이지네이션/관리자 화면 설정
+HISTORY_PAGE_SIZE = 5
+MANAGE_ANSWER_PAGE_SIZE = 10
+MANAGE_USER_PAGE_SIZE = 10
+HUMAN_LABEL_CHOICES = ["", "정답", "부분 정답", "오답"]
+PREDICTED_LABEL_CHOICES = ["", "정답", "부분 정답", "오답"]
+_REVIEWED_Q = Q(human_label__isnull=False) & ~Q(human_label="")
+USER_ROLE_CHOICES = [
+    ("active", _lazy("일반 사용자")),
+    ("staff", _lazy("운영자")),
+    ("inactive", _lazy("비활성화")),
+]
+
+# 업로드 영상 파일 제한
+ALLOWED_LECTURE_VIDEO_EXTENSIONS = {
+    ".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v",
+}
+MAX_LECTURE_VIDEO_BYTES = 500 * 1024 * 1024
+
+LECTURE_VIDEO_MIME_TYPES = {
+    ".mp4": "video/mp4",
+    ".m4v": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".mkv": "video/x-matroska",
+}
+
+
+def _compute_study_streaks(activity_dates):
+    """활동한 날짜 집합에서 (현재 연속일, 최고 연속일)을 계산한다."""
+    if not activity_dates:
+        return 0, 0
+
+    sorted_dates = sorted(activity_dates)
+
+    longest = 1
+    run = 1
+    for prev_date, cur_date in zip(sorted_dates, sorted_dates[1:]):
+        gap = (cur_date - prev_date).days
+        if gap == 1:
+            run += 1
+        else:
+            run = 1
+        longest = max(longest, run)
+
+    today = timezone.localdate()
+    date_set = set(sorted_dates)
+
+    current = 0
+    if today in date_set:
+        cursor = today
+    elif (today - timedelta(days=1)) in date_set:
+        cursor = today - timedelta(days=1)
+    else:
+        cursor = None
+
+    while cursor is not None and cursor in date_set:
+        current += 1
+        cursor -= timedelta(days=1)
+
+    return current, longest
+
+
+def _supported_language_codes():
+    return {code for code, _label in settings.LANGUAGES}
+
+
+def _set_language_cookie(response, lang_code):
+    response.set_cookie(
+        settings.LANGUAGE_COOKIE_NAME,
+        lang_code,
+        max_age=settings.LANGUAGE_COOKIE_AGE,
+        path=settings.LANGUAGE_COOKIE_PATH,
+        domain=settings.LANGUAGE_COOKIE_DOMAIN,
+        secure=settings.LANGUAGE_COOKIE_SECURE,
+        httponly=settings.LANGUAGE_COOKIE_HTTPONLY,
+        samesite=settings.LANGUAGE_COOKIE_SAMESITE,
     )
 
-    for answer in answers:
-        answer_dict[str(answer.quiz_question.number)] = answer.user_answer
 
-    return answer_dict
-
-
-def save_user_answers_to_quiz_answer(user, quiz, post_data):
-    """POST로 넘어온 사용자 답안을 QuizAnswer 테이블에 저장한다.
-
-    저장 항목:
-    - 사용자 답안
-    - Sentence Transformers 유사도 점수
-    - 시스템 예측 라벨
-    """
-    ensure_quiz_questions_exist(quiz)
-
-    questions = quiz.questions.order_by("number")
-
-    if not questions.exists():
-        print("[답안 저장] QuizQuestion이 없어 QuizAnswer 저장을 건너뜁니다.")
-        return {}
-
-    question_map = {
-        str(question.number): question
-        for question in questions
-    }
-
-    legacy_json_data = {}
-
-    for key in post_data:
-        if not key.startswith("user_answer_"):
-            continue
-
-        suffix = key[len("user_answer_"):]
-        value = post_data.get(key, "")
-
-        if not isinstance(value, str):
-            value = str(value)
-
-        value = value.strip()
-
-        if suffix == "raw":
-            if value:
-                legacy_json_data["__raw__"] = value
-            continue
-
-        if not suffix.isdigit():
-            continue
-
-        legacy_json_data[suffix] = value
-
-        quiz_question = question_map.get(suffix)
-
-        if not quiz_question:
-            continue
-
-        similarity_score = calculate_similarity_score(
-            model_answer=quiz_question.model_answer,
-            user_answer=value,
-        )
-        predicted_label = predict_answer_label(similarity_score)
-
-        QuizAnswer.objects.update_or_create(
-            user=user,
-            quiz_question=quiz_question,
-            defaults={
-                "user_answer": value,
-                "similarity_score": similarity_score,
-                "predicted_label": predicted_label,
-            }
-        )
-
-        print(
-            f"[답안 채점] {quiz.generation_number}차 {quiz_question.number}번 "
-            f"유사도={similarity_score}, 판정={predicted_label}"
-        )
-
-    # 기존 Quiz.answer JSON 구조도 일단 호환용으로 유지
-    quiz.answer = json.dumps(legacy_json_data, ensure_ascii=False)
-    quiz.save(update_fields=["answer"])
-
-    print(f"[답안 저장] {quiz.generation_number}차 사용자 답안을 QuizAnswer에 저장했습니다.")
-    return legacy_json_data
+def _activate_user_language(request, response, lang_code):
+    if lang_code not in _supported_language_codes() or not check_for_language(lang_code):
+        return
+    translation.activate(lang_code)
+    request.LANGUAGE_CODE = lang_code
+    _set_language_cookie(response, lang_code)
 
 
-def build_quiz_items_for_display(quiz_text, quiz, user=None):
-    """퀴즈 화면 출력용 데이터 구성.
+@require_POST
+def set_preferred_language(request):
+    """사이드바 언어 선택: 쿠키 저장 + 로그인 시 UserProfile.preferred_language 반영."""
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or "/"
+    if not url_has_allowed_host_and_scheme(
+        url=next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        next_url = "/"
 
-    우선 QuizQuestion에 저장된 개별 문제를 사용하고,
-    사용자 답안은 QuizAnswer 테이블을 우선 사용한다.
-    기존 Quiz.answer JSON은 fallback으로만 사용한다.
-    """
-    ensure_quiz_questions_exist(quiz)
+    lang_code = (request.POST.get("language") or "").strip()
+    response = HttpResponseRedirect(next_url)
 
-    legacy_answer = _user_answers_dict(quiz)
-    db_answer = {}
+    if lang_code in _supported_language_codes() and check_for_language(lang_code):
+        _activate_user_language(request, response, lang_code)
+        if request.user.is_authenticated:
+            profile, _created = UserProfile.objects.get_or_create(user=request.user)
+            if profile.preferred_language != lang_code:
+                profile.preferred_language = lang_code
+                profile.save(update_fields=["preferred_language"])
 
-    if user and user.is_authenticated:
-        db_answer = get_quiz_answer_dict_from_db(quiz, user)
-
-    items = []
-    questions = quiz.questions.order_by("number")
-
-    if questions.exists():
-        for question in questions:
-            num = str(question.number)
-
-            saved_answer = db_answer.get(num)
-            if saved_answer is None:
-                saved_answer = legacy_answer.get(num, "") or ""
-
-            items.append({
-                "number": question.number,
-                "question": question.question_text,
-                "answer": question.model_answer,
-                "explanation": question.explanation,
-                "saved_answer": saved_answer,
-            })
-
-        raw_saved = legacy_answer.get("__raw__", "") or ""
-        return items, raw_saved
-
-    parsed_items = parse_quiz_text(quiz_text)
-
-    for item in parsed_items:
-        num = str(item["number"]).strip()
-
-        saved_answer = db_answer.get(num)
-        if saved_answer is None:
-            saved_answer = legacy_answer.get(num, "") or ""
-
-        items.append({
-            **item,
-            "saved_answer": saved_answer,
-        })
-
-    raw_saved = legacy_answer.get("__raw__", "") or ""
-    return items, raw_saved
+    return response
 
 
-# =========================
-# 기본 페이지
-# =========================
+def _build_activity_by_date(user):
+    """날짜별 업로드·퀴즈 풀이 수를 집계한다."""
+    activity_by_date = {}
+
+    def bump(key, field):
+        if key not in activity_by_date:
+            activity_by_date[key] = {"uploads": 0, "quizzes": 0}
+        activity_by_date[key][field] += 1
+
+    for created_at in Lecture.objects.filter(user=user).values_list("created_at", flat=True):
+        if created_at:
+            bump(timezone.localtime(created_at).date().isoformat(), "uploads")
+
+    for created_at in QuizAnswer.objects.filter(user=user).values_list("created_at", flat=True):
+        if created_at:
+            bump(timezone.localtime(created_at).date().isoformat(), "quizzes")
+
+    return activity_by_date
+
+
+def _decorate_lecture_for_display(lecture):
+    """강의 제목·과목 표시용 필드를 lecture 객체에 붙인다."""
+    lecture.display_title = lecture.title
+    lecture.detected_subject = "4"
+
+    match = re.search(
+        r"\[\s*SUB\s*:\s*(auto|[1-4])\s*\]",
+        lecture.title or "",
+        re.IGNORECASE,
+    )
+
+    if match:
+        lecture.detected_subject = match.group(1)
+        lecture.display_title = re.sub(
+            r"\s*\[\s*SUB\s*:\s*(?:auto|[1-4])\s*\]",
+            "",
+            lecture.title or "",
+            flags=re.IGNORECASE,
+        ).strip()
+    else:
+        title_lower = (lecture.title or "").lower()
+
+        if any(k in title_lower for k in ["역사", "인문", "조선", "세계사", "한국사"]):
+            lecture.detected_subject = "1"
+        elif any(k in title_lower for k in ["코딩", "파이썬", "개발", "프로그래밍", "알고리즘"]):
+            lecture.detected_subject = "2"
+        elif any(k in title_lower for k in ["수학", "과학", "물리", "화학", "생물", "미적분"]):
+            lecture.detected_subject = "3"
+
+    return lecture
+
+
+def _lecture_card_thumbnail(lecture):
+    """홈·히스토리 카드용 썸네일 URL."""
+    if lecture.thumbnail_url:
+        return lecture.thumbnail_url
+    if lecture.video_id:
+        return f"https://img.youtube.com/vi/{lecture.video_id}/0.jpg"
+    return ""
 
 def home(request):
-    """메인(홈) 페이지."""
-    return render(request, "home.html")
+    """메인(홈) 페이지. 로그인 시 학습 현황 통계를 함께 보여준다."""
+    if not request.user.is_authenticated:
+        return render(request, "home.html")
+
+    user = request.user
+    user_lectures = Lecture.objects.filter(user=user)
+    uploaded_count = user_lectures.count()
+
+    now = timezone.now()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    lectures_this_month = user_lectures.filter(created_at__gte=month_start).count()
+
+    answers = QuizAnswer.objects.filter(user=user)
+    solved_count = answers.count()
+
+    correct_count = answers.filter(
+        Q(human_label="정답")
+        | (Q(human_label="") & Q(predicted_label="정답 가능성 높음"))
+    ).count()
+    accuracy_rate = round(correct_count / solved_count * 100) if solved_count else 0
+
+    activity_dates = set()
+    for created_at in user_lectures.values_list("created_at", flat=True):
+        if created_at:
+            activity_dates.add(timezone.localtime(created_at).date())
+    for created_at in answers.values_list("created_at", flat=True):
+        if created_at:
+            activity_dates.add(timezone.localtime(created_at).date())
+
+    activity_by_date = _build_activity_by_date(user)
+    study_streak, best_streak = _compute_study_streaks(activity_dates)
+
+    latest_answer_subq = QuizAnswer.objects.filter(
+        user=user,
+        quiz_question__quiz__lecture=OuterRef("pk"),
+    ).order_by("-created_at").values("created_at")[:1]
+
+    recent_lectures = list(
+        user_lectures.annotate(
+            quiz_count=Count(
+                "quizzes",
+                filter=Q(quizzes__quiz_text__gt=""),
+                distinct=True,
+            ),
+            last_answer_at=Subquery(latest_answer_subq),
+            last_activity=Coalesce("last_answer_at", "created_at"),
+        )
+        .order_by("-last_activity", "-id")[:3]
+    )
+    for lecture in recent_lectures:
+        _decorate_lecture_for_display(lecture)
+        lecture.card_thumbnail = _lecture_card_thumbnail(lecture)
+
+    calendar_memos = {
+        memo.date.isoformat(): memo.memo
+        for memo in StudyCalendarMemo.objects.filter(user=user).only("date", "memo")
+        if memo.memo.strip()
+    }
+
+    context = {
+        "uploaded_count": uploaded_count,
+        "lectures_this_month": lectures_this_month,
+        "solved_count": solved_count,
+        "accuracy_rate": accuracy_rate,
+        "study_streak": study_streak,
+        "best_streak": best_streak,
+        "activity_dates": sorted(d.isoformat() for d in activity_dates),
+        "activity_by_date": activity_by_date,
+        "calendar_memos": calendar_memos,
+        "recent_lectures": recent_lectures,
+    }
+    return render(request, "home.html", context)
+
+
+@login_required(login_url="home")
+def save_calendar_memo(request):
+    """캘린더 날짜별 학습 메모 저장·삭제."""
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": _("POST만 허용됩니다.")}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": _("잘못된 요청입니다.")}, status=400)
+
+    date_str = (payload.get("date") or "").strip()
+    memo = (payload.get("memo") or "").strip()
+
+    try:
+        memo_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"ok": False, "error": _("날짜 형식이 올바르지 않습니다.")}, status=400)
+
+    if len(memo) > 500:
+        return JsonResponse({"ok": False, "error": _("메모는 500자까지 입력할 수 있습니다.")}, status=400)
+
+    if not memo:
+        StudyCalendarMemo.objects.filter(user=request.user, date=memo_date).delete()
+        return JsonResponse({"ok": True, "deleted": True, "date": date_str})
+
+    entry, _created = StudyCalendarMemo.objects.update_or_create(
+        user=request.user,
+        date=memo_date,
+        defaults={"memo": memo},
+    )
+    return JsonResponse({
+        "ok": True,
+        "date": date_str,
+        "memo": entry.memo,
+        "updated_at": timezone.localtime(entry.updated_at).strftime("%Y-%m-%d %H:%M"),
+    })
 
 
 def login_page(request):
@@ -669,10 +347,16 @@ def login_page(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-            messages.success(request, f"{user.username}님, 환영합니다!")
-            return redirect("home")
+            messages.success(request, _("%(username)s님, 환영합니다!") % {"username": user.username})
+            response = redirect("home")
+            try:
+                lang_code = user.profile.preferred_language
+            except UserProfile.DoesNotExist:
+                lang_code = settings.LANGUAGE_CODE
+            _activate_user_language(request, response, lang_code)
+            return response
 
-        messages.error(request, "아이디 또는 비밀번호가 올바르지 않습니다.")
+        messages.error(request, _("아이디 또는 비밀번호가 올바르지 않습니다."))
         return redirect("home")
 
     return redirect("home")
@@ -682,7 +366,6 @@ def logout_page(request):
     """로그아웃 후 홈으로 이동."""
     logout(request)
     return redirect("home")
-
 
 def signup_page(request):
     """회원가입 및 추가 프로필 정보 저장."""
@@ -718,31 +401,154 @@ def signup_page(request):
     form = UserCreationForm()
     return render(request, "signup.html", {"form": form})
 
+def validate_lecture_video_file(uploaded_file):
+    """업로드 영상 파일 확장자·용량 검증. 문제 없으면 None."""
+    if not uploaded_file:
+        return "분석할 영상 파일을 선택해 주세요."
+
+    ext = os.path.splitext(uploaded_file.name)[1].lower()
+
+    if ext not in ALLOWED_LECTURE_VIDEO_EXTENSIONS:
+        return f"지원하지 않는 영상 형식입니다. ({ext or '확장자 없음'})"
+
+    if uploaded_file.size > MAX_LECTURE_VIDEO_BYTES:
+        return "영상 파일은 500MB 이하여야 합니다."
+
+    return None
 
 @login_required(login_url="home")
 def upload_page(request):
     """강의 업로드 페이지."""
     if request.method == "POST":
-        title = request.POST.get("title", "")
-        youtube_link = request.POST.get("youtube_link", "")
+        title = (request.POST.get("title") or "").strip()
+        upload_mode = (request.POST.get("upload_mode") or Lecture.SOURCE_YOUTUBE).strip()
 
-        video_id = extract_youtube_video_id(youtube_link)
-        thumbnail_url = ""
+        whisper_model = normalize_whisper_model_name(
+            request.POST.get("whisper_model", "base")
+        )
+        workers = normalize_worker_count(
+            request.POST.get("workers", 2)
+        )
+        subject_code = normalize_subject_code(
+            request.POST.get("subject_code", "auto")
+        )
+        summary_api = normalize_summary_api(
+            request.POST.get("summary_api", "gemini")
+        )
 
-        if video_id:
-            thumbnail_url = f"https://img.youtube.com/vi/{video_id}/0.jpg"
+        clean_title = re.sub(
+            r"\s*\[\s*SUB\s*:\s*(?:auto|[1-4])\s*\]",
+            "",
+            title,
+            flags=re.IGNORECASE,
+        ).strip()
 
-        lecture = Lecture.objects.create(
-            user=request.user,
-            title=title,
-            youtube_url=youtube_link,
-            video_id=video_id or "",
-            thumbnail_url=thumbnail_url,
+        if not clean_title:
+            clean_title = "제목 없는 강의"
+
+        final_title = f"{clean_title} [SUB:{subject_code}]"
+
+        if upload_mode == Lecture.SOURCE_FILE:
+            lecture_file = request.FILES.get("lecture_file")
+            file_error = validate_lecture_video_file(lecture_file)
+
+            if file_error:
+                messages.error(request, file_error)
+                return redirect("upload")
+
+            lecture = Lecture.objects.create(
+                user=request.user,
+                title=final_title,
+                source_type=Lecture.SOURCE_FILE,
+                youtube_url="",
+                video_file=lecture_file,
+                video_id="",
+                thumbnail_url="",
+            )
+
+            thumbnail_url = capture_lecture_video_thumbnail(lecture)
+
+            if thumbnail_url:
+                lecture.thumbnail_url = thumbnail_url
+                lecture.save(update_fields=["thumbnail_url"])
+
+        else:
+            youtube_link = (request.POST.get("youtube_link") or "").strip()
+
+            if not youtube_link:
+                messages.error(request, "유튜브 링크를 입력해 주세요.")
+                return redirect("upload")
+
+            video_id = extract_youtube_video_id(youtube_link)
+            thumbnail_url = ""
+
+            if video_id:
+                thumbnail_url = f"https://img.youtube.com/vi/{video_id}/0.jpg"
+
+            lecture = Lecture.objects.create(
+                user=request.user,
+                title=final_title,
+                source_type=Lecture.SOURCE_YOUTUBE,
+                youtube_url=youtube_link,
+                video_id=video_id or "",
+                thumbnail_url=thumbnail_url,
+            )
+
+        request.session[f"lecture_analysis_options_{lecture.id}"] = {
+            "whisper_model": whisper_model,
+            "workers": workers,
+            "subject_code": subject_code,
+            "summary_api": summary_api,
+        }
+        request.session.modified = True
+
+        print(
+            f"[분석 옵션 저장] lecture_id={lecture.id}, "
+            f"source_type={lecture.source_type}, "
+            f"whisper_model={whisper_model}, "
+            f"workers={workers}, "
+            f"subject_code={subject_code}, "
+            f"summary_api={summary_api}"
         )
 
         return redirect(f"/summary/?lecture_id={lecture.id}")
 
-    return render(request, "upload.html")
+    now = timezone.now()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    user_lectures = Lecture.objects.filter(user=request.user)
+
+    lectures_this_month = user_lectures.filter(
+        created_at__gte=month_start,
+    ).exclude(summary_text="").count()
+
+    recent_lecture_ids = list(
+        user_lectures.exclude(summary_text="")
+        .order_by("-created_at")[:5]
+        .values_list("id", flat=True)
+    )
+
+    avg_result = (
+        QuizAnswer.objects.filter(
+            user=request.user,
+            quiz_question__quiz__lecture_id__in=recent_lecture_ids,
+            similarity_score__isnull=False,
+        ).aggregate(avg=Avg("similarity_score"))
+    )
+    average_similarity = round((avg_result["avg"] or 0) * 100, 1)
+
+    total_quiz_count = QuizQuestion.objects.filter(
+        quiz__lecture__user=request.user,
+    ).count()
+
+    return render(
+        request,
+        "upload.html",
+        {
+            "lectures_this_month": lectures_this_month,
+            "average_similarity": average_similarity,
+            "total_quiz_count": total_quiz_count,
+        },
+    )
 
 
 @login_required(login_url="home")
@@ -755,519 +561,230 @@ def summary_page(request):
 
     lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
 
-    video_id = (lecture.video_id or "").strip() or extract_youtube_video_id(
-        lecture.youtube_url or ""
-    ) or ""
+    video_id = ""
+
+    if lecture.source_type == Lecture.SOURCE_YOUTUBE:
+        video_id = (lecture.video_id or "").strip() or extract_youtube_video_id(
+            lecture.youtube_url or ""
+        ) or ""
+
+    video_file_name = ""
+    video_file_url = ""
+
+    if lecture.video_file:
+        video_file_name = os.path.basename(lecture.video_file.name)
+
+        if lecture.source_type == Lecture.SOURCE_FILE:
+            try:
+                video_file_url = reverse("stream_lecture_video", args=[lecture.id])
+            except NoReverseMatch:
+                video_file_url = lecture.video_file.url
+        else:
+            video_file_url = lecture.video_file.url
 
     context = {
         "lecture_id": lecture.id,
         "lecture_title": lecture.title,
+        "source_type": lecture.source_type,
         "youtube_link": lecture.youtube_url,
         "video_id": video_id,
         "thumbnail_url": lecture.thumbnail_url,
+        "video_file_name": video_file_name,
+        "video_file_url": video_file_url,
     }
 
     return render(request, "summary.html", context)
 
 
-# =========================
-# 병렬 STT 핵심 함수
-# =========================
-
-def get_audio_segments(video_url):
-    """유튜브 오디오를 다운로드한 뒤 일정 시간 단위로 mp3 조각으로 분할한다.
-
-    개선 사항:
-    - 유튜브 playlist 방지
-    - video_id만 남겨 단일 영상 URL로 정리
-    - 이전 chunk 파일 삭제
-    - FFmpeg 분할 시 -c copy 대신 16kHz mono로 재인코딩
-    - 너무 작은 chunk 파일 제거
-    """
-    video_id = extract_youtube_video_id(video_url)
-    if video_id:
-        video_url = f"https://www.youtube.com/watch?v={video_id}"
-
-    base_dir = settings.BASE_DIR
-    full_audio_path = os.path.join(base_dir, "temp_full_audio.mp3")
-    ffmpeg_bin = os.path.join(base_dir, "tools", "ffmpeg", "bin", "ffmpeg.exe")
-
-    # 이전 작업 파일 삭제
-    cleanup_audio_segments()
-
-    if os.path.exists(full_audio_path):
-        try:
-            os.remove(full_audio_path)
-        except OSError:
-            pass
-
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "noplaylist": True,
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }],
-        "outtmpl": os.path.join(base_dir, "temp_full_audio"),
-        "ffmpeg_location": os.path.dirname(ffmpeg_bin),
-        "quiet": False,
-    }
-
-    try:
-        print("--- [1단계] 전체 오디오 다운로드 시작 ---")
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([video_url])
-
-    except Exception as e:
-        print(f"--- [에러] 다운로드 실패: {e}")
-        return []
-
-    if not os.path.exists(full_audio_path):
-        print(f"--- [에러] 원본 오디오 파일이 없습니다: {full_audio_path}")
-        return []
-
-    print("--- [2단계] FFmpeg 안정 분할 시작 ---")
-
-    segment_pattern = os.path.join(base_dir, "chunk_%03d.mp3")
-
-    cmd = [
-        ffmpeg_bin,
-        "-y",
-        "-i", full_audio_path,
-        "-f", "segment",
-        "-segment_time", str(AUDIO_SEGMENT_SECONDS),
-        "-reset_timestamps", "1",
-
-        # Whisper가 읽기 좋은 형태로 재인코딩
-        "-acodec", "libmp3lame",
-        "-ar", "16000",
-        "-ac", "1",
-        "-b:a", "64k",
-
-        segment_pattern,
-    ]
-
-    try:
-        subprocess.run(cmd, check=True, capture_output=True)
-    except subprocess.CalledProcessError as e:
-        print(f"--- [에러] FFmpeg 분할 실패: {e}")
-
-        if e.stderr:
-            try:
-                print(e.stderr.decode("utf-8", errors="ignore"))
-            except Exception:
-                pass
-
-        return []
-
-    raw_segments = sorted(glob.glob(os.path.join(base_dir, "chunk_*.mp3")))
-
-    segments = []
-
-    for segment in raw_segments:
-        try:
-            size = os.path.getsize(segment)
-        except OSError:
-            size = 0
-
-        # 너무 작은 파일은 빈 chunk일 가능성이 높음
-        if size < 10 * 1024:
-            print(
-                f"--- [경고] 너무 작은 chunk 제거: "
-                f"{os.path.basename(segment)} / {size} bytes"
-            )
-
-            try:
-                os.remove(segment)
-            except OSError:
-                pass
-
-            continue
-
-        segments.append(segment)
-
-    print(f"--- [3단계] 최종 오디오 조각 개수: {len(segments)}개 ---")
-
-    try:
-        if os.path.exists(full_audio_path):
-            os.remove(full_audio_path)
-    except OSError:
-        pass
-
-    return segments
-
-
-def process_segment_task(segment_path):
-    """분할된 오디오 조각 하나를 Whisper STT 처리한다.
-
-    주의:
-    - 여기서는 chunk 파일을 삭제하지 않는다.
-    - 실패한 chunk를 analyze_video_api()에서 재시도하기 위해 파일을 남긴다.
-    """
-    segment_name = os.path.basename(segment_path)
-
-    try:
-        print(f"[구간 STT 시작] {segment_name}")
-
-        local_model = get_whisper_model()
-
-        stt_start_time = time.time()
-        result = local_model.transcribe(
-            segment_path,
-            language="ko",
-            fp16=False,
-        )
-        stt_duration = time.time() - stt_start_time
-
-        text = result.get("text", "").strip()
-
-        print(
-            f"[구간 STT 완료] {segment_name} | "
-            f"STT={stt_duration:.2f}초 | 텍스트 길이={len(text)}"
-        )
-
-        return {
-            "segment": segment_name,
-            "segment_path": segment_path,
-            "text": text,
-            "stt_duration": stt_duration,
-            "success": bool(text),
-            "error": "",
-        }
-
-    except Exception as e:
-        print(f"[구간 STT 에러] {segment_path}: {e}")
-
-        return {
-            "segment": segment_name,
-            "segment_path": segment_path,
-            "text": "",
-            "stt_duration": 0,
-            "success": False,
-            "error": str(e),
-        }
-
-
 @login_required(login_url="home")
-def analyze_video_api(request):
-    """강의 분석 API.
-
-    병렬 STT + Gemini 요약 버전:
-    - 유튜브 오디오 다운로드
-    - 3분 단위로 오디오 분할
-    - 각 구간을 Whisper STT로 병렬 처리
-    - 실패한 구간은 순차 재시도
-    - 전사 결과를 하나로 합침
-    - Gemini API 요약 흐름으로 최종 요약 생성
-    - 처리 시간 DB 저장
-    """
-    lecture_id = request.GET.get("lecture_id")
-
-    if not lecture_id:
-        return JsonResponse({
-            "status": "error",
-            "message": "lecture_id가 전달되지 않았습니다.",
-        })
+def download_summary_pdf(request, lecture_id):
+    """강의 요약 PDF 다운로드."""
+    from .summary_pdf import build_summary_pdf_filename, generate_summary_pdf_bytes
 
     lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
 
-    if lecture.summary_text:
-        return JsonResponse({
-            "status": "success",
-            "result": lecture.summary_text,
-            "analysis_duration_seconds": lecture.analysis_duration_seconds,
-            "stt_duration_seconds": lecture.stt_duration_seconds,
-            "summary_duration_seconds": lecture.summary_duration_seconds,
-            "whisper_model_name": lecture.whisper_model_name,
-        })
-
-    print("\n" + "=" * 60)
-    print(f"[병렬 STT + Gemini 요약 시작] 강의 제목: {lecture.title}")
-    print(
-        f"[설정] Whisper={WHISPER_MODEL_NAME}, "
-        f"workers={PARALLEL_MAX_WORKERS}, "
-        f"segment={AUDIO_SEGMENT_SECONDS}초, "
-        f"Gemini={GEMINI_MODEL_NAME}"
-    )
-    print("=" * 60)
-
-    analysis_start_time = time.time()
-    segments = []
+    if not (lecture.summary_text or "").strip():
+        return HttpResponse(
+            "요약이 아직 없습니다.",
+            status=404,
+            content_type="text/plain; charset=utf-8",
+        )
 
     try:
-        print("1. 오디오 다운로드 및 구간 분할 중...")
-        segments = get_audio_segments(lecture.youtube_url)
-
-        if not segments:
-            analysis_duration = time.time() - analysis_start_time
-
-            lecture.analysis_duration_seconds = analysis_duration
-            lecture.stt_duration_seconds = 0
-            lecture.summary_duration_seconds = 0
-            lecture.whisper_model_name = WHISPER_MODEL_NAME
-            lecture.analyzed_at = timezone.now()
-            lecture.save(update_fields=[
-                "analysis_duration_seconds",
-                "stt_duration_seconds",
-                "summary_duration_seconds",
-                "whisper_model_name",
-                "analyzed_at",
-            ])
-
-            return JsonResponse({
-                "status": "error",
-                "message": "오디오 다운로드 또는 분할에 실패했습니다.",
-            })
-
-        print(f"2. 병렬 Whisper STT 시작: 총 {len(segments)}개 구간")
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=PARALLEL_MAX_WORKERS) as executor:
-            results = list(executor.map(process_segment_task, segments))
-
-        failed_results = [
-            result for result in results
-            if not result.get("success") or not result.get("text", "").strip()
-        ]
-
-        # 실패한 구간만 순차 재시도
-        if failed_results:
-            print(
-                f"--- [재시도] 실패한 STT 구간 {len(failed_results)}개를 "
-                f"순차 재시도합니다. ---"
-            )
-
-            retry_results = []
-
-            for failed in failed_results:
-                segment_path = failed.get("segment_path")
-
-                if not segment_path or not os.path.exists(segment_path):
-                    print(f"--- [재시도 불가] 파일 없음: {segment_path}")
-                    retry_results.append(failed)
-                    continue
-
-                retry_result = process_segment_task(segment_path)
-
-                if retry_result.get("success"):
-                    print(f"--- [재시도 성공] {retry_result.get('segment')}")
-                else:
-                    print(
-                        f"--- [재시도 실패] {retry_result.get('segment')} / "
-                        f"{retry_result.get('error')}"
-                    )
-
-                retry_results.append(retry_result)
-
-            retry_map = {
-                item.get("segment"): item
-                for item in retry_results
-            }
-
-            fixed_results = []
-
-            for result in results:
-                segment_name = result.get("segment")
-
-                if segment_name in retry_map:
-                    fixed_results.append(retry_map[segment_name])
-                else:
-                    fixed_results.append(result)
-
-            results = fixed_results
-
-        # 파일명 순서대로 정렬해서 강의 순서 유지
-        results = sorted(results, key=lambda x: x.get("segment", ""))
-
-        transcript_parts = []
-        total_stt_duration = 0.0
-        final_failed_segments = []
-
-        for index, result in enumerate(results, start=1):
-            text = result.get("text", "").strip()
-            total_stt_duration += result.get("stt_duration", 0)
-
-            if text:
-                transcript_parts.append(f"[{index}구간 전사]\n{text}")
-            else:
-                final_failed_segments.append(result.get("segment", f"{index}구간"))
-
-        # STT 처리 후 chunk 파일 정리
-        cleanup_audio_segments(segments)
-
-        if final_failed_segments:
-            analysis_duration = time.time() - analysis_start_time
-
-            lecture.analysis_duration_seconds = analysis_duration
-            lecture.stt_duration_seconds = total_stt_duration
-            lecture.summary_duration_seconds = 0
-            lecture.whisper_model_name = f"{WHISPER_MODEL_NAME} / failed_segments"
-            lecture.analyzed_at = timezone.now()
-            lecture.save(update_fields=[
-                "analysis_duration_seconds",
-                "stt_duration_seconds",
-                "summary_duration_seconds",
-                "whisper_model_name",
-                "analyzed_at",
-            ])
-
-            failed_names = ", ".join(final_failed_segments)
-
-            print(f"--- [최종 실패] STT 실패 구간: {failed_names} ---")
-
-            return JsonResponse({
-                "status": "error",
-                "message": f"일부 구간 STT에 실패했습니다: {failed_names}",
-            })
-
-        full_transcript = "\n\n".join(transcript_parts).strip()
-
-        if not full_transcript:
-            analysis_duration = time.time() - analysis_start_time
-
-            lecture.analysis_duration_seconds = analysis_duration
-            lecture.stt_duration_seconds = total_stt_duration
-            lecture.summary_duration_seconds = 0
-            lecture.whisper_model_name = f"{WHISPER_MODEL_NAME} / parallel_stt_failed"
-            lecture.analyzed_at = timezone.now()
-            lecture.save(update_fields=[
-                "analysis_duration_seconds",
-                "stt_duration_seconds",
-                "summary_duration_seconds",
-                "whisper_model_name",
-                "analyzed_at",
-            ])
-
-            return JsonResponse({
-                "status": "error",
-                "message": "STT 결과가 비어 있습니다.",
-            })
-
-        print("3. 병렬 STT 완료")
-        print(f"--- [디버깅] 전체 전사 길이: {len(full_transcript)}")
-        print(f"--- [디버깅] 전체 전사 앞부분: {full_transcript[:300]}")
-
-        print("4. Gemini API 요약 시작")
-        summary_start_time = time.time()
-
-        # Gemini API 호출 횟수를 줄이기 위해,
-        # 짧은 강의는 chunk별 요약을 거치지 않고 전체 전사문을 한 번에 최종 요약한다.
-        # 현재 테스트 영상처럼 전체 전사 길이가 몇천 자 수준이면 이 방식이 더 안정적이다.
-        if len(full_transcript) <= 12000:
-            print("--- [Gemini 요약 방식] 전체 전사문 단일 요약 ---")
-            final_summary = make_final_summary(full_transcript)
-
-        else:
-            print("--- [Gemini 요약 방식] 긴 전사문 chunk 요약 후 최종 요약 ---")
-
-            sentences = preprocess_text(full_transcript)
-            chunks = chunk_text(sentences, chunk_size=10)
-
-            if not chunks:
-                chunks = [full_transcript]
-
-            chunk_summaries = []
-
-            for index, chunk in enumerate(chunks, start=1):
-                print(f"--- [Gemini chunk 요약] {index}/{len(chunks)} ---")
-                summary = summarize_chunk(chunk)
-                chunk_summaries.append(summary)
-
-            merged_chunk_summaries = "\n\n".join(chunk_summaries)
-            final_summary = make_final_summary(merged_chunk_summaries)
-
-        summary_duration = time.time() - summary_start_time
-
-        result_text = "[AI가 분석한 강의 요약]\n\n" + final_summary
-
-        analysis_duration = time.time() - analysis_start_time
-
-        lecture.summary_text = result_text
-        lecture.analysis_duration_seconds = analysis_duration
-        lecture.stt_duration_seconds = total_stt_duration
-        lecture.summary_duration_seconds = summary_duration
-        lecture.whisper_model_name = (
-            f"{WHISPER_MODEL_NAME} / "
-            f"parallel_stt_workers_{PARALLEL_MAX_WORKERS}_retry / "
-            f"gemini_{GEMINI_MODEL_NAME}"
+        pdf_bytes = generate_summary_pdf_bytes(lecture)
+    except Exception as exc:
+        print(f"[PDF 다운로드 오류] lecture_id={lecture_id}: {exc}")
+        return HttpResponse(
+            "PDF 생성에 실패했습니다. static/fonts/NotoSansKR-Regular.ttf 파일을 확인해 주세요.",
+            status=500,
+            content_type="text/plain; charset=utf-8",
         )
-        lecture.analyzed_at = timezone.now()
-        lecture.save(update_fields=[
-            "summary_text",
-            "analysis_duration_seconds",
-            "stt_duration_seconds",
-            "summary_duration_seconds",
-            "whisper_model_name",
-            "analyzed_at",
-        ])
 
-        print("=" * 60)
-        print("[병렬 STT + Gemini 요약 완료]")
-        print(f"전체 분석 시간: {analysis_duration:.2f}초")
-        print(f"구간별 STT 시간 합계: {total_stt_duration:.2f}초")
-        print(f"Gemini 요약 시간: {summary_duration:.2f}초")
-        print(f"workers: {PARALLEL_MAX_WORKERS}")
-        print("=" * 60 + "\n")
+    filename = build_summary_pdf_filename(lecture)
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
 
-        return JsonResponse({
-            "status": "success",
-            "result": result_text,
-            "analysis_duration_seconds": analysis_duration,
-            "stt_duration_seconds": total_stt_duration,
-            "summary_duration_seconds": summary_duration,
-            "whisper_model_name": lecture.whisper_model_name,
-        })
+@login_required(login_url="home")
+def stream_lecture_video(request, lecture_id):
+    """업로드 영상을 HTTP Range(206)로 스트리밍해 재생·탐색이 즉시 가능하도록 한다."""
+    lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
 
-    except Exception as e:
-        cleanup_audio_segments(segments)
+    if lecture.source_type != Lecture.SOURCE_FILE or not lecture.video_file:
+        raise Http404("영상 파일이 없습니다.")
 
-        analysis_duration = time.time() - analysis_start_time
+    video_path = lecture.video_file.path
 
-        lecture.analysis_duration_seconds = analysis_duration
-        lecture.stt_duration_seconds = 0
-        lecture.summary_duration_seconds = 0
-        lecture.whisper_model_name = f"{WHISPER_MODEL_NAME} / parallel_error / gemini_{GEMINI_MODEL_NAME}"
-        lecture.analyzed_at = timezone.now()
-        lecture.save(update_fields=[
-            "analysis_duration_seconds",
-            "stt_duration_seconds",
-            "summary_duration_seconds",
-            "whisper_model_name",
-            "analyzed_at",
-        ])
+    if not os.path.exists(video_path):
+        raise Http404("영상 파일을 찾을 수 없습니다.")
 
-        print(f"[병렬 STT + Gemini 요약 시스템 에러] {str(e)}")
+    ext = os.path.splitext(video_path)[1].lower()
+    content_type = LECTURE_VIDEO_MIME_TYPES.get(ext, "application/octet-stream")
+    file_size = os.path.getsize(video_path)
+    range_header = request.META.get("HTTP_RANGE", "").strip()
 
-        return JsonResponse({
-            "status": "error",
-            "message": str(e),
-        })
+    if range_header:
+        range_match = re.match(r"bytes=(\d+)-(\d*)", range_header)
 
+        if range_match:
+            start = int(range_match.group(1))
+            end_str = range_match.group(2)
+            end = int(end_str) if end_str else file_size - 1
+            end = min(end, file_size - 1)
 
-# =========================
-# 히스토리 / 퀴즈 / 답안 / 피드백
-# =========================
+            if start >= file_size or start > end:
+                response = HttpResponse(status=416)
+                response["Content-Range"] = f"bytes */{file_size}"
+                return response
+
+            length = end - start + 1
+
+            with open(video_path, "rb") as video_fp:
+                video_fp.seek(start)
+                chunk = video_fp.read(length)
+
+            response = HttpResponse(chunk, status=206, content_type=content_type)
+            response["Content-Length"] = str(length)
+            response["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+            response["Accept-Ranges"] = "bytes"
+            return response
+
+    response = FileResponse(open(video_path, "rb"), content_type=content_type)
+    response["Content-Length"] = str(file_size)
+    response["Accept-Ranges"] = "bytes"
+    return response
+
+@login_required(login_url="home")
+def analyze_video_api(request):
+    """강의 분석 API wrapper. 실제 분석 흐름은 services/analysis_service.py에서 처리한다."""
+    return analyze_video_request(request)
 
 @login_required(login_url="home")
 def history_page(request):
-    """내 강의 히스토리 페이지."""
-    quiz_exists = Quiz.objects.filter(lecture=OuterRef("pk")).exclude(quiz_text="")
+    """사용자별 강의 히스토리 페이지."""
+
+    search_query = (request.GET.get("search") or "").strip()
+    quiz_filter = (request.GET.get("quiz") or "all").strip()
+    duration_filter = (request.GET.get("duration") or "all").strip()
+    subject_filter = (request.GET.get("subject") or "all").strip()
+    sort_by = (request.GET.get("sort") or "-created_at").strip()
+
+    allowed_sort_values = ["-created_at", "created_at", "title"]
+
+    if sort_by not in allowed_sort_values:
+        sort_by = "-created_at"
+
+    quiz_exists = Quiz.objects.filter(
+        lecture=OuterRef("pk")
+    ).exclude(quiz_text="")
 
     lectures = (
         Lecture.objects
         .filter(user=request.user)
         .annotate(has_quiz=Exists(quiz_exists))
-        .annotate(quiz_count=Count("quizzes", filter=Q(quizzes__quiz_text__gt=""), distinct=True))
-        .order_by("-created_at")
+        .annotate(
+            quiz_count=Count(
+                "quizzes",
+                filter=Q(quizzes__quiz_text__gt=""),
+                distinct=True,
+            ),
+            latest_generation=Max("quizzes__generation_number"),
+        )
     )
 
-    return render(request, "history.html", {"lectures": lectures})
+    if search_query:
+        lectures = lectures.filter(title__icontains=search_query)
+
+    if quiz_filter == "quiz_exist":
+        lectures = lectures.filter(has_quiz=True)
+    elif quiz_filter == "no_quiz":
+        lectures = lectures.filter(has_quiz=False)
+    else:
+        quiz_filter = "all"
+
+    if duration_filter == "short":
+        lectures = lectures.filter(analysis_duration_seconds__lt=600)
+    elif duration_filter == "medium":
+        lectures = lectures.filter(
+            analysis_duration_seconds__gte=600,
+            analysis_duration_seconds__lte=1800,
+        )
+    elif duration_filter == "long":
+        lectures = lectures.filter(analysis_duration_seconds__gt=1800)
+    else:
+        duration_filter = "all"
+
+    if subject_filter in ["auto", "1", "2", "3", "4"]:
+        lectures = lectures.filter(title__icontains=f"[SUB:{subject_filter}]")
+    else:
+        subject_filter = "all"
+
+    lectures = lectures.order_by(sort_by, "-id")
+
+    paginator = Paginator(lectures, HISTORY_PAGE_SIZE)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    for lecture in page_obj:
+        _decorate_lecture_for_display(lecture)
+
+        if (
+            lecture.source_type == Lecture.SOURCE_FILE
+            and not lecture.thumbnail_url
+            and lecture.video_file
+        ):
+            thumbnail_url = capture_lecture_video_thumbnail(lecture)
+
+            if thumbnail_url:
+                lecture.thumbnail_url = thumbnail_url
+                lecture.save(update_fields=["thumbnail_url"])
+
+    params = request.GET.copy()
+
+    if "page" in params:
+        del params["page"]
+
+    base_query = params.urlencode()
+
+    return render(
+        request,
+        "history.html",
+        {
+            "page_obj": page_obj,
+            "lectures": page_obj,
+            "search_query": search_query,
+            "quiz_filter": quiz_filter,
+            "duration_filter": duration_filter,
+            "subject_filter": subject_filter,
+            "sort_by": sort_by,
+            "base_query": base_query,
+        },
+    )
 
 
 @login_required(login_url="home")
 def quiz_page(request):
-    """예상문제 페이지."""
+    """객관식 문제 생성, 표시, 사용자 선택 답안 저장 페이지."""
     lecture_id = request.GET.get("lecture_id")
 
     if request.method == "POST":
@@ -1281,100 +798,123 @@ def quiz_page(request):
     if not lecture.summary_text:
         return redirect(f"/summary/?lecture_id={lecture.id}")
 
-    quizzes = Quiz.objects.filter(lecture=lecture).exclude(quiz_text="").order_by("generation_number", "id")
+    quizzes = get_objective_quizzes_for_lecture(lecture).order_by("generation_number")
 
-    if request.method == "POST" and request.POST.get("save_user_answers"):
-        gen_raw = request.POST.get("generation")
-
-        if not gen_raw or not str(gen_raw).isdigit():
-            return redirect("history")
-
-        gen = int(gen_raw)
-        quiz_to_update = get_object_or_404(Quiz, lecture=lecture, generation_number=gen)
-
-        save_user_answers_to_quiz_answer(
-            user=request.user,
-            quiz=quiz_to_update,
-            post_data=request.POST,
-        )
-
-        return redirect(f"/quiz/?lecture_id={lecture.id}&generation={gen}")
-
-    if request.method == "POST":
+    if request.method == "POST" and request.POST.get("generate_quiz"):
         max_generation = quizzes.aggregate(max_number=Max("generation_number"))["max_number"] or 0
         next_generation = max_generation + 1
+        previous_quiz_texts = "\n\n".join([quiz.quiz_text for quiz in quizzes if quiz.quiz_text])
 
-        previous_quiz_texts = "\n\n".join([quiz.quiz_text for quiz in quizzes])
-
-        quiz_text = generate_quiz(
-            lecture.summary_text,
-            generation_number=next_generation,
+        quiz_text = generate_objective_quiz(
+            summary_text=lecture.summary_text,
+            question_count=20,
             previous_quiz_texts=previous_quiz_texts,
         )
 
         new_quiz = Quiz.objects.create(
             lecture=lecture,
             generation_number=next_generation,
-            question=quiz_text,
+            question="",
             answer="",
-            explanation="",
+            explanation=OBJECTIVE_QUIZ_TYPE,
             quiz_text=quiz_text,
         )
-
-        save_quiz_questions_from_text(new_quiz, quiz_text)
+        save_objective_questions_from_text(new_quiz, quiz_text)
 
         return redirect(f"/quiz/?lecture_id={lecture.id}&generation={next_generation}")
 
     if not quizzes.exists():
-        quiz_text = generate_quiz(
-            lecture.summary_text,
-            generation_number=1,
+        quiz_text = generate_objective_quiz(
+            summary_text=lecture.summary_text,
+            question_count=20,
             previous_quiz_texts="",
         )
-
-        new_quiz = Quiz.objects.create(
+        first_quiz = Quiz.objects.create(
             lecture=lecture,
             generation_number=1,
-            question=quiz_text,
+            question="",
             answer="",
-            explanation="",
+            explanation=OBJECTIVE_QUIZ_TYPE,
             quiz_text=quiz_text,
         )
-
-        save_quiz_questions_from_text(new_quiz, quiz_text)
-
+        save_objective_questions_from_text(first_quiz, quiz_text)
         return redirect(f"/quiz/?lecture_id={lecture.id}&generation=1")
 
-    selected_generation = request.GET.get("generation")
+    selected_generation = request.GET.get("generation") or request.POST.get("generation")
+    selected_quiz = None
 
-    if selected_generation:
-        selected_quiz = quizzes.filter(generation_number=selected_generation).first()
-    else:
+    if selected_generation and str(selected_generation).isdigit():
+        selected_quiz = quizzes.filter(generation_number=int(selected_generation)).first()
+
+    if not selected_quiz:
         selected_quiz = quizzes.order_by("-generation_number", "-id").first()
 
     if not selected_quiz:
         selected_quiz = quizzes.first()
 
-    quiz_text = selected_quiz.quiz_text
-    quiz_items, raw_user_answer = build_quiz_items_for_display(
-        quiz_text=quiz_text,
-        quiz=selected_quiz,
-        user=request.user,
-    )
+    if request.method == "POST" and request.POST.get("save_user_answers"):
+        for key, value in request.POST.items():
+            if not key.startswith("question_"):
+                continue
+
+            question_id = key.replace("question_", "", 1)
+
+            if not str(question_id).isdigit():
+                continue
+
+            try:
+                question = QuizQuestion.objects.get(
+                    id=int(question_id),
+                    quiz=selected_quiz,
+                )
+            except QuizQuestion.DoesNotExist:
+                continue
+
+            selected_choice = str(value or "").strip()
+            selected_choice = selected_choice.replace("①", "1").replace("②", "2").replace("③", "3").replace("④", "4")
+
+            match = re.search(r"[1-4]", selected_choice)
+            if match:
+                selected_choice = match.group(0)
+
+            QuizAnswer.objects.update_or_create(
+                user=request.user,
+                quiz_question=question,
+                defaults={
+                    "user_answer": selected_choice,
+                    "similarity_score": None,
+                    "predicted_label": "",
+                },
+            )
+
+        return redirect(f"/quiz/answer/?lecture_id={lecture.id}&generation={selected_quiz.generation_number}")
+
+    quiz_items = build_objective_items_for_display(selected_quiz, request.user)
+
+    all_generations = list(quizzes.values_list("generation_number", flat=True).order_by("generation_number"))
+    current_gen = selected_quiz.generation_number if selected_quiz else 1
+
+    current_idx = all_generations.index(current_gen) if current_gen in all_generations else 0
+    prev_gen = all_generations[current_idx - 1] if current_idx > 0 else None
+    next_gen = all_generations[current_idx + 1] if current_idx < len(all_generations) - 1 else None
 
     return render(request, "quiz.html", {
         "lecture": lecture,
         "quizzes": quizzes,
         "selected_quiz": selected_quiz,
-        "quiz_text": quiz_text,
         "quiz_items": quiz_items,
-        "raw_user_answer": raw_user_answer,
+        "current_gen": current_gen,
+        "all_generations": all_generations,
+        "has_prev": prev_gen is not None,
+        "has_next": next_gen is not None,
+        "prev_gen": prev_gen,
+        "next_gen": next_gen,
     })
 
 
 @login_required(login_url="home")
 def quiz_answer_page(request):
-    """모범 답안, 입력한 답안 확인 가능."""
+    """객관식 정답 및 오답 확인 페이지."""
     lecture_id = request.GET.get("lecture_id")
 
     if not lecture_id:
@@ -1385,35 +925,245 @@ def quiz_answer_page(request):
     if not lecture.summary_text:
         return redirect(f"/summary/?lecture_id={lecture.id}")
 
-    quizzes = Quiz.objects.filter(lecture=lecture).exclude(quiz_text="").order_by("generation_number", "id")
+    quizzes = get_objective_quizzes_for_lecture(lecture)
 
     if not quizzes.exists():
         return redirect(f"/quiz/?lecture_id={lecture.id}")
 
     selected_generation = request.GET.get("generation")
+    selected_quiz = None
 
-    if selected_generation:
-        selected_quiz = quizzes.filter(generation_number=selected_generation).first()
-    else:
+    if selected_generation and str(selected_generation).isdigit():
+        selected_quiz = quizzes.filter(generation_number=int(selected_generation)).first()
+
+    if not selected_quiz:
         selected_quiz = quizzes.order_by("-generation_number", "-id").first()
 
     if not selected_quiz:
         selected_quiz = quizzes.first()
 
-    quiz_text = selected_quiz.quiz_text
-    quiz_items, raw_user_answer = build_quiz_items_for_display(
-        quiz_text=quiz_text,
-        quiz=selected_quiz,
-        user=request.user,
-    )
+    quiz_items = build_objective_items_for_display(selected_quiz, request.user)
+
+    correct_count = 0
+    wrong_count = 0
+    has_answers = False
+    wrong_items = []
+
+    for item in quiz_items:
+        user_choice = str(item.get("user_choice") or "").strip()
+        correct_choice = str(item.get("correct_choice") or "").strip()
+        item["is_correct"] = bool(user_choice) and user_choice == correct_choice
+
+        selected_text = ""
+        correct_text = ""
+
+        for choice in item.get("choices") or []:
+            c_num = str(choice.get("c_num") or "").strip()
+            choice_label = f"{c_num}번"
+            choice_text = choice.get("choice_text") or ""
+
+            if c_num == user_choice:
+                selected_text = f"{choice_label} {choice_text}"
+
+            if c_num == correct_choice:
+                correct_text = f"{choice_label} {choice_text}"
+
+        item["selected_text"] = selected_text
+        item["correct_text"] = correct_text
+
+        if user_choice:
+            has_answers = True
+
+        if item["is_correct"]:
+            correct_count += 1
+        else:
+            wrong_count += 1
+            wrong_items.append(item)
+
+    total_count = len(quiz_items)
+    score = round((correct_count / total_count) * 100, 1) if total_count else 0
+
+    # 피드백 페이지에서 오답 기반 서술형 문제 생성에 활용할 수 있도록 세션에도 저장한다.
+    request.session[f"objective_wrong_items_{lecture.id}"] = [
+        {
+            "objective_number": item.get("q_num") or item.get("number"),
+            "question_number": item.get("q_num") or item.get("number"),
+            "question_text": item.get("question_text"),
+            "keyword": item.get("keyword"),
+            "timeline": item.get("timeline"),
+            "explanation": item.get("explanation"),
+            "correct_text": item.get("correct_text"),
+            "selected_text": item.get("selected_text"),
+            "user_choice": item.get("user_choice"),
+            "correct_choice": item.get("correct_choice"),
+            "choices": item.get("choices"),
+        }
+        for item in wrong_items
+    ]
+    request.session.modified = True
 
     return render(request, "quiz_answer.html", {
         "lecture": lecture,
         "quizzes": quizzes,
         "selected_quiz": selected_quiz,
-        "quiz_text": quiz_text,
+        "result_items": quiz_items,
         "quiz_items": quiz_items,
-        "raw_user_answer": raw_user_answer,
+        "total_count": total_count,
+        "correct_count": correct_count,
+        "wrong_count": wrong_count,
+        "score": score,
+        "has_answers": has_answers,
+        "wrong_items": wrong_items,
+    })
+
+
+@login_required(login_url="home")
+def tf_quiz_page(request):
+    """O/X 퀴즈 생성, 표시, 사용자 선택 답안 저장 페이지."""
+    lecture_id = request.GET.get("lecture_id")
+
+    if request.method == "POST":
+        lecture_id = lecture_id or request.POST.get("lecture_id")
+
+    if not lecture_id:
+        return redirect("history")
+
+    lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
+
+    if not lecture.summary_text:
+        return redirect(f"/summary/?lecture_id={lecture.id}")
+
+    # [핵심] explanation 필드를 "tf" 값으로 지정하여 O/X 퀴즈만 조회
+    quizzes = Quiz.objects.filter(lecture=lecture, explanation=TF_QUIZ_TYPE).order_by("generation_number")
+
+    # 1. 새 O/X 퀴즈 생성 요청 처리
+    if request.method == "POST" and request.POST.get("generate_quiz"):
+        max_generation = quizzes.aggregate(max_number=Max("generation_number"))["max_number"] or 0
+        next_generation = max_generation + 1
+
+        new_quiz = Quiz.objects.create(
+            lecture=lecture,
+            generation_number=next_generation,
+            question="",
+            answer="",
+            explanation=TF_QUIZ_TYPE,  # explanation="tf"로 지정
+            quiz_text="",
+        )
+        items = generate_tf_quiz_items(lecture.summary_text, question_count=20)
+        save_tf_questions(new_quiz, items)
+
+        return redirect(f"/tf-quiz/?lecture_id={lecture.id}&generation={next_generation}")
+
+    # 2. 최초 진입 시 O/X 퀴즈가 없는 경우 자동 생성
+    if not quizzes.exists():
+        first_quiz = Quiz.objects.create(
+            lecture=lecture,
+            generation_number=1,
+            question="",
+            answer="",
+            explanation=TF_QUIZ_TYPE,  # explanation="tf"로 지정
+            quiz_text="",
+        )
+        items = generate_tf_quiz_items(lecture.summary_text, question_count=20)
+        save_tf_questions(first_quiz, items)
+        return redirect(f"/tf-quiz/?lecture_id={lecture.id}&generation=1")
+
+    # 3. 요청된 회차(generation) 선택
+    selected_generation = request.GET.get("generation") or request.GET.get("gen")
+    selected_quiz = None
+
+    if selected_generation and str(selected_generation).isdigit():
+        selected_quiz = quizzes.filter(generation_number=int(selected_generation)).first()
+
+    if not selected_quiz:
+        selected_quiz = quizzes.order_by("-generation_number", "-id").first()
+
+    if not selected_quiz:
+        selected_quiz = quizzes.first()
+
+    show_result = False
+
+    # 4. O/X 답안 채점 및 저장
+    if request.method == "POST" and request.POST.get("save_user_answers"):
+        for key, value in request.POST.items():
+            if not key.startswith("question_"):
+                continue
+
+            question_id = key.replace("question_", "", 1)
+            if not str(question_id).isdigit():
+                continue
+
+            try:
+                question = QuizQuestion.objects.get(
+                    id=int(question_id),
+                    quiz=selected_quiz,
+                )
+            except QuizQuestion.DoesNotExist:
+                continue
+
+            user_choice = str(value or "").strip().upper()  # 'O' 또는 'X'
+
+            QuizAnswer.objects.update_or_create(
+                user=request.user,
+                quiz_question=question,
+                defaults={
+                    "user_answer": user_choice,
+                    "similarity_score": None,
+                    "predicted_label": "",
+                },
+            )
+        show_result = True
+
+    # 5. 화면 표출용 아이템 구성
+    quiz_questions = selected_quiz.questions.all().order_by("number")
+    quiz_items = []
+
+    for q in quiz_questions:
+        user_ans = ""
+        user_answer_obj = QuizAnswer.objects.filter(user=request.user, quiz_question=q).first()
+        if user_answer_obj:
+            user_ans = user_answer_obj.user_answer
+
+        # explanation JSON 파싱 (해설 및 원문)
+        explanation_text = ""
+        original_sentence = ""
+        if q.explanation:
+            try:
+                meta = json.loads(q.explanation)
+                explanation_text = meta.get("explanation", "")
+                original_sentence = meta.get("original_sentence", "")
+            except Exception:
+                explanation_text = q.explanation
+
+        quiz_items.append({
+            "id": q.id,
+            "number": q.number,
+            "question_text": q.question_text,
+            "model_answer": q.model_answer,
+            "user_answer": user_ans,
+            "is_correct": (user_ans == q.model_answer) if user_ans else False,
+            "explanation": explanation_text,
+            "original_sentence": original_sentence,
+        })
+
+    # 6. 회차 이동 네비게이션용 계산
+    all_generations = list(quizzes.values_list("generation_number", flat=True).order_by("generation_number"))
+    current_gen = selected_quiz.generation_number if selected_quiz else 1
+
+    prev_gen = current_gen - 1 if (current_gen - 1) in all_generations else None
+    next_gen = current_gen + 1 if (current_gen + 1) in all_generations else None
+
+    return render(request, "tf_quiz.html", {
+        "lecture": lecture,
+        "quizzes": quizzes,
+        "selected_quiz": selected_quiz,
+        "quiz_items": quiz_items,
+        "show_result": show_result,
+        "current_gen": current_gen,
+        "has_prev": prev_gen is not None,
+        "has_next": next_gen is not None,
+        "prev_gen": prev_gen,
+        "next_gen": next_gen,
     })
 
 
@@ -1421,88 +1171,230 @@ def quiz_answer_page(request):
 def feedback_page(request):
     """학습 피드백 페이지.
 
-    강의별 사용자 답안, 유사도 점수, 시스템 1차 판단,
-    사람 검토 결과를 모아 학습 분석 결과로 보여준다.
+    객관식 오답 이후 제공되는 서술형 피드백 문제 생성,
+    사용자 서술형 답안 저장, Reranker 기반 자동 채점 결과 확인을 담당한다.
     """
     lecture_id = request.GET.get("lecture_id")
+
+    if request.method == "POST":
+        lecture_id = lecture_id or request.POST.get("lecture_id")
 
     if not lecture_id:
         return redirect("history")
 
     lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
-
     has_summary = bool(lecture.summary_text)
-    has_quiz = Quiz.objects.filter(lecture=lecture).exclude(quiz_text="").exists()
 
-    answers = (
-        QuizAnswer.objects
-        .filter(
-            user=request.user,
-            quiz_question__quiz__lecture=lecture,
-        )
-        .select_related(
-            "quiz_question",
-            "quiz_question__quiz",
-        )
-        .order_by(
-            "quiz_question__quiz__generation_number",
-            "quiz_question__number",
-            "created_at",
-        )
+    if not has_summary:
+        return render(request, "feedback.html", {
+            "lecture": lecture,
+            "has_summary": False,
+            "has_quiz": False,
+            "quizzes": [],
+            "selected_quiz": None,
+            "quiz_items": [],
+            "answer_items": [],
+            "total_answer_count": 0,
+            "selected_generation": None,
+            "average_similarity": 0,
+            "correct_like_count": 0,
+            "review_needed_count": 0,
+            "wrong_like_count": 0,
+            "reviewed_count": 0,
+            "review_agree_count": 0,
+            "review_agreement_rate": None,
+            "objective_generation": None,
+        })
+
+    objective_generation = request.GET.get("objective_generation") or request.POST.get("objective_generation")
+    auto_generate_feedback = request.GET.get("auto_generate_feedback") == "1"
+
+    feedback_quizzes = (
+        Quiz.objects
+        .filter(lecture=lecture, explanation=FEEDBACK_QUIZ_TYPE)
+        .exclude(quiz_text="")
+        .order_by("generation_number", "id")
     )
 
-    total_answer_count = answers.count()
+    def create_feedback_quiz_from_objective(next_generation):
+        wrong_items = []
 
-    correct_like_count = 0
-    review_needed_count = 0
-    wrong_like_count = 0
+        if objective_generation:
+            objective_quizzes = get_objective_quizzes_for_lecture(lecture)
+            objective_quiz = None
 
-    reviewed_count = 0
-    review_agree_count = 0
+            if str(objective_generation).isdigit():
+                objective_quiz = objective_quizzes.filter(generation_number=int(objective_generation)).first()
 
-    similarity_sum = 0.0
+            if objective_quiz:
+                wrong_items = get_wrong_objective_items_from_quiz(request.user, objective_quiz)
+
+        if not wrong_items:
+            wrong_items = request.session.get(f"objective_wrong_items_{lecture.id}", []) or []
+
+        return build_feedback_quiz_text_from_wrong_items(
+            wrong_items=wrong_items,
+            generation_number=next_generation,
+            summary_text=lecture.summary_text,
+        )
+
+    if auto_generate_feedback and objective_generation:
+        max_generation = feedback_quizzes.aggregate(max_number=Max("generation_number"))["max_number"] or 0
+        next_generation = max_generation + 1
+        quiz_text = create_feedback_quiz_from_objective(next_generation)
+
+        new_quiz = Quiz.objects.create(
+            lecture=lecture,
+            generation_number=next_generation,
+            question=quiz_text,
+            answer="",
+            explanation=FEEDBACK_QUIZ_TYPE,
+            quiz_text=quiz_text,
+        )
+        save_quiz_questions_from_text(new_quiz, quiz_text)
+
+        return redirect(
+            f"/feedback/?lecture_id={lecture.id}"
+            f"&generation={next_generation}"
+            f"&objective_generation={objective_generation}"
+        )
+
+    if request.method == "POST" and request.POST.get("generate_feedback_questions"):
+        max_generation = feedback_quizzes.aggregate(max_number=Max("generation_number"))["max_number"] or 0
+        next_generation = max_generation + 1
+
+        if objective_generation:
+            quiz_text = create_feedback_quiz_from_objective(next_generation)
+        else:
+            previous_quiz_texts = "\n\n".join([quiz.quiz_text for quiz in feedback_quizzes])
+            quiz_text = generate_quiz(
+                lecture.summary_text,
+                generation_number=next_generation,
+                previous_quiz_texts=previous_quiz_texts,
+            )
+
+        new_quiz = Quiz.objects.create(
+            lecture=lecture,
+            generation_number=next_generation,
+            question=quiz_text,
+            answer="",
+            explanation=FEEDBACK_QUIZ_TYPE,
+            quiz_text=quiz_text,
+        )
+        save_quiz_questions_from_text(new_quiz, quiz_text)
+
+        redirect_url = f"/feedback/?lecture_id={lecture.id}&generation={next_generation}"
+        if objective_generation:
+            redirect_url += f"&objective_generation={objective_generation}"
+        return redirect(redirect_url)
+
+    if request.method == "POST" and request.POST.get("save_feedback_answers"):
+        gen_raw = request.POST.get("generation")
+
+        if not gen_raw or not str(gen_raw).isdigit():
+            return redirect(f"/feedback/?lecture_id={lecture.id}")
+
+        gen = int(gen_raw)
+        quiz_to_update = feedback_quizzes.filter(generation_number=gen).first()
+
+        if not quiz_to_update:
+            return redirect(f"/feedback/?lecture_id={lecture.id}")
+
+        save_user_answers_to_quiz_answer(
+            user=request.user,
+            quiz=quiz_to_update,
+            post_data=request.POST,
+        )
+
+        redirect_url = f"/feedback/?lecture_id={lecture.id}&generation={gen}"
+        if objective_generation:
+            redirect_url += f"&objective_generation={objective_generation}"
+        return redirect(redirect_url)
+
+    feedback_quizzes = (
+        Quiz.objects
+        .filter(lecture=lecture, explanation=FEEDBACK_QUIZ_TYPE)
+        .exclude(quiz_text="")
+        .order_by("generation_number", "id")
+    )
+
+    has_quiz = feedback_quizzes.exists()
+    selected_quiz = None
+    selected_generation = None
+    quiz_items = []
+    raw_user_answer = ""
+
+    if has_quiz:
+        generation_param = request.GET.get("generation")
+
+        if generation_param and str(generation_param).isdigit():
+            selected_quiz = feedback_quizzes.filter(generation_number=int(generation_param)).first()
+
+        if not selected_quiz:
+            selected_quiz = feedback_quizzes.order_by("-generation_number", "-id").first()
+
+        if not selected_quiz:
+            selected_quiz = feedback_quizzes.first()
+
+        selected_generation = selected_quiz.generation_number
+
+        quiz_items, raw_user_answer = build_quiz_items_for_display(
+            quiz_text=selected_quiz.quiz_text,
+            quiz=selected_quiz,
+            user=request.user,
+        )
+
+    answers = QuizAnswer.objects.none()
+
+    if selected_quiz:
+        answers = (
+            QuizAnswer.objects
+            .filter(user=request.user, quiz_question__quiz=selected_quiz)
+            .select_related("quiz_question", "quiz_question__quiz")
+            .order_by("quiz_question__number", "created_at")
+        )
+
     answer_items = []
 
     def normalize_label(label):
-        """시스템 라벨과 사람 라벨을 비교하기 위한 공통 분류."""
         if not label:
             return ""
-
         label = str(label).strip()
         label_no_space = label.replace(" ", "")
-
         if label_no_space in ["정답", "정답가능성높음"]:
             return "정답"
-
         if label_no_space in ["부분정답", "검토필요"]:
             return "부분정답"
-
         if label_no_space in ["오답", "오답가능성높음"]:
             return "오답"
-
         return label
 
     def label_from_human_score(score):
-        """human_label이 없을 때 human_score를 기준으로 라벨을 추정한다."""
         if score is None:
             return ""
-
         try:
             score = float(score)
         except (TypeError, ValueError):
             return ""
-
         if score >= 75:
             return "정답"
-
         if score >= 45:
             return "부분정답"
-
         return "오답"
 
+    correct_like_count = 0
+    review_needed_count = 0
+    wrong_like_count = 0
+    reviewed_count = 0
+    review_agree_count = 0
+    score_sum = 0.0
+    total_answer_count = 0
+
     for answer in answers:
-        score = answer.similarity_score if answer.similarity_score is not None else 0.0
-        similarity_sum += score
+        raw_score = answer.similarity_score if answer.similarity_score is not None else 0.0
+        display_score = max(0.0, min(raw_score, 1.0))
+        score_sum += display_score
+        total_answer_count += 1
 
         predicted_label = answer.predicted_label or ""
         normalized_predicted = normalize_label(predicted_label)
@@ -1516,29 +1408,34 @@ def feedback_page(request):
 
         human_score = answer.human_score
         human_label = answer.human_label or ""
-
         is_reviewed = bool(human_label) or human_score is not None
 
         if is_reviewed:
             reviewed_count += 1
-
             normalized_human_label = normalize_label(human_label)
-
             if not normalized_human_label:
                 normalized_human_label = label_from_human_score(human_score)
-
             if normalized_predicted == normalized_human_label:
                 review_agree_count += 1
 
+        question = answer.quiz_question
+        keywords = (question.explanation or "").strip()
+        timelines = (getattr(question, "related_timeline", "") or "").strip()
+
+        if not keywords and timelines:
+            keywords, timelines = split_quiz_reference(combined=timelines)
+
         answer_items.append({
             "id": answer.id,
-            "generation_number": answer.quiz_question.quiz.generation_number,
-            "question_number": answer.quiz_question.number,
-            "question_text": answer.quiz_question.question_text,
-            "model_answer": answer.quiz_question.model_answer,
+            "generation_number": question.quiz.generation_number,
+            "question_number": question.number,
+            "question_text": question.question_text,
+            "model_answer": question.model_answer,
+            "keywords": keywords,
+            "timelines": timelines,
             "user_answer": answer.user_answer,
-            "similarity_score": score,
-            "similarity_percent": round(score * 100, 1),
+            "similarity_score": raw_score,
+            "similarity_percent": round(display_score * 100, 1),
             "predicted_label": predicted_label,
             "human_score": human_score,
             "human_label": human_label,
@@ -1546,34 +1443,29 @@ def feedback_page(request):
             "created_at": answer.created_at,
         })
 
-    if total_answer_count > 0:
-        average_similarity = round((similarity_sum / total_answer_count) * 100, 1)
-    else:
-        average_similarity = 0
-
-    if reviewed_count > 0:
-        review_agreement_rate = round((review_agree_count / reviewed_count) * 100, 1)
-    else:
-        review_agreement_rate = None
+    average_similarity = round((score_sum / total_answer_count) * 100, 1) if total_answer_count else 0
+    review_agreement_rate = round((review_agree_count / reviewed_count) * 100, 1) if reviewed_count else None
 
     return render(request, "feedback.html", {
         "lecture": lecture,
         "has_summary": has_summary,
         "has_quiz": has_quiz,
-
+        "quizzes": feedback_quizzes,
+        "selected_quiz": selected_quiz,
+        "selected_generation": selected_generation,
+        "quiz_items": quiz_items,
+        "raw_user_answer": raw_user_answer,
         "answer_items": answer_items,
         "total_answer_count": total_answer_count,
         "average_similarity": average_similarity,
-
         "correct_like_count": correct_like_count,
         "review_needed_count": review_needed_count,
         "wrong_like_count": wrong_like_count,
-
         "reviewed_count": reviewed_count,
         "review_agree_count": review_agree_count,
         "review_agreement_rate": review_agreement_rate,
+        "objective_generation": objective_generation,
     })
-
 
 def test_api(request):
     """프론트-백엔드 연결 테스트용 API."""
@@ -1581,3 +1473,281 @@ def test_api(request):
         {"message": "백엔드 연결 성공"},
         json_dumps_params={"ensure_ascii": False},
     )
+
+def _user_role_value(user):
+    if not user.is_active:
+        return "inactive"
+    if user.is_staff:
+        return "staff"
+    return "active"
+
+def _apply_user_role(user, role, actor):
+    """사용자 권한(is_staff / is_active)을 적용한다."""
+    if role == "staff":
+        is_staff, is_active = True, True
+    elif role == "inactive":
+        is_staff, is_active = False, False
+    elif role == "active":
+        is_staff, is_active = False, True
+    else:
+        return False, "올바르지 않은 권한 값입니다."
+
+    if user.pk == actor.pk:
+        if not is_active:
+            return False, "본인 계정은 비활성화할 수 없습니다."
+        if not is_staff:
+            return False, "본인 계정의 관리자 권한은 해제할 수 없습니다."
+
+    user.is_staff = is_staff
+    user.is_active = is_active
+    user.save(update_fields=["is_staff", "is_active"])
+    return True, ""
+
+def staff_required(view_func):
+    """is_staff 사용자만 접근 가능. 비로그인/권한 없음은 홈으로 보낸다."""
+    return user_passes_test(
+        lambda u: u.is_active and u.is_staff,
+        login_url="home",
+    )(view_func)
+
+@staff_required
+def manage_dashboard(request):
+    """학습 관리 대시보드: 핵심 지표와 최근 답안을 한눈에 보여준다."""
+    answer_count = QuizAnswer.objects.count()
+    reviewed_count = QuizAnswer.objects.filter(_REVIEWED_Q).count()
+
+    recent_answers = (
+        QuizAnswer.objects
+        .select_related(
+            "user",
+            "quiz_question",
+            "quiz_question__quiz",
+            "quiz_question__quiz__lecture",
+        )
+        .order_by("-created_at")[:8]
+    )
+
+    context = {
+        "lecture_count": Lecture.objects.count(),
+        "analyzed_count": Lecture.objects.exclude(summary_text="").count(),
+        "quiz_count": Quiz.objects.exclude(quiz_text="").count(),
+        "question_count": QuizQuestion.objects.count(),
+        "answer_count": answer_count,
+        "reviewed_count": reviewed_count,
+        "pending_review_count": max(0, answer_count - reviewed_count),
+        "user_count": User.objects.count(),
+        "recent_answers": recent_answers,
+    }
+    return render(request, "manage/dashboard.html", context)
+
+@staff_required
+def manage_answers(request):
+    """제출된 답안 목록 검수 페이지.
+
+    GET: 필터/검색/페이지네이션으로 답안을 조회한다.
+    POST: 특정 답안에 사람 라벨/점수를 저장한다.
+    """
+    if request.method == "POST":
+        answer = get_object_or_404(QuizAnswer, id=request.POST.get("answer_id"))
+
+        answer.human_label = (request.POST.get("human_label") or "").strip()
+
+        human_score_raw = (request.POST.get("human_score") or "").strip()
+        if human_score_raw == "":
+            answer.human_score = None
+        else:
+            try:
+                answer.human_score = float(human_score_raw)
+            except ValueError:
+                answer.human_score = None
+
+        answer.save(update_fields=["human_label", "human_score"])
+        messages.success(
+            request,
+            f"{answer.user.username}님의 답안 검수 결과를 저장했습니다.",
+        )
+
+        querystring = request.POST.get("querystring", "")
+        url = reverse("manage_answers")
+        if querystring:
+            url = f"{url}?{querystring}"
+        return redirect(url)
+
+    answers = (
+        QuizAnswer.objects
+        .select_related(
+            "user",
+            "quiz_question",
+            "quiz_question__quiz",
+            "quiz_question__quiz__lecture",
+        )
+    )
+
+    search = (request.GET.get("q") or "").strip()
+    label = (request.GET.get("label") or "").strip()
+    generation = (request.GET.get("generation") or "").strip()
+    lecture_id = (request.GET.get("lecture") or "").strip()
+    review_state = (request.GET.get("review") or "").strip()
+
+    if search:
+        answers = answers.filter(
+            Q(user__username__icontains=search)
+            | Q(quiz_question__question_text__icontains=search)
+            | Q(user_answer__icontains=search)
+            | Q(quiz_question__quiz__lecture__title__icontains=search)
+        )
+
+    if label:
+        answers = answers.filter(predicted_label=label)
+
+    if generation.isdigit():
+        answers = answers.filter(
+            quiz_question__quiz__generation_number=int(generation)
+        )
+
+    if lecture_id.isdigit():
+        answers = answers.filter(quiz_question__quiz__lecture_id=int(lecture_id))
+
+    if review_state == "reviewed":
+        answers = answers.filter(_REVIEWED_Q)
+    elif review_state == "pending":
+        answers = answers.exclude(_REVIEWED_Q)
+
+    answers = answers.order_by("-created_at")
+
+    paginator = Paginator(answers, MANAGE_ANSWER_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    items = []
+    for answer in page_obj:
+        raw_score = answer.similarity_score if answer.similarity_score is not None else 0.0
+        items.append({
+            "obj": answer,
+            "percent": round(max(0.0, min(raw_score, 1.0)) * 100, 1),
+            "is_reviewed": bool(answer.human_label) or answer.human_score is not None,
+        })
+
+    # 페이지 이동 시 필터를 유지하기 위한 쿼리스트링 (page 제외)
+    params = request.GET.copy()
+    params.pop("page", None)
+    base_query = params.urlencode()
+
+    context = {
+        "page_obj": page_obj,
+        "items": items,
+        "search": search,
+        "label": label,
+        "generation": generation,
+        "lecture_id": lecture_id,
+        "review_state": review_state,
+        "predicted_labels": PREDICTED_LABEL_CHOICES,
+        "human_labels": HUMAN_LABEL_CHOICES,
+        "lectures": Lecture.objects.order_by("title").values("id", "title"),
+        "generations": (
+            Quiz.objects.exclude(quiz_text="")
+            .values_list("generation_number", flat=True)
+            .distinct()
+            .order_by("generation_number")
+        ),
+        "base_query": base_query,
+        "current_query": request.GET.urlencode(),
+        "reviewed_count": QuizAnswer.objects.filter(_REVIEWED_Q).count(),
+        "total_count": QuizAnswer.objects.count(),
+    }
+    return render(request, "manage/answers.html", context)
+
+@staff_required
+def manage_users(request):
+    """등록된 사용자 목록 및 UserProfile 수정 페이지."""
+    if request.method == "POST":
+        user = get_object_or_404(User, id=request.POST.get("user_id"))
+
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+
+        profile.name = (request.POST.get("name") or "").strip()
+        profile.phone = (request.POST.get("phone") or "").strip()
+        profile.certification = (request.POST.get("certification") or "").strip()
+        profile.reason = (request.POST.get("reason") or "").strip()
+        profile.interest = (request.POST.get("interest") or "").strip()
+
+        age_raw = (request.POST.get("age") or "").strip()
+        if age_raw == "":
+            profile.age = None
+        else:
+            try:
+                age_val = int(age_raw)
+                profile.age = age_val if age_val > 0 else None
+            except ValueError:
+                profile.age = None
+
+        profile.save()
+
+        role = (request.POST.get("role") or "").strip()
+        ok, err = _apply_user_role(user, role, request.user)
+        if not ok:
+            messages.error(request, err)
+        else:
+            messages.success(request, f"{user.username}님의 프로필과 권한을 저장했습니다.")
+
+        querystring = request.POST.get("querystring", "")
+        url = reverse("manage_users")
+        if querystring:
+            url = f"{url}?{querystring}"
+        return redirect(url)
+
+    users = (
+        User.objects
+        .annotate(
+            lecture_count=Count("lectures", distinct=True),
+            answer_count=Count("quiz_answers", distinct=True),
+            display_name=Coalesce("profile__name", Value("")),
+        )
+        .order_by("-date_joined")
+    )
+
+    search = (request.GET.get("q") or "").strip()
+    if search:
+        users = users.filter(
+            Q(username__icontains=search)
+            | Q(email__icontains=search)
+            | Q(first_name__icontains=search)
+            | Q(last_name__icontains=search)
+            | Q(profile__name__icontains=search)
+        )
+
+    paginator = Paginator(users, MANAGE_USER_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    profile_map = {
+        p.user_id: p
+        for p in UserProfile.objects.filter(
+            user_id__in=[u.id for u in page_obj.object_list]
+        )
+    }
+
+    items = []
+    for user in page_obj.object_list:
+        profile = profile_map.get(user.id)
+        items.append({
+            "user": user,
+            "profile": profile,
+            "display_name": user.display_name,
+            "role": _user_role_value(user),
+            "is_self": user.pk == request.user.pk,
+        })
+
+    params = request.GET.copy()
+    params.pop("page", None)
+    base_query = params.urlencode()
+
+    context = {
+        "page_obj": page_obj,
+        "items": items,
+        "search": search,
+        "base_query": base_query,
+        "current_query": request.GET.urlencode(),
+        "total_count": User.objects.count(),
+        "edit_user_id": (request.GET.get("edit") or "").strip(),
+        "user_roles": USER_ROLE_CHOICES,
+    }
+    return render(request, "manage/users.html", context)

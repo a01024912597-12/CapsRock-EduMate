@@ -1,43 +1,71 @@
 {% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "강의 요약" %} — EduMate{% endblock %}
+{% block breadcrumb %}{% trans "강의 요약" %}{% endblock %}
 
 {% block content %}
-    <!-- 강의 기본 정보 영역 -->
-    <h2>강의 요약</h2>
+    <h2 class="app-page-title">
+        <span class="title-icon"><i class="fas fa-file-alt"></i></span>
+        {% trans "강의 요약" %}
+    </h2>
 
-    <p><strong>강의 제목:</strong> {{ lecture_title }}</p>
-    <p><strong>유튜브 링크:</strong> {{ youtube_link }}</p>
+    <p class="app-meta-line"><strong>{% trans "강의 제목:" %}</strong> {{ lecture_title }}</p>
 
-    {% if video_id %}
-        <!-- 유튜브 임베드 영역: 16:9 비율 고정 -->
-        <h3>강의 영상</h3>
-        <div style="position: relative; width: 100%; max-width: 960px; margin: 0 auto; aspect-ratio: 16 / 9;">
-            <iframe
-                src="https://www.youtube-nocookie.com/embed/{{ video_id }}"
-                title="YouTube video player"
-                referrerpolicy="strict-origin-when-cross-origin"
-                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; border-radius: 10px;"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowfullscreen>
-            </iframe>
-        </div>
+    {% if source_type == "file" %}
+        <p class="app-meta-line"><strong>{% trans "업로드 파일:" %}</strong> {{ video_file_name }}</p>
+
+        {% if video_file_url %}
+            <h3 style="margin: 20px 0 12px; font-size: 17px; color: var(--text-main);">{% trans "강의 영상" %}</h3>
+
+            <div class="lecture-video-wrap lecture-video-wrap--file" id="lectureVideoWrap">
+                <div class="lecture-video-loading" id="lectureVideoLoading" aria-hidden="false">
+                    <div class="loader loader--video"></div>
+                    <span>{% trans "영상 불러오는 중…" %}</span>
+                </div>
+
+                <video
+                    id="lectureUploadedVideo"
+                    controls
+                    playsinline
+                    preload="auto"
+                    src="{{ video_file_url }}">
+                    {% trans "브라우저가 video 태그를 지원하지 않습니다." %}
+                </video>
+            </div>
+        {% else %}
+            <p class="app-meta-line">{% trans "업로드된 영상 파일을 불러올 수 없습니다." %}</p>
+        {% endif %}
     {% else %}
-        <!-- video_id를 추출하지 못한 경우 안내 메시지 -->
-        <p>유튜브 영상 ID를 확인할 수 없어 재생할 수 없습니다.</p>
+        <p class="app-meta-line"><strong>{% trans "유튜브 링크:" %}</strong> {{ youtube_link }}</p>
+
+        {% if video_id %}
+            <h3 style="margin: 20px 0 12px; font-size: 17px; color: var(--text-main);">{% trans "강의 영상" %}</h3>
+
+            <div id="lecture-video-wrap" class="lecture-video-wrap">
+                <iframe
+                    id="lecture-video-iframe"
+                    src="https://www.youtube-nocookie.com/embed/{{ video_id }}"
+                    title="YouTube video player"
+                    referrerpolicy="strict-origin-when-cross-origin"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowfullscreen>
+                </iframe>
+            </div>
+        {% else %}
+            <p class="app-meta-line">{% trans "유튜브 영상 ID를 확인할 수 없어 재생할 수 없습니다." %}</p>
+        {% endif %}
     {% endif %}
 
-    <!-- AI 요약 결과 영역 -->
-    <div style="margin-top: 30px;">
-        <h3 style="font-size: 18px; color: #2f3640; margin-bottom: 15px;">📋 AI 요약</h3>
+    <div class="summary-analysis-wrap">
+        <h3 class="summary-analysis-title">📋 {% trans "AI 요약" %}</h3>
 
-        <div id="analysis-container"
-             style="background: white; border: 1px solid #dcdde1; padding: 25px; border-radius: 10px; line-height: 1.8; white-space: pre-wrap; font-size: 15px; color: #353b48; min-height: 200px;">
-            <div id="loading-area" style="text-align: center; padding: 40px;">
-                <!-- 분석 요청 중 로딩 UI -->
-                <div class="loader"
-                     style="border: 6px solid #f3f3f3; border-top: 6px solid #273c75; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px auto;"></div>
-                <p id="status-text" style="font-weight: bold; color: #7f8c8d;">
-                    AI가 강의 내용을 분석 중입니다... <br>
-                    <span style="font-size: 12px; font-weight: normal;">(영상 길이에 따라 최대 몇 분이 소요될 수 있습니다)</span>
+        <div id="analysis-container">
+            <div id="loading-area">
+                <div class="loader"></div>
+                <p id="status-text">
+                    {% trans "AI가 강의 내용을 분석 중입니다..." %} <br>
+                    <span>{% trans "(영상 길이에 따라 최대 몇 분이 소요될 수 있습니다)" %}</span>
                 </p>
             </div>
 
@@ -45,53 +73,422 @@
         </div>
     </div>
 
-    <!-- 페이지 이동 버튼 -->
-    <div style="margin-top: 40px; text-align: center;">
-        <button onclick="location.href='{% url 'upload' %}'" style="background-color: #7f8c8d; padding: 12px 24px;">
-            새로운 강의 분석
+    <div class="page-actions">
+        <a
+            id="summary-pdf-download"
+            href="{% url 'download_summary_pdf' lecture_id=lecture_id %}"
+            class="btn-action btn-action--muted"
+            style="{% if not has_summary %}display: none;{% endif %}"
+            download>
+            <i class="fas fa-file-pdf"></i> {% trans "PDF 다운로드" %}
+        </a>
+        <button type="button" class="btn-action btn-action--muted" onclick="location.href='{% url 'upload' %}'">
+            {% trans "새로운 강의 분석" %}
         </button>
-
-        <button onclick="location.href='{% url 'quiz' %}?lecture_id={{ lecture_id }}'" style="padding: 12px 24px; margin-left: 10px;">
-            예상 문제 풀기
+        <button type="button" class="btn-action btn-action--primary" onclick="location.href='{% url 'quiz' %}?lecture_id={{ lecture_id }}'">
+            {% trans "예상 문제 풀기" %}
         </button>
     </div>
 
     <style>
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .lecture-video-wrap {
+            position: relative;
+            width: 100%;
+            max-width: 960px;
+            aspect-ratio: 16 / 9;
+            margin: 0 auto 24px;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #000;
+            border: 1px solid var(--border);
+        }
+
+        .lecture-video-wrap iframe,
+        .lecture-video-wrap video {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border: 0;
+            background: #000;
+        }
+
+        .lecture-video-wrap--file video {
+            object-fit: contain;
+        }
+
+        .lecture-video-loading {
+            position: absolute;
+            inset: 0;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.72);
+            color: var(--text-sub);
+            font-size: 14px;
+            pointer-events: none;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+
+        .lecture-video-wrap.is-ready .lecture-video-loading {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loader--video {
+            width: 42px;
+            height: 42px;
+        }
+
+        .summary-ts {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 6px;
+            margin: 0 2px;
+            border-radius: 999px;
+            background: var(--grad-soft);
+            color: var(--accent);
+            font-weight: 800;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .summary-ts:hover,
+        .summary-ts:focus {
+            outline: none;
+            color: var(--accent2);
+            box-shadow: var(--ring);
+        }
+
+        .summary-section {
+            margin: 18px 0 10px;
+            font-size: 17px;
+            color: var(--text-main);
+            line-height: 1.6;
+        }
+
+        .summary-list {
+            margin: 8px 0 12px 20px;
+            padding: 0;
+            color: var(--text-sub);
+            line-height: 1.8;
+        }
+
+        .summary-list li {
+            margin-bottom: 6px;
+        }
+
+        .summary-para {
+            margin: 8px 0;
+            color: var(--text-sub);
+            line-height: 1.8;
+        }
+
+        .timeline-image-wrapper {
+            max-width: 920px;
+            margin: 24px auto;
         }
     </style>
 
     <script>
-        // 페이지가 열리면 자동으로 강의 분석 API를 호출해 결과를 표시한다.
-        document.addEventListener('DOMContentLoaded', function () {
-            const lectureId = "{{ lecture_id }}";
-            const loadingArea = document.getElementById('loading-area');
-            const resultArea = document.getElementById('result-text');
+        (function () {
+            const videoId = "{{ video_id|default:''|escapejs }}";
+            const sourceType = "{{ source_type|default:'youtube'|escapejs }}";
+            const canSeekVideo = Boolean(videoId) || sourceType === "file";
 
-            fetch(`/analyze-api/?lecture_id=${lectureId}`)
-                .then(response => response.json())
-                .then(data => {
-                    // 응답 수신 후 로딩 숨김, 결과 표시
-                    loadingArea.style.display = 'none';
-                    resultArea.style.display = 'block';
+            function escapeHtml(s) {
+                return String(s)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
 
-                    if (data.status === 'success') {
-                        // 정상 처리 시 요약 결과 렌더링
-                        resultArea.innerText = data.result;
-                    } else {
-                        // 서버 내부 처리 실패 메시지 표시
-                        resultArea.innerHTML = `<span style="color: #e84118; font-weight: bold;">${data.message}</span>`;
-                    }
-                })
-                .catch(error => {
-                    // 네트워크/통신 오류 처리
-                    loadingArea.style.display = 'none';
-                    resultArea.style.display = 'block';
-                    resultArea.innerText = "서버 통신 중 오류가 발생했습니다.";
-                    console.error('Error:', error);
+            function linkifyTimestampsInLine(line) {
+                if (!canSeekVideo) return line;
+
+                const re = /\(\s*(\d{1,3})\s*:\s*(\d{1,2})\s*(?::\s*(\d{1,2})\s*)?\)/g;
+
+                return line.replace(re, function (match, p1, p2, p3) {
+                    const a = parseInt(p1, 10);
+                    const b = parseInt(p2, 10);
+                    const c = p3 !== undefined && p3 !== '' ? parseInt(p3, 10) : NaN;
+
+                    const seconds = !Number.isNaN(c) ? a * 3600 + b * 60 + c : a * 60 + b;
+
+                    if (seconds < 0 || seconds > 86400) return match;
+
+                    return '<span class="summary-ts" role="button" tabindex="0" data-seconds="' + seconds +
+                        '" title="{% trans "클릭하면 이 시점부터 영상이 재생됩니다" %}">' + match + '</span>';
                 });
-        });
+            }
+
+            function isAllowedTimelineImageHtml(block) {
+                return block.indexOf('<div class="timeline-image-wrapper"') !== -1 &&
+                    block.indexOf('<img ') !== -1 &&
+                    block.indexOf('/media/lecture_frames/') !== -1;
+            }
+
+            function renderSummaryHtml(text) {
+                const lines = String(text || '').split('\n');
+
+                let html = '';
+                let inList = false;
+                let inImageBlock = false;
+                let imageBuffer = [];
+
+                for (let i = 0; i < lines.length; i++) {
+                    const raw = lines[i];
+                    const trimmed = raw.trim();
+
+                    if (trimmed.startsWith('<div class="timeline-image-wrapper"')) {
+                        if (inList) {
+                            html += '</ul>';
+                            inList = false;
+                        }
+
+                        inImageBlock = true;
+                        imageBuffer = [raw];
+
+                        if (trimmed.includes('</div>')) {
+                            const oneLineImageBlock = imageBuffer.join('\n');
+
+                            if (isAllowedTimelineImageHtml(oneLineImageBlock)) {
+                                html += oneLineImageBlock;
+                            }
+
+                            imageBuffer = [];
+                            inImageBlock = false;
+                        }
+
+                        continue;
+                    }
+
+                    if (inImageBlock) {
+                        imageBuffer.push(raw);
+
+                        if (trimmed.includes('</div>')) {
+                            const imageBlock = imageBuffer.join('\n');
+
+                            if (isAllowedTimelineImageHtml(imageBlock)) {
+                                html += imageBlock;
+                            }
+
+                            imageBuffer = [];
+                            inImageBlock = false;
+                        }
+
+                        continue;
+                    }
+
+                    if (!trimmed) {
+                        if (inList) {
+                            html += '</ul>';
+                            inList = false;
+                        }
+
+                        html += '<div style="height:8px;"></div>';
+                        continue;
+                    }
+
+                    const sectionMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
+
+                    if (sectionMatch) {
+                        if (inList) {
+                            html += '</ul>';
+                            inList = false;
+                        }
+
+                        html += '<h4 class="summary-section">' +
+                            escapeHtml(sectionMatch[1] + '. ' + sectionMatch[2]) +
+                            '</h4>';
+                        continue;
+                    }
+
+                    const bulletMatch = trimmed.match(/^[-•]\s+(.+)$/);
+
+                    if (bulletMatch) {
+                        if (!inList) {
+                            html += '<ul class="summary-list">';
+                            inList = true;
+                        }
+
+                        html += '<li>' +
+                            linkifyTimestampsInLine(escapeHtml(bulletMatch[1])) +
+                            '</li>';
+                        continue;
+                    }
+
+                    if (inList) {
+                        html += '</ul>';
+                        inList = false;
+                    }
+
+                    html += '<p class="summary-para">' +
+                        linkifyTimestampsInLine(escapeHtml(trimmed)) +
+                        '</p>';
+                }
+
+                if (inList) {
+                    html += '</ul>';
+                }
+
+                if (inImageBlock && imageBuffer.length > 0) {
+                    const finalImageBlock = imageBuffer.join('\n');
+
+                    if (isAllowedTimelineImageHtml(finalImageBlock)) {
+                        html += finalImageBlock;
+                    }
+                }
+
+                return html;
+            }
+
+            function playVideoAt(seconds) {
+                const t = Math.max(0, Math.floor(seconds));
+
+                if (sourceType === "file") {
+                    const video = document.getElementById('lectureUploadedVideo');
+
+                    if (!video) return;
+
+                    video.currentTime = t;
+                    video.play().catch(function () {});
+
+                    const wrap = document.getElementById('lectureVideoWrap');
+                    (wrap || video).scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return;
+                }
+
+                const iframe = document.getElementById('lecture-video-iframe');
+
+                if (!iframe || !videoId) return;
+
+                iframe.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(videoId) +
+                    '?start=' + t + '&autoplay=1';
+
+                const wrap = document.getElementById('lecture-video-wrap');
+                (wrap || iframe).scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            function markUploadedVideoReady() {
+                const wrap = document.getElementById('lectureVideoWrap');
+                const loading = document.getElementById('lectureVideoLoading');
+
+                if (wrap) {
+                    wrap.classList.add('is-ready');
+                }
+
+                if (loading) {
+                    loading.setAttribute('aria-hidden', 'true');
+                }
+            }
+
+            function whenUploadedVideoReady(video) {
+                return new Promise(function (resolve) {
+                    if (!video) {
+                        resolve();
+                        return;
+                    }
+
+                    if (video.readyState >= 2) {
+                        markUploadedVideoReady();
+                        resolve();
+                        return;
+                    }
+
+                    let finished = false;
+
+                    const finish = function () {
+                        if (finished) return;
+                        finished = true;
+                        markUploadedVideoReady();
+                        resolve();
+                    };
+
+                    video.addEventListener('loadeddata', finish, { once: true });
+                    video.addEventListener('canplay', finish, { once: true });
+                    video.addEventListener('canplaythrough', finish, { once: true });
+
+                    setTimeout(finish, 4000);
+                });
+            }
+
+            function runAnalysis(lectureId, loadingArea, resultArea) {
+                const pdfDownloadButton = document.getElementById('summary-pdf-download');
+                fetch('/analyze-api/?lecture_id=' + encodeURIComponent(lectureId))
+                    .then(function (response) {
+                        return response.json();
+                    })
+                    .then(function (data) {
+                        loadingArea.style.display = 'none';
+                        resultArea.style.display = 'block';
+
+                        if (data.status === 'success') {
+                            resultArea.innerHTML = renderSummaryHtml(data.result);
+
+                            if (pdfDownloadButton) {
+                                pdfDownloadButton.style.display = 'inline-flex';
+                            }
+                        } else {
+                            resultArea.innerHTML = '<span class="signup-status signup-status--err">' +
+                                escapeHtml(data.message || '{% trans "분석 중 오류가 발생했습니다." %}') +
+                                '</span>';
+                        }
+                    })
+                    .catch(function (error) {
+                        loadingArea.style.display = 'none';
+                        resultArea.style.display = 'block';
+                        resultArea.innerText = '{% trans "서버 통신 중 오류가 발생했습니다." %}';
+                        console.error('Error:', error);
+                    });
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                const lectureId = "{{ lecture_id }}";
+                const loadingArea = document.getElementById('loading-area');
+                const resultArea = document.getElementById('result-text');
+                const uploadedVideo = document.getElementById('lectureUploadedVideo');
+
+                resultArea.addEventListener('click', function (e) {
+                    const el = e.target.closest('.summary-ts');
+
+                    if (!el) return;
+
+                    const sec = parseInt(el.getAttribute('data-seconds'), 10);
+
+                    if (!Number.isNaN(sec)) {
+                        playVideoAt(sec);
+                    }
+                });
+
+                resultArea.addEventListener('keydown', function (e) {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+
+                    const el = e.target.closest('.summary-ts');
+
+                    if (!el || el !== e.target) return;
+
+                    e.preventDefault();
+
+                    const sec = parseInt(el.getAttribute('data-seconds'), 10);
+
+                    if (!Number.isNaN(sec)) {
+                        playVideoAt(sec);
+                    }
+                });
+
+                if (sourceType === 'file' && uploadedVideo) {
+                    whenUploadedVideoReady(uploadedVideo).then(function () {
+                        runAnalysis(lectureId, loadingArea, resultArea);
+                    });
+                } else {
+                    runAnalysis(lectureId, loadingArea, resultArea);
+                }
+            });
+        })();
     </script>
 {% endblock %}

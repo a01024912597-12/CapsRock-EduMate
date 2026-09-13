@@ -1,11 +1,17 @@
 from django.contrib import admin
-from .models import Lecture, UserProfile, Quiz, QuizQuestion, QuizAnswer
+from .models import Lecture, UserProfile, Quiz, QuizQuestion, QuizAnswer, StudyCalendarMemo
 
 
 class QuizQuestionInline(admin.TabularInline):
     model = QuizQuestion
     extra = 0
-    fields = ("number", "question_text", "model_answer", "explanation")
+    fields = (
+        "number",
+        "question_text",
+        "model_answer",
+        "explanation",
+        "related_timeline",
+    )
     ordering = ("number",)
 
 
@@ -30,6 +36,7 @@ class LectureAdmin(admin.ModelAdmin):
     list_display = (
         "title",
         "user",
+        "source_type",
         "whisper_model_name",
         "analysis_duration_seconds",
         "stt_duration_seconds",
@@ -37,8 +44,13 @@ class LectureAdmin(admin.ModelAdmin):
         "analyzed_at",
         "created_at",
     )
-    list_filter = ("whisper_model_name", "created_at", "analyzed_at")
-    search_fields = ("title", "youtube_url", "summary_text")
+    list_filter = ("source_type", "whisper_model_name", "created_at", "analyzed_at")
+    search_fields = (
+        "title",
+        "youtube_url",
+        "summary_text",
+        "summary_timeline",
+    )
     readonly_fields = (
         "created_at",
         "analyzed_at",
@@ -46,6 +58,7 @@ class LectureAdmin(admin.ModelAdmin):
         "stt_duration_seconds",
         "summary_duration_seconds",
         "whisper_model_name",
+        "summary_timeline",
     )
 
 
@@ -65,11 +78,26 @@ class QuizQuestionAdmin(admin.ModelAdmin):
         "get_generation_number",
         "number",
         "short_question",
+        "related_timeline",
         "created_at",
     )
-    list_filter = ("quiz__generation_number", "quiz__lecture", "created_at")
-    search_fields = ("quiz__lecture__title", "question_text", "model_answer")
-    ordering = ("quiz__lecture__title", "quiz__generation_number", "number")
+    list_filter = (
+        "quiz__generation_number",
+        "quiz__lecture",
+        "created_at",
+    )
+    search_fields = (
+        "quiz__lecture__title",
+        "question_text",
+        "model_answer",
+        "explanation",
+        "related_timeline",
+    )
+    ordering = (
+        "quiz__lecture__title",
+        "quiz__generation_number",
+        "number",
+    )
     inlines = [QuizAnswerInline]
 
     def get_lecture_title(self, obj):
@@ -149,5 +177,21 @@ class QuizAnswerAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "name", "age", "phone", "certification")
+    list_display = ("user", "name", "age", "phone", "certification", "preferred_language")
+    list_filter = ("preferred_language",)
     search_fields = ("user__username", "name", "phone", "certification")
+
+
+@admin.register(StudyCalendarMemo)
+class StudyCalendarMemoAdmin(admin.ModelAdmin):
+    list_display = ("user", "date", "short_memo", "updated_at")
+    list_filter = ("date", "updated_at")
+    search_fields = ("user__username", "memo")
+    ordering = ("-date", "user__username")
+
+    def short_memo(self, obj):
+        if len(obj.memo) > 40:
+            return obj.memo[:40] + "..."
+        return obj.memo
+
+    short_memo.short_description = "메모"

@@ -1,15 +1,661 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block content %}
-    <h2>에듀메이트에 오신 것을 환영합니다.</h2>
-    <p>강의 영상을 업로드하고 AI 요약, 문제 생성, 학습 피드백 기능을 이용할 수 있습니다.</p>
+{% block title %}EduMate{% endblock %}
+{% block breadcrumb %}{% trans "홈" %}{% endblock %}
+{% block page_content_class %} page-content--home{% endblock %}
 
-    {% if user.is_authenticated %}
-        <div style="margin-top: 30px;">
-            <button onclick="location.href='{% url 'upload' %}'">강의 업로드 하러 가기</button>
-            <button onclick="location.href='{% url 'history' %}'" style="margin-left: 10px;">내 히스토리 보기</button>
+{% block content_area %}
+{% if user.is_authenticated %}
+<div class="home-page">
+<div class="home-layout">
+<div class="home-main">
+    <section class="welcome-hero">
+        <div class="welcome-main">
+            <h1>{% trans "에듀메이트에 오신 것을 환영합니다." %}</h1>
+            <p>{% trans "강의 영상을 업로드하고 AI 요약, 문제 생성, 학습 피드백 기능을 이용할 수 있습니다." %}</p>
+
+            <div class="welcome-actions">
+                <a href="{% url 'upload' %}" class="wbtn wbtn--primary"><i class="fas fa-cloud-upload-alt"></i> {% trans "강의 업로드 하기" %}</a>
+                <a class="wbtn"><i class="fas fa-wand-magic-sparkles"></i> {% trans "AI 요약" %}</a>
+                <a class="wbtn"><i class="fas fa-file-lines"></i> {% trans "문제 생성" %}</a>
+            </div>
+            <div class="welcome-actions">
+                <a href="{% url 'history' %}" class="wbtn"><i class="fas fa-clock-rotate-left"></i> {% trans "내 히스토리 보기" %}</a>
+            </div>
+
+            <div class="welcome-tip">
+                <i class="fas fa-lightbulb"></i>
+                {% trans "팁: 강의 영상을 업로드하면 AI가 핵심 내용을 요약하고 문제를 만들어 학습을 도와줘요." %}
+            </div>
         </div>
-    {% else %}
-        <p style="margin-top: 20px;">로그인 후 강의 업로드와 히스토리 기능을 사용할 수 있습니다.</p>
-    {% endif %}
+
+        <div class="welcome-illust" aria-hidden="true">
+            <div class="wi-window">
+                <div class="wi-dots"><span></span><span></span><span></span></div>
+                <div class="wi-screen"><div class="wi-play"><i class="fas fa-play"></i></div></div>
+            </div>
+            <div class="wi-card wi-card--lines"><i></i><i></i><i></i></div>
+            <div class="wi-card wi-card--chart"><span></span><span></span><span></span></div>
+            <span class="wi-spark wi-spark--a">✦</span>
+            <span class="wi-spark wi-spark--b">✦</span>
+            <span class="wi-spark wi-spark--c">✦</span>
+        </div>
+    </section>
+
+    <div class="home-stats">
+        <a class="home-stat">
+            <div class="hs-top">
+                <div class="hs-ic blue"><i class="fas fa-cloud-upload-alt"></i></div>
+            </div>
+            <div class="hs-label">{% trans "업로드한 강의" %}</div>
+            <div class="hs-value">{{ uploaded_count }}</div>
+            <div class="hs-foot up"><i class="fas fa-arrow-trend-up"></i> {% blocktrans %}이번 달 {{ lectures_this_month }}개 추가{% endblocktrans %}</div>
+        </a>
+
+        <a class="home-stat">
+            <div class="hs-top">
+                <div class="hs-ic purple"><i class="fas fa-circle-check"></i></div>
+            </div>
+            <div class="hs-label">{% trans "풀어본 문제" %}</div>
+            <div class="hs-value">{{ solved_count }}</div>
+            <div class="hs-foot"><i class="fas fa-chart-simple"></i> {% blocktrans %}정답률 {{ accuracy_rate }}%{% endblocktrans %}</div>
+        </a>
+
+        <a class="home-stat">
+            <div class="hs-top">
+                <div class="hs-ic orange{% if study_streak == 0 %} is-dormant{% endif %}"><i class="fas fa-fire"></i></div>
+            </div>
+            <div class="hs-label">{% trans "학습 연속일" %}</div>
+            <div class="hs-value">{% blocktrans %}{{ study_streak }}일{% endblocktrans %}</div>
+            {% if study_streak == 0 %}
+            <div class="hs-foot">{% trans "오늘 첫 학습을 시작해보세요!" %}</div>
+            {% else %}
+            <div class="hs-foot"><i class="fas fa-star"></i> {% blocktrans %}최고 {{ best_streak }}일{% endblocktrans %}</div>
+            {% endif %}
+        </a>
+    </div>
+
+    <section class="home-recent" aria-label="{% trans '최근 학습' %}">
+        <div class="home-recent-header">
+            <h2><i class="fas fa-clock-rotate-left"></i> {% trans "최근 학습" %}</h2>
+            {% if recent_lectures %}
+            <a href="{% url 'history' %}" class="home-recent-more">{% trans "전체 보기" %} <i class="fas fa-arrow-right"></i></a>
+            {% endif %}
+        </div>
+
+        {% if recent_lectures %}
+        <div class="home-recent-grid">
+            {% for lecture in recent_lectures %}
+            <article class="home-recent-card">
+                <a href="{% url 'summary' %}?lecture_id={{ lecture.id }}" class="home-recent-thumb">
+                    {% if lecture.card_thumbnail %}
+                    <img src="{{ lecture.card_thumbnail }}" alt="{% blocktrans with title=lecture.display_title|default:lecture.title %}{{ title }} 썸네일{% endblocktrans %}">
+                    {% else %}
+                    <div class="home-recent-thumb-placeholder">
+                        <i class="fas fa-{% if lecture.source_type == 'file' %}file-video{% else %}play-circle{% endif %}"></i>
+                    </div>
+                    {% endif %}
+                    <span class="home-recent-badge">
+                        {% if lecture.source_type == 'file' %}
+                        <i class="fas fa-file-video"></i> {% trans "파일" %}
+                        {% else %}
+                        <i class="fab fa-youtube"></i> YouTube
+                        {% endif %}
+                    </span>
+                </a>
+                <div class="home-recent-body">
+                    <h3 class="home-recent-title">
+                        <a href="{% url 'summary' %}?lecture_id={{ lecture.id }}">{{ lecture.display_title|default:lecture.title }}</a>
+                    </h3>
+                    <p class="home-recent-meta">
+                        {% if lecture.last_answer_at %}
+                        <i class="fas fa-pencil-alt"></i> {% trans "최근 학습" %} {{ lecture.last_answer_at|date:"Y.m.d" }}
+                        {% else %}
+                        <i class="fas fa-cloud-upload-alt"></i> {% trans "업로드" %} {{ lecture.created_at|date:"Y.m.d" }}
+                        {% endif %}
+                        {% if lecture.summary_text %}
+                        · <span class="home-recent-tag done">{% trans "요약 완료" %}</span>
+                        {% endif %}
+                        {% if lecture.quiz_count %}
+                        · <span class="home-recent-tag quiz">{% blocktrans %}퀴즈 {{ lecture.quiz_count }}차{% endblocktrans %}</span>
+                        {% endif %}
+                    </p>
+                    <div class="home-recent-actions">
+                        <a href="{% url 'summary' %}?lecture_id={{ lecture.id }}" class="home-recent-btn home-recent-btn--primary">
+                            <i class="fas fa-book-open"></i> {% trans "요약" %}
+                        </a>
+                        {% if lecture.quiz_count %}
+                        <a href="{% url 'quiz' %}?lecture_id={{ lecture.id }}" class="home-recent-btn">
+                            <i class="fas fa-pencil-alt"></i> {% trans "퀴즈" %}
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="home-recent-empty">
+            <i class="fas fa-inbox"></i>
+            <p>{% trans "아직 업로드한 강의가 없습니다." %}<br>{% trans "첫 강의를 업로드하고 학습을 시작해 보세요." %}</p>
+            <a href="{% url 'upload' %}" class="home-recent-empty-btn"><i class="fas fa-cloud-upload-alt"></i> {% trans "강의 업로드 하기" %}</a>
+        </div>
+        {% endif %}
+    </section>
+</div>
+
+    <section class="home-calendar" aria-label="{% trans '학습 캘린더' %}">
+        <div class="home-calendar-header">
+            <div class="home-calendar-heading">
+                <h2><i class="fas fa-calendar-alt"></i> {% trans "학습 캘린더" %}</h2>
+                <p class="home-calendar-sub">{% trans "강의 업로드·문제 풀이가 있었던 날을 표시합니다." %}</p>
+            </div>
+            <div class="home-calendar-toggle" role="tablist" aria-label="{% trans '캘린더 보기 전환' %}">
+                <button type="button" class="cal-toggle is-active" data-view="week" role="tab" aria-selected="true">{% trans "주간" %}</button>
+                <button type="button" class="cal-toggle" data-view="month" role="tab" aria-selected="false">{% trans "월간" %}</button>
+            </div>
+        </div>
+
+        <div class="home-calendar-nav">
+            <button type="button" class="cal-nav-btn" id="homeCalendarPrev" aria-label="{% trans '이전 주' %}">
+                <i class="fas fa-chevron-left" aria-hidden="true"></i>
+            </button>
+            <p class="home-calendar-title" id="homeCalendarTitle"></p>
+            <button type="button" class="cal-nav-btn" id="homeCalendarNext" aria-label="{% trans '다음 주' %}">
+                <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <div class="home-calendar-weekdays" id="homeCalendarWeekdays" aria-hidden="true"></div>
+        <div class="home-calendar-grid" id="homeCalendarGrid"></div>
+
+        <div class="home-calendar-detail" id="homeCalendarDetail">
+            <p class="home-calendar-detail-title" id="homeCalendarDetailTitle">{% trans "날짜를 선택하세요" %}</p>
+            <p class="home-calendar-detail-body" id="homeCalendarDetailBody">{% trans "캘린더에서 날짜를 클릭하면 해당 일의 학습 내역을 확인할 수 있습니다." %}</p>
+            <div class="home-calendar-memo" id="homeCalendarMemo" hidden>
+                <label class="home-calendar-memo-label" for="homeCalendarMemoInput">
+                    <i class="fas fa-note-sticky"></i> {% trans "학습 메모" %}
+                </label>
+                <textarea id="homeCalendarMemoInput" maxlength="500" rows="3" placeholder="{% trans '이 날의 학습 계획이나 복습 내용을 적어보세요.' %}"></textarea>
+                <div class="home-calendar-memo-foot">
+                    <span class="home-calendar-memo-count" id="homeCalendarMemoCount">0 / 500</span>
+                    <span class="home-calendar-memo-status" id="homeCalendarMemoStatus" aria-live="polite"></span>
+                    <div class="home-calendar-memo-actions">
+                        <button type="button" class="home-calendar-memo-btn" id="homeCalendarMemoClear">{% trans "삭제" %}</button>
+                        <button type="button" class="home-calendar-memo-btn home-calendar-memo-btn--primary" id="homeCalendarMemoSave">{% trans "저장" %}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <p class="home-calendar-legend">
+            <span class="home-calendar-legend-item"><span class="home-calendar-mini-ic upload" aria-hidden="true"><i class="fas fa-video"></i></span> {% trans "강의 업로드" %}</span>
+            <span class="home-calendar-legend-item"><span class="home-calendar-mini-ic quiz" aria-hidden="true"><i class="fas fa-pencil-alt"></i></span> {% trans "문제 풀이" %}</span>
+            <span class="home-calendar-legend-item"><span class="home-calendar-memo-preview home-calendar-memo-preview--sample" aria-hidden="true">{% trans "메모 내용" %}</span> {% trans "메모" %}</span>
+        </p>
+    </section>
+</div>
+
+    {{ activity_by_date|json_script:"home-activity-by-date" }}
+    {{ calendar_memos|json_script:"home-calendar-memos" }}
+    {% csrf_token %}
+
+    <script>
+        (function () {
+            const activityByDateEl = document.getElementById('home-activity-by-date');
+            const calendarMemosEl = document.getElementById('home-calendar-memos');
+            const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+            const memoSaveUrl = "{% url 'save_calendar_memo' %}";
+            const titleEl = document.getElementById('homeCalendarTitle');
+            const weekdaysEl = document.getElementById('homeCalendarWeekdays');
+            const gridEl = document.getElementById('homeCalendarGrid');
+            const prevBtn = document.getElementById('homeCalendarPrev');
+            const nextBtn = document.getElementById('homeCalendarNext');
+            const detailTitleEl = document.getElementById('homeCalendarDetailTitle');
+            const detailBodyEl = document.getElementById('homeCalendarDetailBody');
+            const detailPanelEl = document.getElementById('homeCalendarDetail');
+            const memoSectionEl = document.getElementById('homeCalendarMemo');
+            const memoInputEl = document.getElementById('homeCalendarMemoInput');
+            const memoCountEl = document.getElementById('homeCalendarMemoCount');
+            const memoStatusEl = document.getElementById('homeCalendarMemoStatus');
+            const memoSaveBtn = document.getElementById('homeCalendarMemoSave');
+            const memoClearBtn = document.getElementById('homeCalendarMemoClear');
+            const toggleButtons = document.querySelectorAll('.cal-toggle');
+
+            if (!gridEl || !prevBtn || !nextBtn) {
+                return;
+            }
+
+            const activityMap = activityByDateEl
+                ? JSON.parse(activityByDateEl.textContent)
+                : {};
+            const memoMap = calendarMemosEl
+                ? JSON.parse(calendarMemosEl.textContent)
+                : {};
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const weekdayLabels = [
+                "{% trans '일' %}",
+                "{% trans '월' %}",
+                "{% trans '화' %}",
+                "{% trans '수' %}",
+                "{% trans '목' %}",
+                "{% trans '금' %}",
+                "{% trans '토' %}"
+            ];
+            const I18N = {
+                year: "{% trans '년' %}",
+                month: "{% trans '월' context 'date-month-suffix' %}",
+                day: "{% trans '일' context 'date-day-suffix' %}",
+                noActivity: "{% trans '이 날은 학습 활동이 없습니다.' %}",
+                uploadedLectures: "{% trans '업로드한 강의' %}",
+                solvedProblems: "{% trans '푼 문제' %}",
+                countUnit: "{% trans '개' %}",
+                saving: "{% trans '저장 중...' %}",
+                saveFailed: "{% trans '저장에 실패했습니다.' %}",
+                memoDeleted: "{% trans '메모를 삭제했습니다.' %}",
+                savedPrefix: "{% trans '저장되었습니다.' %}",
+                lectureUpload: "{% trans '강의 업로드' %}",
+                quizSolve: "{% trans '문제 풀이' %}",
+                memo: "{% trans '메모' %}",
+                prevWeek: "{% trans '이전 주' %}",
+                nextWeek: "{% trans '다음 주' %}",
+                prevMonth: "{% trans '이전 달' %}",
+                nextMonth: "{% trans '다음 달' %}",
+                confirmDeleteMemo: "{% trans '이 날짜의 메모를 삭제할까요?' %}"
+            };
+            let currentView = 'week';
+            let selectedDateKey = null;
+            const weekFocus = new Date(today);
+            const monthFocus = new Date(today.getFullYear(), today.getMonth(), 1);
+
+            function pad2(value) {
+                return String(value).padStart(2, '0');
+            }
+
+            function dateKey(date) {
+                return date.getFullYear() + '-' + pad2(date.getMonth() + 1) + '-' + pad2(date.getDate());
+            }
+
+            function parseDateKey(key) {
+                const parts = key.split('-');
+                return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+            }
+
+            function isSameDay(a, b) {
+                return (
+                    a.getFullYear() === b.getFullYear()
+                    && a.getMonth() === b.getMonth()
+                    && a.getDate() === b.getDate()
+                );
+            }
+
+            function getActivity(date) {
+                return activityMap[dateKey(date)] || { uploads: 0, quizzes: 0 };
+            }
+
+            function hasMemo(key) {
+                return Boolean(memoMap[key] && memoMap[key].trim());
+            }
+
+            function escapeHtml(text) {
+                return String(text)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function getMemoPreview(key) {
+                return (memoMap[key] || '').replace(/\s+/g, ' ').trim();
+            }
+
+            function updateMemoCount() {
+                if (!memoInputEl || !memoCountEl) {
+                    return;
+                }
+                memoCountEl.textContent = memoInputEl.value.length + ' / 500';
+            }
+
+            function setMemoStatus(message, type) {
+                if (!memoStatusEl) {
+                    return;
+                }
+                memoStatusEl.textContent = message || '';
+                memoStatusEl.className = 'home-calendar-memo-status';
+                if (type) {
+                    memoStatusEl.classList.add('is-' + type);
+                }
+            }
+
+            function formatDetailDate(date) {
+                return (
+                    date.getFullYear() + I18N.year + ' ' +
+                    (date.getMonth() + 1) + I18N.month + ' ' +
+                    date.getDate() + I18N.day + ' (' +
+                    weekdayLabels[date.getDay()] + ')'
+                );
+            }
+
+            function renderDetail(date) {
+                if (!detailTitleEl || !detailBodyEl || !detailPanelEl) {
+                    return;
+                }
+
+                const key = dateKey(date);
+                const activity = getActivity(date);
+                detailPanelEl.classList.add('is-active');
+                detailTitleEl.textContent = formatDetailDate(date);
+
+                if (activity.uploads === 0 && activity.quizzes === 0) {
+                    detailBodyEl.textContent = I18N.noActivity;
+                } else {
+                    const parts = [];
+                    if (activity.uploads > 0) {
+                        parts.push(I18N.uploadedLectures + ' ' + activity.uploads + I18N.countUnit);
+                    }
+                    if (activity.quizzes > 0) {
+                        parts.push(I18N.solvedProblems + ' ' + activity.quizzes + I18N.countUnit);
+                    }
+                    detailBodyEl.textContent = parts.join(', ');
+                }
+
+                if (memoSectionEl && memoInputEl) {
+                    memoSectionEl.hidden = false;
+                    memoInputEl.value = memoMap[key] || '';
+                    updateMemoCount();
+                    setMemoStatus('', null);
+                }
+            }
+
+            async function saveMemo(clearMemo) {
+                if (!selectedDateKey || !memoInputEl || !csrfInput) {
+                    return;
+                }
+
+                const memoText = clearMemo ? '' : memoInputEl.value.trim();
+                setMemoStatus(I18N.saving, 'loading');
+                memoSaveBtn.disabled = true;
+                memoClearBtn.disabled = true;
+
+                try {
+                    const response = await fetch(memoSaveUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfInput.value,
+                        },
+                        body: JSON.stringify({
+                            date: selectedDateKey,
+                            memo: memoText,
+                        }),
+                    });
+                    const data = await response.json();
+
+                    if (!response.ok || !data.ok) {
+                        throw new Error(data.error || I18N.saveFailed);
+                    }
+
+                    if (data.deleted) {
+                        delete memoMap[selectedDateKey];
+                        memoInputEl.value = '';
+                        setMemoStatus(I18N.memoDeleted, 'success');
+                    } else {
+                        memoMap[selectedDateKey] = data.memo;
+                        memoInputEl.value = data.memo;
+                        setMemoStatus(I18N.savedPrefix + ' (' + data.updated_at + ')', 'success');
+                    }
+
+                    updateMemoCount();
+                    renderCalendar();
+                } catch (error) {
+                    setMemoStatus(error.message || I18N.saveFailed, 'error');
+                } finally {
+                    memoSaveBtn.disabled = false;
+                    memoClearBtn.disabled = false;
+                }
+            }
+
+            function getWeekStart(date) {
+                const start = new Date(date);
+                start.setDate(start.getDate() - start.getDay());
+                start.setHours(0, 0, 0, 0);
+                return start;
+            }
+
+            function renderWeekdays() {
+                weekdaysEl.innerHTML = weekdayLabels
+                    .map(function (label) {
+                        return '<div class="home-calendar-weekday">' + label + '</div>';
+                    })
+                    .join('');
+            }
+
+            function buildDayCell(date, options) {
+                options = options || {};
+                const classes = ['home-calendar-day'];
+                const key = dateKey(date);
+                const activity = getActivity(date);
+                const hasActivity = activity.uploads > 0 || activity.quizzes > 0;
+
+                if (options.empty) {
+                    classes.push('is-empty');
+                }
+
+                if (!options.empty && isSameDay(date, today)) {
+                    classes.push('is-today');
+                }
+
+                if (!options.empty && hasActivity) {
+                    classes.push('has-activity');
+                }
+
+                if (!options.empty && hasMemo(key)) {
+                    classes.push('has-memo');
+                }
+
+                if (!options.empty && key === selectedDateKey) {
+                    classes.push('is-selected');
+                }
+
+                const dayNumber = options.empty ? '' : String(date.getDate());
+                let icons = '';
+                let memoPreviewHtml = '';
+                const memoText = options.empty ? '' : getMemoPreview(key);
+
+                if (!options.empty) {
+                    if (activity.uploads > 0) {
+                        icons += '<span class="home-calendar-mini-ic upload" title="' + I18N.lectureUpload + '"><i class="fas fa-video"></i></span>';
+                    }
+                    if (activity.quizzes > 0) {
+                        icons += '<span class="home-calendar-mini-ic quiz" title="' + I18N.quizSolve + '"><i class="fas fa-pencil-alt"></i></span>';
+                    }
+                    if (memoText) {
+                        memoPreviewHtml =
+                            '<p class="home-calendar-memo-preview" title="' + escapeHtml(memoText) + '">' +
+                            escapeHtml(memoText) +
+                            '</p>';
+                    }
+                }
+
+                const ariaLabel = options.empty
+                    ? ''
+                    : escapeHtml(formatDetailDate(date) + (memoText ? ' — ' + memoText : ''));
+                const attrs = options.empty
+                    ? ''
+                    : ' data-date="' + key + '" role="button" tabindex="0" aria-label="' + ariaLabel + '"';
+
+                return (
+                    '<div class="' + classes.join(' ') + '"' + attrs + '>' +
+                    '<span class="home-calendar-day-num">' + dayNumber + '</span>' +
+                    memoPreviewHtml +
+                    (icons ? '<div class="home-calendar-day-icons">' + icons + '</div>' : '') +
+                    '</div>'
+                );
+            }
+
+            function selectDate(key) {
+                selectedDateKey = key;
+                renderCalendar();
+                renderDetail(parseDateKey(key));
+            }
+
+            function renderWeek() {
+                const weekStart = getWeekStart(weekFocus);
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekEnd.getDate() + 6);
+
+                titleEl.textContent =
+                    weekStart.getFullYear() + I18N.year + ' ' +
+                    (weekStart.getMonth() + 1) + I18N.month + ' ' + weekStart.getDate() + I18N.day + ' ~ ' +
+                    (weekEnd.getMonth() + 1) + I18N.month + ' ' + weekEnd.getDate() + I18N.day;
+
+                gridEl.className = 'home-calendar-grid home-calendar-grid--week';
+                gridEl.innerHTML = '';
+
+                for (let offset = 0; offset < 7; offset += 1) {
+                    const cellDate = new Date(weekStart);
+                    cellDate.setDate(weekStart.getDate() + offset);
+                    gridEl.insertAdjacentHTML('beforeend', buildDayCell(cellDate));
+                }
+            }
+
+            function renderMonth() {
+                const year = monthFocus.getFullYear();
+                const month = monthFocus.getMonth();
+                const firstDay = new Date(year, month, 1);
+                const lastDay = new Date(year, month + 1, 0);
+                const leadingEmpty = firstDay.getDay();
+                const totalDays = lastDay.getDate();
+
+                titleEl.textContent = year + I18N.year + ' ' + (month + 1) + I18N.month;
+
+                gridEl.className = 'home-calendar-grid home-calendar-grid--month';
+                gridEl.innerHTML = '';
+
+                for (let i = 0; i < leadingEmpty; i += 1) {
+                    gridEl.insertAdjacentHTML('beforeend', buildDayCell(today, { empty: true }));
+                }
+
+                for (let day = 1; day <= totalDays; day += 1) {
+                    gridEl.insertAdjacentHTML('beforeend', buildDayCell(new Date(year, month, day)));
+                }
+            }
+
+            function updateNavLabels() {
+                if (currentView === 'week') {
+                    prevBtn.setAttribute('aria-label', I18N.prevWeek);
+                    nextBtn.setAttribute('aria-label', I18N.nextWeek);
+                } else {
+                    prevBtn.setAttribute('aria-label', I18N.prevMonth);
+                    nextBtn.setAttribute('aria-label', I18N.nextMonth);
+                }
+            }
+
+            function renderCalendar() {
+                renderWeekdays();
+                updateNavLabels();
+                if (currentView === 'week') {
+                    renderWeek();
+                } else {
+                    renderMonth();
+                }
+            }
+
+            gridEl.addEventListener('click', function (event) {
+                const cell = event.target.closest('.home-calendar-day:not(.is-empty)');
+                if (!cell) {
+                    return;
+                }
+                const key = cell.getAttribute('data-date');
+                if (key) {
+                    selectDate(key);
+                }
+            });
+
+            gridEl.addEventListener('keydown', function (event) {
+                if (event.key !== 'Enter' && event.key !== ' ') {
+                    return;
+                }
+                const cell = event.target.closest('.home-calendar-day:not(.is-empty)');
+                if (!cell) {
+                    return;
+                }
+                event.preventDefault();
+                const key = cell.getAttribute('data-date');
+                if (key) {
+                    selectDate(key);
+                }
+            });
+
+            prevBtn.addEventListener('click', function () {
+                if (currentView === 'week') {
+                    weekFocus.setDate(weekFocus.getDate() - 7);
+                } else {
+                    monthFocus.setMonth(monthFocus.getMonth() - 1);
+                }
+                renderCalendar();
+            });
+
+            nextBtn.addEventListener('click', function () {
+                if (currentView === 'week') {
+                    weekFocus.setDate(weekFocus.getDate() + 7);
+                } else {
+                    monthFocus.setMonth(monthFocus.getMonth() + 1);
+                }
+                renderCalendar();
+            });
+
+            toggleButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    const view = button.getAttribute('data-view');
+                    if (!view || view === currentView) {
+                        return;
+                    }
+
+                    currentView = view;
+                    toggleButtons.forEach(function (item) {
+                        const active = item.getAttribute('data-view') === currentView;
+                        item.classList.toggle('is-active', active);
+                        item.setAttribute('aria-selected', active ? 'true' : 'false');
+                    });
+                    renderCalendar();
+                });
+            });
+
+            if (memoInputEl) {
+                memoInputEl.addEventListener('input', updateMemoCount);
+            }
+
+            if (memoSaveBtn) {
+                memoSaveBtn.addEventListener('click', function () {
+                    saveMemo(false);
+                });
+            }
+
+            if (memoClearBtn) {
+                memoClearBtn.addEventListener('click', function () {
+                    if (!selectedDateKey) {
+                        return;
+                    }
+                    if (memoInputEl.value.trim() && !window.confirm(I18N.confirmDeleteMemo)) {
+                        return;
+                    }
+                    saveMemo(true);
+                });
+            }
+
+            renderCalendar();
+        })();
+    </script>
+</div>
+{% else %}
+<div class="legacy-content legacy-content--guest">
+    <h2>{% trans "에듀메이트에 오신 것을 환영합니다." %}</h2>
+    <p>{% trans "강의 영상을 업로드하고 AI 요약, 문제 생성, 학습 피드백 기능을 이용할 수 있습니다." %}</p>
+    <p style="margin-top: 14px; color: var(--text-sub);">{% trans "로그인 후 강의 업로드와 히스토리 기능을 사용할 수 있습니다." %}</p>
+</div>
+{% endif %}
 {% endblock %}

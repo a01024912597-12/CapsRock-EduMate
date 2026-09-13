@@ -1,18 +1,923 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block content %}
-<h2>강의 링크 입력</h2>
-<p>유튜브 강의 링크를 입력하세요.</p>
+{% block title %}{% trans "강의 업로드" %} — EduMate{% endblock %}
+{% block breadcrumb %}{% trans "강의 업로드" %}{% endblock %}
 
-<form action="/upload/" method="post">
-    {% csrf_token %}
+{% block content_area %}
+<div class="hero-banner">
+    <div class="hero-text">
+        <h1><i class="fas fa-cloud-upload-alt"></i> {% trans "강의 업로드" %}</h1>
+        <p>{% trans "유튜브 링크 또는 영상 파일을 업로드하면 AI가 강의를 분석하고 학습 자료를 자동 생성합니다." %}</p>
+        <div class="hero-badges">
+            <span class="hero-badge"><i class="fas fa-robot"></i> {% trans "AI 분석" %}</span>
+            <span class="hero-badge"><i class="fas fa-bolt"></i> {% trans "30초 완성" %}</span>
+            <span class="hero-badge"><i class="fas fa-infinity"></i> {% trans "무제한" %}</span>
+        </div>
+    </div>
+    <div class="hero-icon"><i class="fas fa-brain"></i></div>
+</div>
 
-    <label>강의 제목</label>
-    <input type="text" name="title" placeholder="강의 제목 입력" required>
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-label">{% trans "분석 완료" %}</div>
+        <div class="stat-value">{{ lectures_this_month }}</div>
+        <div class="stat-desc">{% trans "누적 강의 수" %}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">{% trans "평균 이해도" %}</div>
+        <div class="stat-value">{{ average_similarity }}<span style="font-size:16px;color:var(--text-sub)">%</span></div>
+        <div class="stat-desc">{% trans "최근 5개 강의 기준" %}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">{% trans "생성된 퀴즈" %}</div>
+        <div class="stat-value">{{ total_quiz_count }}</div>
+        <div class="stat-desc">{% trans "누적 퀴즈 문항 수" %}</div>
+    </div>
+</div>
 
-    <label>유튜브 링크</label>
-    <input type="text" name="youtube_link" placeholder="https://www.youtube.com/watch?v=..." required>
+<div class="main-card">
+    <div class="main-card-header">
+        <h2><i class="fas fa-cloud-upload-alt"></i> {% trans "새 강의 분석" %}</h2>
+    </div>
 
-    <button type="submit">분석 시작</button>
-</form>
+    <div class="main-card-body">
+        <form action="{% url 'upload' %}" method="post" id="uploadForm" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="upload_mode" id="uploadModeInput" value="youtube">
+
+            <div class="upload-source-box">
+                <div class="upload-mode-tabs" role="tablist" aria-label="{% trans '강의 업로드 방식' %}">
+                    <button type="button" class="upload-mode-tab is-active" role="tab"
+                            id="tab-youtube" data-mode="youtube" aria-selected="true" aria-controls="youtubePane">
+                        <i class="fab fa-youtube"></i> {% trans "유튜브 링크 업로드" %}
+                    </button>
+                    <button type="button" class="upload-mode-tab" role="tab"
+                            id="tab-file" data-mode="file" aria-selected="false" aria-controls="filePane">
+                        <i class="fas fa-file-video"></i> {% trans "파일 업로드" %}
+                    </button>
+                </div>
+
+                <div class="upload-source-pane is-active" id="youtubePane" role="tabpanel" aria-labelledby="tab-youtube">
+                    <div class="form-group">
+                        <label><i class="fas fa-tag"></i> {% trans "강의 제목" %} <span class="required">{% trans "필수" %}</span></label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-pen input-icon"></i>
+                            <input type="text" name="title" id="titleYoutubeInput"
+                                   placeholder="{% trans '예) 운영체제 2주차 — 프로세스 관리' %}" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label><i class="fas fa-link"></i> {% trans "유튜브 링크" %} <span class="required">{% trans "필수" %}</span></label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-link input-icon"></i>
+                            <input type="url" name="youtube_link" id="youtubeLinkInput"
+                                   placeholder="https://www.youtube.com/watch?v=..." required>
+                        </div>
+                    </div>
+
+                    <div class="yt-preview" id="ytPreview">
+                        <div class="yt-thumb" id="ytThumb"><i class="fas fa-play-circle"></i></div>
+                        <div class="yt-info" id="ytInfo">{% trans "링크를 입력하면" %} <span>{% trans "미리보기" %}</span>{% trans "가 표시됩니다" %}</div>
+                    </div>
+                </div>
+
+                <div class="upload-source-pane" id="filePane" role="tabpanel" aria-labelledby="tab-file" hidden>
+                    <div class="form-group">
+                        <label><i class="fas fa-tag"></i> {% trans "강의 제목" %} <span class="required">{% trans "필수" %}</span></label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-pen input-icon"></i>
+                            <input type="text" name="title" id="titleFileInput"
+                                   placeholder="{% trans '예) 운영체제 2주차 — 프로세스 관리' %}" disabled>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label><i class="fas fa-film"></i> {% trans "강의 영상 파일" %} <span class="required">{% trans "필수" %}</span></label>
+                        <div class="file-dropzone" id="fileDropzone">
+                            <input type="file" name="lecture_file" id="lectureFileInput"
+                                   accept="video/*,.mp4,.mov,.avi,.mkv,.webm,.m4v" hidden disabled>
+
+                            <div class="file-dropzone-empty" id="fileDropzoneEmpty">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p><strong>{% trans "클릭" %}</strong>{% trans "하거나 영상 파일을" %} <strong>{% trans "드래그" %}</strong>{% trans "하세요" %}</p>
+                                <span>{% trans "MP4, MOV, AVI, MKV, WEBM · 최대 500MB" %}</span>
+                            </div>
+
+                            <div class="file-dropzone-preview" id="fileDropzonePreview" hidden>
+                                <div class="file-preview-icon"><i class="fas fa-file-video"></i></div>
+                                <div class="file-preview-meta">
+                                    <strong id="filePreviewName">—</strong>
+                                    <span id="filePreviewSize">—</span>
+                                </div>
+                                <button type="button" class="file-clear-btn" id="fileClearBtn" aria-label="{% trans '선택 파일 제거' %}">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="upload-source-hint">{% trans "MP4, MOV, AVI, MKV, WEBM 형식 · 최대 500MB" %}</p>
+                </div>
+            </div>
+
+            <div class="analysis-option-box">
+                <div class="analysis-option-header">
+                    <h3><i class="fas fa-sliders-h"></i> {% trans "분석 옵션 설정" %}</h3>
+                    <p>{% trans "PC 성능, 정확도, 강의 과목에 맞춰 분석 방식을 선택할 수 있습니다." %}</p>
+                </div>
+
+                <div class="analysis-option-grid">
+                    <div class="analysis-option-card">
+                        <div class="analysis-option-label-row">
+                            <label for="whisperModelSelect" class="analysis-option-label-text">
+                                <i class="fas fa-brain"></i> {% trans "Whisper 모델 선택" %}
+                            </label>
+                            <span class="option-info-trigger" tabindex="0" aria-describedby="modelDesc">
+                                <i class="fas fa-info-circle" aria-hidden="true"></i>
+                                <div class="option-desc" id="modelDesc" role="tooltip">
+                                    {% trans "base는 빠른 분석에 적합하며, large는 가장 높은 정확도를 제공하지만 CPU 환경에서는 매우 느릴 수 있습니다." %}
+                                </div>
+                            </span>
+                        </div>
+
+                        <select name="whisper_model" id="whisperModelSelect" class="analysis-select">
+                            <option value="base" selected>{% trans "base — 빠른 분석" %}</option>
+                            <option value="small">{% trans "small — 속도/정확도 균형" %}</option>
+                            <option value="medium">{% trans "medium — 높은 정확도" %}</option>
+                            <option value="large">{% trans "large — 최고 정확도" %}</option>
+                        </select>
+                    </div>
+
+                    <div class="analysis-option-card">
+                        <div class="analysis-option-label-row">
+                            <label for="workersSelect" class="analysis-option-label-text">
+                                <i class="fas fa-users-cog"></i> {% trans "작업 스레드 수 설정" %}
+                            </label>
+                            <span class="option-info-trigger" tabindex="0" aria-describedby="workersDesc">
+                                <i class="fas fa-info-circle" aria-hidden="true"></i>
+                                <div class="option-desc" id="workersDesc" role="tooltip">
+                                    {% trans "2개는 현재 권장 기본값입니다. CPU 사용량과 처리 속도의 균형이 좋아 노트북 환경에 적합합니다." %}
+                                </div>
+                            </span>
+                        </div>
+
+                        <select name="workers" id="workersSelect" class="analysis-select">
+                            <option value="1">{% trans "1개 — 저사양 PC 권장" %}</option>
+                            <option value="2" selected>{% trans "2개 — 기본 권장값" %}</option>
+                            <option value="3">{% trans "3개 — 고성능 병렬 처리" %}</option>
+                            <option value="4">{% trans "4개 — 고성능 PC용" %}</option>
+                        </select>
+                    </div>
+
+                    <div class="analysis-option-card full-option">
+                        <div class="analysis-option-label-row">
+                            <label for="subjectSelect" class="analysis-option-label-text">
+                                <i class="fas fa-book-open"></i> {% trans "과목 유형 선택" %}
+                            </label>
+                            <span class="option-info-trigger" tabindex="0" aria-describedby="subjectDesc">
+                                <i class="fas fa-info-circle" aria-hidden="true"></i>
+                                <div class="option-desc" id="subjectDesc" role="tooltip">
+                                    {% trans "AI 자동 생성은 API가 강의 성격을 판단하여 시험 대비에 적합한 방식으로 요약합니다." %}
+                                </div>
+                            </span>
+                        </div>
+
+                        <select name="subject_code" id="subjectSelect" class="analysis-select">
+                            <option value="auto" selected>{% trans "AI 자동 생성 — 시험 대비 맞춤 요약" %}</option>
+                            <option value="4">{% trans "일반 강의 — 범용 요약" %}</option>
+                            <option value="1">{% trans "역사/인문학 — 사건 흐름과 인과관계 중심" %}</option>
+                            <option value="2">{% trans "프로그래밍/IT — 코드 흐름과 실습 중심" %}</option>
+                            <option value="3">{% trans "수학/과학 — 개념, 공식, 풀이 과정 중심" %}</option>
+                        </select>
+                    </div>
+
+                    <div class="analysis-option-card full-option">
+                        <div class="analysis-option-label-row">
+                            <label for="summaryApiSelect" class="analysis-option-label-text">
+                                <i class="fas fa-microchip"></i> {% trans "요약 API 선택" %}
+                            </label>
+                            <span class="option-info-trigger" tabindex="0" aria-describedby="summaryApiDesc">
+                                <i class="fas fa-info-circle" aria-hidden="true"></i>
+                                <div class="option-desc" id="summaryApiDesc" role="tooltip">
+                                    {% trans "Gemini API는 기존 EduMate 요약 방식입니다. Gemini 사용량이 많거나 503 오류가 반복될 경우 GPT API를 선택할 수 있습니다." %}
+                                </div>
+                            </span>
+                        </div>
+
+                        <select name="summary_api" id="summaryApiSelect" class="analysis-select">
+                            <option value="gemini" selected>{% trans "Gemini API — 기존 요약 방식" %}</option>
+                            <option value="gpt">{% trans "GPT API — OpenAI 기반 요약 방식" %}</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="analysis-warning">
+                    <i class="fas fa-info-circle"></i>
+                    {% trans "각 설정에 맞는 설명은 아이콘에 마우스를 올리면 표시됩니다. 요약 API는 Gemini 또는 GPT 중 선택할 수 있으며, 이후 객관식 문제 생성과 서술형 피드백은 생성된 요약문을 기반으로 진행됩니다." %}
+                </div>
+            </div>
+
+            <div class="upload-notice" id="uploadNotice" role="status"></div>
+
+            <div class="btn-area">
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-robot"></i> {% trans "AI 분석 시작" %}
+                </button>
+                <button type="reset" class="btn-secondary" id="resetBtn">
+                    <i class="fas fa-redo"></i> {% trans "초기화" %}
+                </button>
+            </div>
+
+            <div class="feature-tags">
+                <div class="feature-tag"><i class="fas fa-file-alt"></i> {% trans "자동 요약" %}</div>
+                <div class="feature-tag"><i class="fas fa-question-circle"></i> {% trans "퀴즈 생성" %}</div>
+                <div class="feature-tag"><i class="fas fa-lightbulb"></i> {% trans "핵심 키워드" %}</div>
+                <div class="feature-tag"><i class="fas fa-clock"></i> {% trans "타임라인 분석" %}</div>
+                <div class="feature-tag"><i class="fas fa-brain"></i> {% trans "이해도 측정" %}</div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .upload-source-box {
+        margin-top: 4px;
+        padding: 18px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: var(--bg-inner);
+    }
+
+    .upload-mode-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 18px;
+        padding: 4px;
+        border-radius: 12px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+    }
+
+    .upload-mode-tab {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 11px 12px;
+        border: none;
+        border-radius: 9px;
+        background: transparent;
+        color: var(--text-sub);
+        font-size: 13px;
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .upload-mode-tab.is-active {
+        background: var(--grad-soft);
+        color: var(--text-main);
+        box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.25);
+    }
+
+    .upload-mode-tab i {
+        font-size: 15px;
+    }
+
+    .upload-source-pane {
+        display: none;
+    }
+
+    .upload-source-pane.is-active {
+        display: block;
+    }
+
+    .upload-source-pane .form-group {
+        margin-bottom: 0;
+    }
+
+    .upload-source-pane .form-group + .form-group {
+        margin-top: 18px;
+    }
+
+    .upload-source-pane .yt-preview {
+        margin-top: 12px;
+    }
+
+    .upload-source-hint {
+        margin: 10px 0 0;
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.5;
+    }
+
+    .file-dropzone {
+        position: relative;
+        min-height: 148px;
+        padding: 18px 16px;
+        border: 1px dashed var(--border2);
+        border-radius: 12px;
+        background: var(--bg-dark);
+        cursor: pointer;
+        transition: border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .file-dropzone:hover,
+    .file-dropzone.is-dragover {
+        border-color: var(--accent);
+        background: rgba(99, 102, 241, 0.05);
+    }
+
+    .file-dropzone-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 112px;
+        text-align: center;
+        color: var(--text-sub);
+        pointer-events: none;
+    }
+
+    .file-dropzone-empty i {
+        font-size: 28px;
+        color: var(--accent);
+        margin-bottom: 4px;
+    }
+
+    .file-dropzone-empty p {
+        margin: 0;
+        font-size: 13.5px;
+        line-height: 1.5;
+    }
+
+    .file-dropzone-empty span {
+        font-size: 11.5px;
+        color: var(--text-muted);
+    }
+
+    .file-dropzone-preview {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 112px;
+    }
+
+    .file-preview-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: var(--grad-soft);
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--accent);
+        font-size: 20px;
+        flex-shrink: 0;
+    }
+
+    .file-preview-meta {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .file-preview-meta strong {
+        font-size: 13.5px;
+        color: var(--text-main);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .file-preview-meta span {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .file-clear-btn {
+        width: 32px;
+        height: 32px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg-card);
+        color: var(--text-sub);
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: all 0.2s ease;
+    }
+
+    .file-clear-btn:hover {
+        color: var(--accent3);
+        border-color: rgba(239, 68, 68, 0.35);
+    }
+
+    .upload-notice {
+        display: none;
+        margin-bottom: 16px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgba(234, 88, 12, 0.1);
+        border: 1px solid rgba(234, 88, 12, 0.25);
+        color: var(--text-main);
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .upload-notice.is-visible {
+        display: block;
+    }
+
+    .analysis-option-box {
+        margin-top: 26px;
+        margin-bottom: 24px;
+        padding: 24px;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        background: var(--bg-card);
+    }
+
+    .analysis-option-header {
+        margin-bottom: 18px;
+    }
+
+    .analysis-option-header h3 {
+        margin: 0 0 8px;
+        font-size: 18px;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .analysis-option-header p {
+        margin: 0;
+        color: var(--text-sub);
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .analysis-option-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+    }
+
+    .analysis-option-card {
+        padding: 18px;
+        border-radius: 14px;
+        background: var(--bg-inner);
+        border: 1px solid var(--border);
+    }
+
+    .analysis-option-card.full-option {
+        grid-column: 1 / -1;
+    }
+
+    .analysis-option-label-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .analysis-option-label-text {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        font-weight: 800;
+        color: var(--text-main);
+        font-size: 15px;
+    }
+
+    .option-info-trigger {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        color: var(--accent);
+        cursor: help;
+        outline: none;
+        transition: background-color 0.18s ease, color 0.18s ease;
+    }
+
+    .option-info-trigger:hover,
+    .option-info-trigger:focus,
+    .option-info-trigger:focus-visible {
+        background: var(--grad-soft);
+        color: var(--accent2);
+    }
+
+    .option-info-trigger > .fa-info-circle {
+        font-size: 15px;
+        pointer-events: none;
+    }
+
+    .analysis-select {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--bg-card);
+        color: var(--text-main);
+        font-size: 14px;
+        font-weight: 700;
+        outline: none;
+    }
+
+    .analysis-select:focus {
+        border-color: var(--accent);
+        box-shadow: var(--ring);
+    }
+
+    .option-desc {
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        z-index: 30;
+        width: min(300px, calc(100vw - 48px));
+        margin: 0;
+        padding: 12px 13px;
+        border-radius: 12px;
+        background: var(--bg-card);
+        color: var(--text-sub);
+        font-size: 13px;
+        line-height: 1.6;
+        font-weight: 500;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow-md);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: translateY(4px);
+        transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+    }
+
+    .option-info-trigger:hover .option-desc,
+    .option-info-trigger:focus .option-desc,
+    .option-info-trigger:focus-within .option-desc {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+
+    .analysis-warning {
+        margin-top: 16px;
+        padding: 13px 15px;
+        border-radius: 14px;
+        background: var(--grad-soft);
+        border: 1px solid rgba(99, 102, 241, 0.16);
+        color: var(--text-sub);
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+    @media (max-width: 900px) {
+        .upload-mode-tab {
+            font-size: 12px;
+            padding: 10px 8px;
+        }
+
+        .analysis-option-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .analysis-option-card.full-option {
+            grid-column: auto;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    const form = document.getElementById('uploadForm');
+    const uploadModeInput = document.getElementById('uploadModeInput');
+    const uploadNotice = document.getElementById('uploadNotice');
+    const youtubePane = document.getElementById('youtubePane');
+    const filePane = document.getElementById('filePane');
+    const modeTabs = document.querySelectorAll('.upload-mode-tab[data-mode]');
+
+    const input = document.getElementById('youtubeLinkInput');
+    const thumb = document.getElementById('ytThumb');
+    const info = document.getElementById('ytInfo');
+    const resetBtn = document.getElementById('resetBtn');
+    const titleYoutubeInput = document.getElementById('titleYoutubeInput');
+    const titleFileInput = document.getElementById('titleFileInput');
+
+    const fileInput = document.getElementById('lectureFileInput');
+    const fileDropzone = document.getElementById('fileDropzone');
+    const fileDropzoneEmpty = document.getElementById('fileDropzoneEmpty');
+    const fileDropzonePreview = document.getElementById('fileDropzonePreview');
+    const filePreviewName = document.getElementById('filePreviewName');
+    const filePreviewSize = document.getElementById('filePreviewSize');
+    const fileClearBtn = document.getElementById('fileClearBtn');
+
+    const whisperSelect = document.getElementById('whisperModelSelect');
+    const workersSelect = document.getElementById('workersSelect');
+    const subjectSelect = document.getElementById('subjectSelect');
+    const summaryApiSelect = document.getElementById('summaryApiSelect');
+
+    const modelDesc = document.getElementById('modelDesc');
+    const workersDesc = document.getElementById('workersDesc');
+    const subjectDesc = document.getElementById('subjectDesc');
+    const summaryApiDesc = document.getElementById('summaryApiDesc');
+    const I18N = {
+        previewHint: '{% trans "링크를 입력하면" %} <span>{% trans "미리보기" %}</span>{% trans "가 표시됩니다" %}',
+        videoIdPrefix: '{% trans "영상 ID:" %}',
+        analysisStart: '{% trans "제출 시 분석이 시작됩니다" %}',
+        selectFile: '{% trans "분석할 영상 파일을 선택해 주세요." %}'
+    };
+
+    const modelDescriptions = {
+        base: '{% trans "base 모델은 가장 빠르게 분석할 수 있어 테스트용이나 짧은 강의에 적합합니다. 정확도는 small, medium보다 낮을 수 있습니다." %}',
+        small: '{% trans "small 모델은 속도와 정확도의 균형이 좋아 일반적인 강의 분석에 적합합니다. base보다 느리지만 전사 품질이 더 안정적입니다." %}',
+        medium: '{% trans "medium 모델은 정확도가 높지만 CPU 환경에서는 분석 시간이 크게 증가할 수 있습니다. 고성능 PC 또는 정확도가 중요한 강의에 적합합니다." %}',
+        large: '{% trans "large 모델은 가장 높은 정확도를 제공하지만 처리 속도와 메모리 사용량 부담이 가장 큽니다. 짧은 영상이나 고성능 PC에서만 권장합니다." %}'
+    };
+
+    const workerDescriptions = {
+        1: '{% trans "1개는 가장 안정적이며 저사양 PC에 적합합니다. 대신 분석 시간이 길어질 수 있습니다." %}',
+        2: '{% trans "2개는 현재 권장 기본값입니다. CPU 사용량과 처리 속도의 균형이 좋아 노트북 환경에 적합합니다." %}',
+        3: '{% trans "3개는 고성능 병렬 처리용입니다. CPU 사용량은 늘어나지만 여러 구간을 동시에 처리할 수 있습니다." %}',
+        4: '{% trans "4개는 고성능 PC에 적합합니다. CPU와 메모리 사용량이 높아질 수 있습니다." %}'
+    };
+
+    const subjectDescriptions = {
+        auto: '{% trans "AI 자동 생성은 API가 강의 내용을 보고 과목 성격을 판단한 뒤, 시험 대비에 적합한 구조로 요약합니다." %}',
+        1: '{% trans "역사/인문학은 인물, 사건, 시대 배경, 인과관계를 중심으로 요약합니다." %}',
+        2: '{% trans "프로그래밍/IT는 기술 스택, 코드 흐름, 함수, 실습 과정, 오류 해결을 중심으로 요약합니다." %}',
+        3: '{% trans "수학/과학은 핵심 개념, 공식, 원리, 문제 풀이 과정을 중심으로 요약합니다." %}',
+        4: '{% trans "일반 강의는 과목이 명확하지 않은 영상에 적합하며, 핵심 주제와 전체 흐름을 중심으로 요약합니다." %}'
+    };
+
+    const summaryApiDescriptions = {
+        gemini: '{% trans "Gemini API는 기존 EduMate 요약 방식입니다. Gemini 사용량이 많거나 503 오류가 반복될 경우 GPT API를 선택할 수 있습니다." %}',
+        gpt: '{% trans "GPT API는 OpenAI 기반 요약 방식입니다. 기존 요약 구조와 출력 형식은 유지하고, 요약 호출 API만 GPT로 변경합니다." %}'
+    };
+
+    function extractVideoId(url) {
+        if (!url) return null;
+
+        try {
+            const u = new URL(url.trim());
+
+            if (u.hostname.includes('youtu.be')) {
+                return u.pathname.replace('/', '').split('/')[0] || null;
+            }
+
+            if (u.searchParams.get('v')) {
+                return u.searchParams.get('v');
+            }
+
+            const parts = u.pathname.split('/').filter(Boolean);
+            const embedIdx = parts.indexOf('embed');
+
+            if (embedIdx >= 0 && parts[embedIdx + 1]) {
+                return parts[embedIdx + 1];
+            }
+        } catch (e) {
+            return null;
+        }
+
+        return null;
+    }
+
+    function formatFileSize(bytes) {
+        if (!bytes && bytes !== 0) return '—';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function hideNotice() {
+        uploadNotice.classList.remove('is-visible');
+        uploadNotice.textContent = '';
+    }
+
+    function showNotice(message) {
+        uploadNotice.textContent = message;
+        uploadNotice.classList.add('is-visible');
+    }
+
+    function syncTitleFields(source) {
+        const value = source.value;
+        if (source === titleYoutubeInput) {
+            titleFileInput.value = value;
+        } else {
+            titleYoutubeInput.value = value;
+        }
+    }
+
+    function clearSelectedFile() {
+        fileInput.value = '';
+        fileDropzoneEmpty.hidden = false;
+        fileDropzonePreview.hidden = true;
+        filePreviewName.textContent = '—';
+        filePreviewSize.textContent = '—';
+    }
+
+    function setUploadMode(mode) {
+        const isYoutube = mode === 'youtube';
+        const wasYoutube = uploadModeInput.value === 'youtube';
+
+        if (wasYoutube && !isYoutube) {
+            titleFileInput.value = titleYoutubeInput.value;
+        } else if (!wasYoutube && isYoutube) {
+            titleYoutubeInput.value = titleFileInput.value;
+        }
+
+        uploadModeInput.value = mode;
+
+        modeTabs.forEach(function (tab) {
+            const active = tab.dataset.mode === mode;
+            tab.classList.toggle('is-active', active);
+            tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+
+        youtubePane.classList.toggle('is-active', isYoutube);
+        youtubePane.hidden = !isYoutube;
+
+        filePane.classList.toggle('is-active', !isYoutube);
+        filePane.hidden = isYoutube;
+
+        input.required = isYoutube;
+        input.disabled = !isYoutube;
+
+        fileInput.required = !isYoutube;
+        fileInput.disabled = isYoutube;
+
+        titleYoutubeInput.required = isYoutube;
+        titleYoutubeInput.disabled = !isYoutube;
+
+        titleFileInput.required = !isYoutube;
+        titleFileInput.disabled = isYoutube;
+
+        if (isYoutube) {
+            clearSelectedFile();
+        }
+
+        hideNotice();
+    }
+
+    function showSelectedFile(file) {
+        if (!file) {
+            clearSelectedFile();
+            return;
+        }
+
+        filePreviewName.textContent = file.name;
+        filePreviewSize.textContent = formatFileSize(file.size);
+        fileDropzoneEmpty.hidden = true;
+        fileDropzonePreview.hidden = false;
+    }
+
+    function resetPreview() {
+        thumb.innerHTML = '<i class="fas fa-play-circle"></i>';
+        thumb.style.backgroundImage = '';
+        info.innerHTML = I18N.previewHint;
+    }
+
+    function updatePreview() {
+        const videoId = extractVideoId(input.value);
+
+        if (!videoId) {
+            resetPreview();
+            return;
+        }
+
+        thumb.innerHTML = '';
+        thumb.style.backgroundImage = 'url(https://img.youtube.com/vi/' + videoId + '/mqdefault.jpg)';
+        thumb.style.backgroundSize = 'cover';
+        thumb.style.backgroundPosition = 'center';
+        info.innerHTML = I18N.videoIdPrefix + ' <span>' + videoId + '</span> — ' + I18N.analysisStart;
+    }
+
+    function updateModelDesc() {
+        modelDesc.textContent = modelDescriptions[whisperSelect.value] || modelDescriptions.base;
+    }
+
+    function updateWorkersDesc() {
+        workersDesc.textContent = workerDescriptions[workersSelect.value] || workerDescriptions[2];
+    }
+
+    function updateSubjectDesc() {
+        subjectDesc.textContent = subjectDescriptions[subjectSelect.value] || subjectDescriptions.auto;
+    }
+
+    function updateSummaryApiDesc() {
+        summaryApiDesc.textContent = summaryApiDescriptions[summaryApiSelect.value] || summaryApiDescriptions.gemini;
+    }
+
+    modeTabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            setUploadMode(tab.dataset.mode);
+        });
+    });
+
+    fileDropzone.addEventListener('click', function (e) {
+        if (e.target.closest('.file-clear-btn')) return;
+        fileInput.click();
+    });
+
+    fileClearBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        clearSelectedFile();
+    });
+
+    fileInput.addEventListener('change', function () {
+        setUploadMode('file');
+        showSelectedFile(fileInput.files && fileInput.files[0] ? fileInput.files[0] : null);
+    });
+
+    ['dragenter', 'dragover'].forEach(function (eventName) {
+        fileDropzone.addEventListener(eventName, function (e) {
+            if (uploadModeInput.value !== 'file') return;
+            e.preventDefault();
+            fileDropzone.classList.add('is-dragover');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(function (eventName) {
+        fileDropzone.addEventListener(eventName, function (e) {
+            e.preventDefault();
+            fileDropzone.classList.remove('is-dragover');
+        });
+    });
+
+    fileDropzone.addEventListener('drop', function (e) {
+        if (uploadModeInput.value !== 'file') return;
+
+        const files = e.dataTransfer && e.dataTransfer.files;
+        if (!files || !files.length) return;
+
+        fileInput.files = files;
+        setUploadMode('file');
+        showSelectedFile(files[0]);
+    });
+
+    form.addEventListener('submit', function (e) {
+        if (uploadModeInput.value === 'file') {
+            if (!fileInput.files || !fileInput.files.length) {
+                e.preventDefault();
+                showNotice(I18N.selectFile);
+            }
+        }
+    });
+
+    titleYoutubeInput.addEventListener('input', function () {
+        syncTitleFields(titleYoutubeInput);
+    });
+
+    titleFileInput.addEventListener('input', function () {
+        syncTitleFields(titleFileInput);
+    });
+
+    input.addEventListener('input', updatePreview);
+    whisperSelect.addEventListener('change', updateModelDesc);
+    workersSelect.addEventListener('change', updateWorkersDesc);
+    subjectSelect.addEventListener('change', updateSubjectDesc);
+    summaryApiSelect.addEventListener('change', updateSummaryApiDesc);
+
+    resetBtn.addEventListener('click', function () {
+        setTimeout(function () {
+            setUploadMode('youtube');
+            titleYoutubeInput.value = '';
+            titleFileInput.value = '';
+            resetPreview();
+            clearSelectedFile();
+            fileDropzone.classList.remove('is-dragover');
+            whisperSelect.value = 'base';
+            workersSelect.value = '2';
+            subjectSelect.value = 'auto';
+            summaryApiSelect.value = 'gemini';
+            updateModelDesc();
+            updateWorkersDesc();
+            updateSubjectDesc();
+            updateSummaryApiDesc();
+        }, 0);
+    });
+
+    setUploadMode('youtube');
+    updateModelDesc();
+    updateWorkersDesc();
+    updateSubjectDesc();
+    updateSummaryApiDesc();
+})();
+</script>
 {% endblock %}

@@ -10,3 +10,5 @@ staticfiles/
 .DS_Store
 .idea/
 .vscode/
+
+edumate_backup/

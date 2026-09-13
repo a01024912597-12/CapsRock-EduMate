@@ -1,0 +1,1250 @@
+# EduMate UI translations
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: EduMate\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-29 00:00+0900\n"
+"PO-Revision-Date: 2026-08-29 00:00+0900\n"
+"Last-Translator: \n"
+"Language-Team: Chinese (Simplified)\n"
+"Language: zh_Hans\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "AI 학습 플랫폼"
+msgstr "AI学习平台"
+
+msgid "홈 대시보드"
+msgstr "首页仪表盘"
+
+msgid "강의 업로드"
+msgstr "上传讲座"
+
+msgid "내 히스토리"
+msgstr "我的记录"
+
+msgid "학습 관리"
+msgstr "学习管理"
+
+msgid "언어"
+msgstr "语言"
+
+msgid "다크 모드"
+msgstr "深色模式"
+
+msgid "라이트 모드"
+msgstr "浅色模式"
+
+msgid "로그아웃"
+msgstr "退出登录"
+
+msgid "페이지"
+msgstr "页面"
+
+msgid "님"
+msgstr "​"
+
+msgid "AI 기반 강의 이해도 분석 및 학습 지원 시스템"
+msgstr "基于AI的讲座理解分析与学习支持系统"
+
+msgid "로그인"
+msgstr "登录"
+
+msgid "회원가입"
+msgstr "注册"
+
+msgid "EduMate 로그인"
+msgstr "EduMate 登录"
+
+msgid "아이디"
+msgstr "账号"
+
+msgid "아이디를 입력하세요"
+msgstr "请输入账号"
+
+msgid "비밀번호"
+msgstr "密码"
+
+msgid "비밀번호를 입력하세요"
+msgstr "请输入密码"
+
+msgid "서술형 피드백"
+msgstr "论述反馈"
+
+msgid "객관식 오답을 기반으로 생성된 서술형 문제를 풀고, 자동 채점 결과를 확인할 수 있습니다."
+msgstr "根据选择题错题生成论述题并查看自动评分结果。"
+
+msgid "아직 이 강의의 요약이 생성되지 않았습니다."
+msgstr "该讲座尚未生成摘要。"
+
+msgid "객관식 오답 정보가 없는 경우 강의 요약의 핵심 개념을 기반으로 서술형 문제가 생성됩니다."
+msgstr "如果没有选择题错题，将根据讲座摘要的核心概念生成论述题。"
+
+msgid "서술형 피드백 문제 생성"
+msgstr "生成论述反馈题"
+
+msgid "피드백 차수 선택"
+msgstr "选择反馈轮次"
+
+msgid "차 피드백"
+msgstr "次反馈"
+
+msgid "아직 생성된 서술형 피드백 문제가 없습니다."
+msgstr "尚未生成论述反馈题。"
+
+msgid "위의 「서술형 피드백 문제 생성」 버튼을 눌러 문제를 생성해주세요."
+msgstr "请点击上方的「生成论述反馈题」按钮生成题目。"
+
+msgid "차 서술형 피드백 문제"
+msgstr "次论述反馈题"
+
+msgid "차"
+msgstr "次"
+
+msgid "번 문제"
+msgstr "题"
+
+msgid "관련 객관식 오답 :"
+msgstr "相关选择题错题："
+
+msgid "정보 없음"
+msgstr "暂无信息"
+
+msgid "서술형 문제"
+msgstr "论述题"
+
+msgid "모범 답안"
+msgstr "参考答案"
+
+msgid "내 서술형 답안"
+msgstr "我的论述答案"
+
+msgid "여기에 서술형 답안을 입력하세요."
+msgstr "请在此输入论述答案。"
+
+msgid "답안을 제출하면 자동 채점 결과를 확인할 수 있습니다."
+msgstr "提交答案后即可查看自动评分结果。"
+
+msgid "관련 영상 다시보기"
+msgstr "重看相关视频"
+
+msgid "문제 형식이 자동 분해되지 않은 경우, 여기에 답을 자유롭게 입력하세요."
+msgstr "如果题目未能自动拆分，请在此自由作答。"
+
+msgid "서술형 답안 저장 및 자동 채점"
+msgstr "保存论述答案并自动评分"
+
+msgid "제출 답안 수"
+msgstr "提交答案数"
+
+msgid "개"
+msgstr "个"
+
+msgid "평균 자동 채점 점수"
+msgstr "平均自动评分"
+
+msgid "정답 가능성 높음"
+msgstr "很可能正确"
+
+msgid "검토 필요"
+msgstr "需要复核"
+
+msgid "오답 가능성 높음"
+msgstr "很可能错误"
+
+msgid "자동 채점 결과"
+msgstr "自动评分结果"
+
+msgid "자동 채점 점수"
+msgstr "自动评分"
+
+msgid "문제"
+msgstr "题目"
+
+msgid "사용자 답안"
+msgstr "用户答案"
+
+msgid "입력된 답안 없음"
+msgstr "未输入答案"
+
+msgid "시스템 1차 판단"
+msgstr "系统初判"
+
+msgid "판단 없음"
+msgstr "无判定"
+
+msgid "사람 검토 점수"
+msgstr "人工复核分数"
+
+msgid "점"
+msgstr "分"
+
+msgid "미검토"
+msgstr "未复核"
+
+msgid "사람 검토 라벨"
+msgstr "人工复核标签"
+
+msgid "아직 제출된 서술형 답안이 없습니다."
+msgstr "尚未提交论述答案。"
+
+msgid "위 문제에 답안을 입력한 뒤 「서술형 답안 저장 및 자동 채점」을 눌러주세요."
+msgstr "请在上方题目中作答，然后点击「保存论述答案并自动评分」。"
+
+msgid "히스토리로 돌아가기"
+msgstr "返回记录"
+
+msgid "객관식 문제로 이동"
+msgstr "前往选择题"
+
+msgid "관련 문제 정보"
+msgstr "相关题目信息"
+
+msgid "번 서술형 문제"
+msgstr "题论述题"
+
+msgid "관련 구간 :"
+msgstr "相关片段："
+
+msgid "관련 정보 없음"
+msgstr "暂无相关信息"
+
+msgid "유튜브 영상 ID를 확인할 수 없어 재생할 수 없습니다."
+msgstr "无法确认 YouTube 视频 ID，无法播放。"
+
+msgid "현재 %(objective_generation)s차 객관식 오답을 기반으로 서술형 피드백 문제를 생성할 수 있습니다."
+msgstr "可根据第%(objective_generation)s轮选择题错题生成论述反馈题。"
+
+msgid "내 강의 히스토리"
+msgstr "我的讲座记录"
+
+msgid "업로드한 강의의 요약·예상 문제·학습 피드백을 한곳에서 확인하세요."
+msgstr "在一处查看已上传讲座的摘要、练习题和学习反馈。"
+
+msgid "검색 결과 또는 강의 없음"
+msgstr "无搜索结果或讲座"
+
+msgid "최신 등록순"
+msgstr "最新注册"
+
+msgid "오래된순"
+msgstr "最早注册"
+
+msgid "강의 제목순"
+msgstr "按讲座标题"
+
+msgid "퀴즈 전체"
+msgstr "全部测验"
+
+msgid "예상 문제 생성 완료"
+msgstr "已生成练习题"
+
+msgid "예상 문제 미생성"
+msgstr "未生成练习题"
+
+msgid "영상 길이 전체"
+msgstr "全部时长"
+
+msgid "10분 미만 (숏폼/핵심)"
+msgstr "10分钟以下（短视频/要点）"
+
+msgid "10분 ~ 30분 (일반)"
+msgstr "10–30分钟（普通）"
+
+msgid "30분 초과 (장편 특강)"
+msgstr "超过30分钟（长讲座）"
+
+msgid "과목 전체"
+msgstr "全部科目"
+
+msgid "역사/인문학"
+msgstr "历史/人文学"
+
+msgid "프로그래밍/IT"
+msgstr "编程/IT"
+
+msgid "수학/과학"
+msgstr "数学/科学"
+
+msgid "일반 강의"
+msgstr "通用讲座"
+
+msgid "강의 제목 검색"
+msgstr "搜索讲座标题"
+
+msgid "적용"
+msgstr "应用"
+
+msgid "초기화"
+msgstr "重置"
+
+msgid "등록 시간:"
+msgstr "注册时间："
+
+msgid "분석 완료"
+msgstr "分析完成"
+
+msgid "분석 중"
+msgstr "分析中"
+
+msgid "요약 상태"
+msgstr "摘要状态"
+
+msgid "완료"
+msgstr "完成"
+
+msgid "미완료"
+msgstr "未完成"
+
+msgid "예상 문제"
+msgstr "练习题"
+
+msgid "미생성"
+msgstr "未生成"
+
+msgid "요약 다시 보기"
+msgstr "再次查看摘要"
+
+msgid "PDF 다운로드"
+msgstr "下载 PDF"
+
+msgid "예상 문제 풀기"
+msgstr "做练习题"
+
+msgid "모범 답안 확인하기"
+msgstr "查看参考答案"
+
+msgid "학습 피드백"
+msgstr "学习反馈"
+
+msgid "처음"
+msgstr "首页"
+
+msgid "이전"
+msgstr "上一页"
+
+msgid "다음"
+msgstr "下一页"
+
+msgid "마지막"
+msgstr "末页"
+
+msgid "해당 조건의 강의 내역을 찾을 수 없습니다."
+msgstr "找不到符合条件的讲座记录。"
+
+msgid "총 %(page_obj.paginator.count)s개 강의"
+msgstr "共 %(page_obj.paginator.count)s 个讲座"
+
+msgid "%(page_obj.start_index)s–%(page_obj.end_index)s번째 표시"
+msgstr "显示第 %(page_obj.start_index)s–%(page_obj.end_index)s 条"
+
+msgid "%(title)s 썸네일"
+msgstr "%(title)s 缩略图"
+
+msgid "생성 완료 / %(lecture.quiz_count)s차까지 생성"
+msgstr "已生成至第%(lecture.quiz_count)s轮"
+
+msgid "홈"
+msgstr "首页"
+
+msgid "에듀메이트에 오신 것을 환영합니다."
+msgstr "欢迎来到 EduMate。"
+
+msgid "강의 영상을 업로드하고 AI 요약, 문제 생성, 학습 피드백 기능을 이용할 수 있습니다."
+msgstr "上传讲座视频即可使用 AI 摘要、出题和学习反馈功能。"
+
+msgid "강의 업로드 하기"
+msgstr "上传讲座"
+
+msgid "AI 요약"
+msgstr "AI摘要"
+
+msgid "문제 생성"
+msgstr "生成题目"
+
+msgid "내 히스토리 보기"
+msgstr "查看我的记录"
+
+msgid "팁: 강의 영상을 업로드하면 AI가 핵심 내용을 요약하고 문제를 만들어 학습을 도와줘요."
+msgstr "提示：上传讲座视频后，AI 会总结要点并出题帮助学习。"
+
+msgid "업로드한 강의"
+msgstr "已上传讲座"
+
+msgid "풀어본 문제"
+msgstr "已做题目"
+
+msgid "학습 연속일"
+msgstr "连续学习天数"
+
+msgid "오늘 첫 학습을 시작해보세요!"
+msgstr "今天开始第一次学习吧！"
+
+msgid "최근 학습"
+msgstr "最近学习"
+
+msgid "전체 보기"
+msgstr "查看全部"
+
+msgid "파일"
+msgstr "文件"
+
+msgid "업로드"
+msgstr "上传"
+
+msgid "요약 완료"
+msgstr "摘要完成"
+
+msgid "요약"
+msgstr "摘要"
+
+msgid "퀴즈"
+msgstr "测验"
+
+msgid "아직 업로드한 강의가 없습니다."
+msgstr "尚未上传讲座。"
+
+msgid "첫 강의를 업로드하고 학습을 시작해 보세요."
+msgstr "上传第一堂讲座并开始学习。"
+
+msgid "학습 캘린더"
+msgstr "学习日历"
+
+msgid "강의 업로드·문제 풀이가 있었던 날을 표시합니다."
+msgstr "显示有讲座上传或做题记录的日期。"
+
+msgid "캘린더 보기 전환"
+msgstr "切换日历视图"
+
+msgid "주간"
+msgstr "周"
+
+msgid "월간"
+msgstr "月"
+
+msgid "이전 주"
+msgstr "上一周"
+
+msgid "다음 주"
+msgstr "下一周"
+
+msgid "날짜를 선택하세요"
+msgstr "请选择日期"
+
+msgid "캘린더에서 날짜를 클릭하면 해당 일의 학습 내역을 확인할 수 있습니다."
+msgstr "点击日历中的日期即可查看当天的学习记录。"
+
+msgid "학습 메모"
+msgstr "学习备忘"
+
+msgid "이 날의 학습 계획이나 복습 내용을 적어보세요."
+msgstr "写下这一天的学习计划或复习内容。"
+
+msgid "삭제"
+msgstr "删除"
+
+msgid "저장"
+msgstr "保存"
+
+msgid "문제 풀이"
+msgstr "做题"
+
+msgid "메모"
+msgstr "备忘"
+
+msgid "일"
+msgstr "日"
+
+msgid "월"
+msgstr "一"
+
+msgid "화"
+msgstr "二"
+
+msgid "수"
+msgstr "三"
+
+msgid "목"
+msgstr "四"
+
+msgid "금"
+msgstr "五"
+
+msgid "토"
+msgstr "六"
+
+msgid "년"
+msgstr "年"
+
+msgid "이 날은 학습 활동이 없습니다."
+msgstr "这一天没有学习活动。"
+
+msgid "푼 문제"
+msgstr "已做题目"
+
+msgid "저장 중..."
+msgstr "保存中..."
+
+msgid "저장에 실패했습니다."
+msgstr "保存失败。"
+
+msgid "메모를 삭제했습니다."
+msgstr "已删除备忘。"
+
+msgid "저장되었습니다."
+msgstr "已保存。"
+
+msgid "이전 달"
+msgstr "上个月"
+
+msgid "다음 달"
+msgstr "下个月"
+
+msgid "이 날짜의 메모를 삭제할까요?"
+msgstr "要删除该日期的备忘吗？"
+
+msgid "로그인 후 강의 업로드와 히스토리 기능을 사용할 수 있습니다."
+msgstr "登录后即可使用讲座上传和记录功能。"
+
+msgid "이번 달 %(lectures_this_month)s개 추가"
+msgstr "本月新增 %(lectures_this_month)s 个"
+
+msgid "정답률 %(accuracy_rate)s%"
+msgstr "正确率 %(accuracy_rate)s%"
+
+msgid "%(study_streak)s일"
+msgstr "%(study_streak)s天"
+
+msgid "최고 %(best_streak)s일"
+msgstr "最高 %(best_streak)s天"
+
+msgid "퀴즈 %(lecture.quiz_count)s차"
+msgstr "测验第%(lecture.quiz_count)s轮"
+
+msgid "CapsRock 서비스 로그인"
+msgstr "CapsRock 服务登录"
+
+msgid "계정이 없으신가요? 관리자에게 문의하세요."
+msgstr "没有账号？请联系管理员。"
+
+msgid "객관식 문제 풀이"
+msgstr "选择题练习"
+
+msgid "강의 제목:"
+msgstr "讲座标题："
+
+msgid "강의 요약 내용을 바탕으로 생성된 객관식 문제입니다. 답안을 선택한 뒤 「내 답안 저장 및 채점」을 누르면 정답 및 오답 확인 화면으로 이동합니다."
+msgstr "这些选择题根据讲座摘要生成。选择答案后点击「保存并评分」即可查看对错。"
+
+msgid "퀴즈 차수 목록"
+msgstr "测验轮次列表"
+
+msgid "차 문제"
+msgstr "次题目"
+
+msgid "선택됨"
+msgstr "已选"
+
+msgid "생성된 문제 없음"
+msgstr "尚未生成题目"
+
+msgid "새 객관식 문제 생성"
+msgstr "生成新选择题"
+
+msgid "차 객관식 문제"
+msgstr "次选择题"
+
+msgid "객관식 문제가 없습니다."
+msgstr "没有选择题。"
+
+msgid "새 객관식 문제 생성 버튼을 눌러 문제를 생성해주세요."
+msgstr "请点击生成新选择题按钮来出题。"
+
+msgid "내 답안 저장 및 채점"
+msgstr "保存并评分"
+
+msgid "정답 및 오답 확인하기"
+msgstr "查看对错"
+
+msgid "정답 및 오답 확인"
+msgstr "对错确认"
+
+msgid "차 객관식 채점 결과"
+msgstr "次选择题评分结果"
+
+msgid "객관식 채점 결과"
+msgstr "选择题评分结果"
+
+msgid "시험 점수"
+msgstr "考试分数"
+
+msgid "정답 개수"
+msgstr "正确数"
+
+msgid "오답 개수"
+msgstr "错误数"
+
+msgid "제출된 객관식 답안이 없습니다."
+msgstr "尚未提交选择题答案。"
+
+msgid "먼저 객관식 문제 풀이 화면에서 답안을 제출해주세요."
+msgstr "请先在选择题页面提交答案。"
+
+msgid "퀴즈 차수 변경"
+msgstr "更改测验轮次"
+
+msgid "차 결과"
+msgstr "次结果"
+
+msgid "현재"
+msgstr "当前"
+
+msgid "보기"
+msgstr "查看"
+
+msgid "문항별 채점 대조표"
+msgstr "按题对照表"
+
+msgid "정답"
+msgstr "正确"
+
+msgid "오답"
+msgstr "错误"
+
+msgid "내 선택"
+msgstr "我的选择"
+
+msgid "내가 선택한 답"
+msgstr "我选择的答案"
+
+msgid "번"
+msgstr "号"
+
+msgid "미선택"
+msgstr "未选择"
+
+msgid "관련 키워드"
+msgstr "相关关键词"
+
+msgid "근거 없음"
+msgstr "无依据"
+
+msgid "해설"
+msgstr "解析"
+
+msgid "객관식 문제로 돌아가기"
+msgstr "返回选择题"
+
+msgid "오답 기반 서술형 피드백 받기"
+msgstr "根据错题获取论述反馈"
+
+msgid "EduMate 회원가입"
+msgstr "EduMate 注册"
+
+msgid "서비스 이용을 위해 정보를 입력해주세요."
+msgstr "请输入信息以使用服务。"
+
+msgid "기본 계정 정보"
+msgstr "基本账号信息"
+
+msgid "비밀번호 확인"
+msgstr "确认密码"
+
+msgid "사용자 상세 정보"
+msgstr "用户详细信息"
+
+msgid "이름"
+msgstr "姓名"
+
+msgid "이름을 입력하세요"
+msgstr "请输入姓名"
+
+msgid "나이"
+msgstr "年龄"
+
+msgid "나이를 입력하세요"
+msgstr "请输入年龄"
+
+msgid "전화번호"
+msgstr "电话号码"
+
+msgid "학습 프로필"
+msgstr "学习资料"
+
+msgid "준비 중인 자격증"
+msgstr "正在准备的资格证"
+
+msgid "예: 정보처리기사, ADsP"
+msgstr "例如：信息处理工程师、ADsP"
+
+msgid "가입 이유"
+msgstr "注册原因"
+
+msgid "관심 분야"
+msgstr "兴趣领域"
+
+msgid "예: 파이썬, 장고, 정보처리기사, NLP"
+msgstr "例如：Python、Django、信息处理工程师、NLP"
+
+msgid "회원가입 완료"
+msgstr "完成注册"
+
+msgid "이미 계정이 있으신가요?"
+msgstr "已有账号？"
+
+msgid "✓ 8자 이상 충족"
+msgstr "✓ 已满8个字符"
+
+msgid "✗ 8자 이상 입력해주세요"
+msgstr "✗ 请输入至少8个字符"
+
+msgid "✓ 비밀번호가 일치합니다"
+msgstr "✓ 密码一致"
+
+msgid "✗ 비밀번호가 일치하지 않습니다"
+msgstr "✗ 密码不一致"
+
+msgid "강의 요약"
+msgstr "讲座摘要"
+
+msgid "업로드 파일:"
+msgstr "上传文件："
+
+msgid "강의 영상"
+msgstr "讲座视频"
+
+msgid "영상 불러오는 중…"
+msgstr "正在加载视频…"
+
+msgid "브라우저가 video 태그를 지원하지 않습니다."
+msgstr "浏览器不支持 video 标签。"
+
+msgid "업로드된 영상 파일을 불러올 수 없습니다."
+msgstr "无法加载已上传的视频文件。"
+
+msgid "유튜브 링크:"
+msgstr "YouTube 链接："
+
+msgid "AI가 강의 내용을 분석 중입니다..."
+msgstr "AI 正在分析讲座内容..."
+
+msgid "(영상 길이에 따라 최대 몇 분이 소요될 수 있습니다)"
+msgstr "（根据视频长度可能需要几分钟）"
+
+msgid "새로운 강의 분석"
+msgstr "分析新讲座"
+
+msgid "분석 중 오류가 발생했습니다."
+msgstr "分析过程中发生错误。"
+
+msgid "서버 통신 중 오류가 발생했습니다."
+msgstr "与服务器通信时发生错误。"
+
+msgid "유튜브 링크 또는 영상 파일을 업로드하면 AI가 강의를 분석하고 학습 자료를 자동 생성합니다."
+msgstr "上传 YouTube 链接或视频文件后，AI 会分析讲座并自动生成学习资料。"
+
+msgid "AI 분석"
+msgstr "AI分析"
+
+msgid "30초 완성"
+msgstr "30秒完成"
+
+msgid "무제한"
+msgstr "不限次数"
+
+msgid "누적 강의 수"
+msgstr "累计讲座数"
+
+msgid "평균 이해도"
+msgstr "平均理解度"
+
+msgid "최근 5개 강의 기준"
+msgstr "基于最近5个讲座"
+
+msgid "생성된 퀴즈"
+msgstr "已生成测验"
+
+msgid "누적 퀴즈 문항 수"
+msgstr "累计测验题数"
+
+msgid "새 강의 분석"
+msgstr "分析新讲座"
+
+msgid "강의 업로드 방식"
+msgstr "讲座上传方式"
+
+msgid "유튜브 링크 업로드"
+msgstr "上传 YouTube 链接"
+
+msgid "파일 업로드"
+msgstr "上传文件"
+
+msgid "강의 제목"
+msgstr "讲座标题"
+
+msgid "필수"
+msgstr "必填"
+
+msgid "예) 운영체제 2주차 — 프로세스 관리"
+msgstr "例如：操作系统第2周 — 进程管理"
+
+msgid "유튜브 링크"
+msgstr "YouTube 链接"
+
+msgid "링크를 입력하면"
+msgstr "输入链接后将显示"
+
+msgid "미리보기"
+msgstr "预览"
+
+msgid "가 표시됩니다"
+msgstr " "
+
+msgid "강의 영상 파일"
+msgstr "讲座视频文件"
+
+msgid "클릭"
+msgstr "点击"
+
+msgid "하거나 영상 파일을"
+msgstr "或将视频文件"
+
+msgid "드래그"
+msgstr "拖放"
+
+msgid "하세요"
+msgstr "到此处"
+
+msgid "MP4, MOV, AVI, MKV, WEBM · 최대 500MB"
+msgstr "MP4、MOV、AVI、MKV、WEBM · 最大 500MB"
+
+msgid "선택 파일 제거"
+msgstr "移除所选文件"
+
+msgid "MP4, MOV, AVI, MKV, WEBM 형식 · 최대 500MB"
+msgstr "MP4、MOV、AVI、MKV、WEBM 格式 · 最大 500MB"
+
+msgid "분석 옵션 설정"
+msgstr "分析选项设置"
+
+msgid "PC 성능, 정확도, 강의 과목에 맞춰 분석 방식을 선택할 수 있습니다."
+msgstr "可根据电脑性能、准确度和科目选择分析方式。"
+
+msgid "Whisper 모델 선택"
+msgstr "选择 Whisper 模型"
+
+msgid "base 모델은 가장 빠르게 분석할 수 있어 테스트용이나 짧은 강의에 적합합니다."
+msgstr "base 模型分析最快，适合测试或较短讲座。"
+
+msgid "base — 빠른 분석"
+msgstr "base — 快速分析"
+
+msgid "small — 속도/정확도 균형"
+msgstr "small — 速度/准确度平衡"
+
+msgid "medium — 높은 정확도"
+msgstr "medium — 更高准确度"
+
+msgid "작업 스레드 수 설정"
+msgstr "工作线程数"
+
+msgid "3개는 기본 권장값입니다. CPU 사용량은 늘어나지만 여러 구간을 동시에 처리할 수 있습니다."
+msgstr "3 个是默认推荐值。CPU 占用会增加，但可同时处理多个片段。"
+
+msgid "1개 — 저사양 PC 권장"
+msgstr "1个 — 低配电脑推荐"
+
+msgid "2개 — 안정적인 병렬 처리"
+msgstr "2个 — 稳定并行处理"
+
+msgid "3개 — 기본 권장값"
+msgstr "3个 — 默认推荐"
+
+msgid "4개 — 고성능 PC용"
+msgstr "4个 — 高性能电脑"
+
+msgid "과목 유형 선택"
+msgstr "选择科目类型"
+
+msgid "일반 강의는 과목이 명확하지 않은 영상에 적합하며, 핵심 주제와 전체 흐름을 중심으로 요약합니다."
+msgstr "通用讲座适合科目不明确的视频，围绕核心主题和整体脉络进行摘要。"
+
+msgid "일반 강의 — 범용 요약"
+msgstr "通用讲座 — 通用摘要"
+
+msgid "역사/인문학 — 사건 흐름과 인과관계 중심"
+msgstr "历史/人文学 — 事件脉络与因果关系"
+
+msgid "프로그래밍/IT — 코드 흐름과 실습 중심"
+msgstr "编程/IT — 代码流程与实践"
+
+msgid "수학/과학 — 개념, 공식, 풀이 과정 중심"
+msgstr "数学/科学 — 概念、公式与解题过程"
+
+msgid "요약 API 선택"
+msgstr "选择摘要 API"
+
+msgid "Gemini API는 기존 EduMate 요약 방식입니다. Gemini 사용량이 많거나 503 오류가 반복될 경우 GPT API를 선택할 수 있습니다."
+msgstr "Gemini API 是 EduMate 原有摘要方式。若 Gemini 用量高或反复出现 503 错误，可选择 GPT API。"
+
+msgid "Gemini API — 기존 요약 방식"
+msgstr "Gemini API — 原有摘要方式"
+
+msgid "GPT API — OpenAI 기반 요약 방식"
+msgstr "GPT API — 基于 OpenAI 的摘要"
+
+msgid "각 설정에 맞는 설명은 아이콘에 마우스를 올리면 표시됩니다. 요약 API는 Gemini 또는 GPT 중 선택할 수 있으며, 이후 객관식 문제 생성과 서술형 피드백은 생성된 요약문을 기반으로 진행됩니다."
+msgstr "将鼠标悬停在图标上可查看各设置说明。摘要 API 可选择 Gemini 或 GPT，之后的选择题和论述反馈将基于生成的摘要进行。"
+
+msgid "AI 분석 시작"
+msgstr "开始 AI 分析"
+
+msgid "자동 요약"
+msgstr "自动摘要"
+
+msgid "퀴즈 생성"
+msgstr "生成测验"
+
+msgid "핵심 키워드"
+msgstr "核心关键词"
+
+msgid "타임라인 분석"
+msgstr "时间轴分析"
+
+msgid "이해도 측정"
+msgstr "理解度测评"
+
+msgid "영상 ID:"
+msgstr "视频 ID："
+
+msgid "제출 시 분석이 시작됩니다"
+msgstr "提交后将开始分析"
+
+msgid "분석할 영상 파일을 선택해 주세요."
+msgstr "请选择要分析的视频文件。"
+
+msgid "base 모델은 가장 빠르게 분석할 수 있어 테스트용이나 짧은 강의에 적합합니다. 정확도는 small, medium보다 낮을 수 있습니다."
+msgstr "base 模型分析最快，适合测试或较短讲座。准确度可能低于 small、medium。"
+
+msgid "small 모델은 속도와 정확도의 균형이 좋아 일반적인 강의 분석에 적합합니다. base보다 느리지만 전사 품질이 더 안정적입니다."
+msgstr "small 模型在速度和准确度之间较平衡，适合一般讲座。比 base 慢，但转写更稳定。"
+
+msgid "medium 모델은 정확도가 높지만 CPU 환경에서는 분석 시간이 크게 증가할 수 있습니다. 고성능 PC 또는 정확도가 중요한 강의에 적합합니다."
+msgstr "medium 模型准确度更高，但在 CPU 环境下分析时间可能明显增加。适合高性能电脑或对准确度要求高的讲座。"
+
+msgid "1개는 가장 안정적이며 저사양 PC에 적합합니다. 대신 분석 시간이 길어질 수 있습니다."
+msgstr "1 个线程最稳定，适合低配电脑，但分析时间可能更长。"
+
+msgid "2개는 안정성과 속도의 균형이 좋아 노트북 환경에서 무난하게 사용할 수 있습니다."
+msgstr "2 个线程在稳定性与速度之间较平衡，适合笔记本。"
+
+msgid "4개는 고성능 PC에 적합합니다. CPU와 메모리 사용량이 높아질 수 있습니다."
+msgstr "4 个线程适合高性能电脑，CPU 和内存占用可能较高。"
+
+msgid "역사/인문학은 인물, 사건, 시대 배경, 인과관계를 중심으로 요약합니다."
+msgstr "历史/人文学围绕人物、事件、时代背景和因果关系进行摘要。"
+
+msgid "프로그래밍/IT는 기술 스택, 코드 흐름, 함수, 실습 과정, 오류 해결을 중심으로 요약합니다."
+msgstr "编程/IT 围绕技术栈、代码流程、函数、实践和排错进行摘要。"
+
+msgid "수학/과학은 핵심 개념, 공식, 원리, 문제 풀이 과정을 중심으로 요약합니다."
+msgstr "数学/科学围绕核心概念、公式、原理和解题过程进行摘要。"
+
+msgid "GPT API는 OpenAI 기반 요약 방식입니다. 기존 요약 구조와 출력 형식은 유지하고, 요약 호출 API만 GPT로 변경합니다."
+msgstr "GPT API 是基于 OpenAI 的摘要方式。保留原有摘要结构和输出格式，仅将调用 API 改为 GPT。"
+
+msgid "답안 검수"
+msgstr "答案复核"
+
+msgid "학습 관리로"
+msgstr "返回学习管理"
+
+msgid "자동 채점된 답안을 검토하고 사람 라벨·점수를 부여하세요."
+msgstr "复核自动评分答案并赋予人工标签和分数。"
+
+msgid "검색 결과"
+msgstr "搜索结果"
+
+msgid "건"
+msgstr "条"
+
+msgid "검수"
+msgstr "复核"
+
+msgid "검색"
+msgstr "搜索"
+
+msgid "사용자 / 강의 / 문제 / 답안 내용"
+msgstr "用户 / 讲座 / 题目 / 答案内容"
+
+msgid "강의"
+msgstr "讲座"
+
+msgid "전체"
+msgstr "全部"
+
+msgid "차수"
+msgstr "轮次"
+
+msgid "자동 라벨"
+msgstr "自动标签"
+
+msgid "검수 상태"
+msgstr "复核状态"
+
+msgid "검수 대기"
+msgstr "待复核"
+
+msgid "검수 완료"
+msgstr "复核完成"
+
+msgid "표시"
+msgstr "显示"
+
+msgid "전체 검수 진행:"
+msgstr "整体复核进度："
+
+msgid "사용자"
+msgstr "用户"
+
+msgid "제출 답안"
+msgstr "提交答案"
+
+msgid "점수"
+msgstr "分数"
+
+msgid "제출 시각"
+msgstr "提交时间"
+
+msgid "(빈 답안)"
+msgstr "（空答案）"
+
+msgid "미판정"
+msgstr "未判定"
+
+msgid "사람 라벨"
+msgstr "人工标签"
+
+msgid "미검수"
+msgstr "未复核"
+
+msgid "사람 점수"
+msgstr "人工分数"
+
+msgid "조건에 맞는 답안이 없습니다."
+msgstr "没有符合条件的答案。"
+
+msgid "답안 목록 페이지"
+msgstr "答案列表分页"
+
+msgid "학습 데이터 현황과 답안 검수를 한곳에서 관리합니다."
+msgstr "在一处管理学习数据概况和答案复核。"
+
+msgid "전체 강의"
+msgstr "全部讲座"
+
+msgid "분석 완료 강의"
+msgstr "已分析讲座"
+
+msgid "전체 문제"
+msgstr "全部题目"
+
+msgid "제출된 답안"
+msgstr "已提交答案"
+
+msgid "최근 제출된 답안"
+msgstr "最近提交的答案"
+
+msgid "강의 / 차수 / 번호"
+msgstr "讲座 / 轮次 / 题号"
+
+msgid "자동 점수"
+msgstr "自动分数"
+
+msgid "검수됨"
+msgstr "已复核"
+
+msgid "대기"
+msgstr "等待"
+
+msgid "아직 제출된 답안이 없습니다."
+msgstr "尚未提交答案。"
+
+msgid "사용자 목록"
+msgstr "用户列表"
+
+msgid "등록된 사용자와 프로필 정보를 확인·수정합니다."
+msgstr "查看并修改已注册用户和资料。"
+
+msgid "명"
+msgstr "人"
+
+msgid "아이디 / 이름 / 이메일"
+msgstr "账号 / 姓名 / 邮箱"
+
+msgid "권한"
+msgstr "权限"
+
+msgid "강의 수"
+msgstr "讲座数"
+
+msgid "가입일"
+msgstr "注册日期"
+
+msgid "관리"
+msgstr "管理"
+
+msgid "관리자"
+msgstr "管理员"
+
+msgid "일반"
+msgstr "普通"
+
+msgid "비활성"
+msgstr "停用"
+
+msgid "프로필 수정"
+msgstr "编辑资料"
+
+msgid "답안"
+msgstr "答案"
+
+msgid "본인 권한은 변경할 수 없습니다."
+msgstr "无法更改本人权限。"
+
+msgid "실명 또는 표시 이름"
+msgstr "真实姓名或显示名"
+
+msgid "예) 25"
+msgstr "例如 25"
+
+msgid "연락처"
+msgstr "联系方式"
+
+msgid "자격/전공"
+msgstr "资格/专业"
+
+msgid "자격증, 전공, 직무 등"
+msgstr "资格证、专业、职务等"
+
+msgid "가입 목적"
+msgstr "注册目的"
+
+msgid "서비스 이용 목적"
+msgstr "使用服务的目的"
+
+msgid "관심 있는 학습 주제"
+msgstr "感兴趣的学习主题"
+
+msgid "닫기"
+msgstr "关闭"
+
+msgid "프로필이 없습니다. 저장 시 새로 생성됩니다."
+msgstr "暂无资料。保存时将新建。"
+
+msgid "조건에 맞는 사용자가 없습니다."
+msgstr "没有符合条件的用户。"
+
+msgid "사용자 목록 페이지"
+msgstr "用户列表分页"
+
+msgid "일반 사용자"
+msgstr "普通用户"
+
+msgid "운영자"
+msgstr "运营者"
+
+msgid "비활성화"
+msgstr "停用"
+
+msgid "POST만 허용됩니다."
+msgstr "仅允许 POST。"
+
+msgid "잘못된 요청입니다."
+msgstr "请求无效。"
+
+msgid "날짜 형식이 올바르지 않습니다."
+msgstr "日期格式不正确。"
+
+msgid "메모는 500자까지 입력할 수 있습니다."
+msgstr "备忘最多可输入 500 个字符。"
+
+msgid "%(username)s님, 환영합니다!"
+msgstr "欢迎，%(username)s！"
+
+msgid "아이디 또는 비밀번호가 올바르지 않습니다."
+msgstr "账号或密码不正确。"
+
+msgid "회원가입이 완료되었습니다. 로그인해주세요."
+msgstr "注册完成，请登录。"
+
+msgid "회원가입에 실패했습니다. 입력값을 다시 확인해주세요."
+msgstr "注册失败，请检查输入内容。"
+
+msgid "지원하지 않는 영상 형식입니다. (%(ext)s)"
+msgstr "不支持的视频格式。(%(ext)s)"
+
+msgid "확장자 없음"
+msgstr "无扩展名"
+
+msgid "영상 파일은 500MB 이하여야 합니다."
+msgstr "视频文件必须不超过 500MB。"
+
+msgid "제목 없는 강의"
+msgstr "无标题讲座"
+
+msgid "유튜브 링크를 입력해 주세요."
+msgstr "请输入 YouTube 链接。"
+
+msgid "요약이 아직 없습니다."
+msgstr "尚无摘要。"
+
+msgid "PDF 생성에 실패했습니다. static/fonts/NotoSansKR-Regular.ttf 파일을 확인해 주세요."
+msgstr "PDF 生成失败。请检查 static/fonts/NotoSansKR-Regular.ttf 文件。"
+
+msgid "올바르지 않은 권한 값입니다."
+msgstr "权限值不正确。"
+
+msgid "본인 계정은 비활성화할 수 없습니다."
+msgstr "无法停用本人账号。"
+
+msgid "본인 계정의 관리자 권한은 해제할 수 없습니다."
+msgstr "无法取消本人账号的管理员权限。"
+
+msgid "%(username)s님의 답안 검수 결과를 저장했습니다."
+msgstr "已保存 %(username)s 的答案复核结果。"
+
+msgid "%(username)s님의 프로필과 권한을 저장했습니다."
+msgstr "已保存 %(username)s 的资料和权限。"
+
+msgid "부분 정답"
+msgstr "部分正确"
+
+msgid "lecture_id가 전달되지 않았습니다."
+msgstr "未提供 lecture_id。"
+
+msgid "오디오 추출 또는 분할에 실패했습니다."
+msgstr "音频提取或分割失败。"
+
+msgid "일부 구간 STT에 실패했습니다: %(names)s"
+msgstr "部分片段语音识别失败：%(names)s"
+
+msgid "STT 결과가 비어 있습니다."
+msgstr "语音识别结果为空。"
+
+msgid "클릭하면 이 시점부터 영상이 재생됩니다"
+msgstr "点击即可从该时间点播放视频"
+
+msgid "메모 내용"
+msgstr "备忘内容"
+
+msgctxt "date-month-suffix"
+msgid "월"
+msgstr "月"
+
+msgctxt "date-day-suffix"
+msgid "일"
+msgstr "日"
+

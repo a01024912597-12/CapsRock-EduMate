@@ -1,70 +1,266 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block content %}
-    <h2>내 강의 히스토리</h2>
+{% block title %}EduMate — {% trans "내 히스토리" %}{% endblock %}
+{% block breadcrumb %}{% trans "내 히스토리" %}{% endblock %}
+{% block page_content_class %} page-content--history{% endblock %}
 
-    {% if lectures %}
-        {% for lecture in lectures %}
-            <div style="background: white; border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-bottom: 25px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);">
-                <h3>{{ lecture.title }}</h3>
-                <p><strong>검색 시간:</strong> {{ lecture.created_at|date:"Y-m-d H:i" }}</p>
-
-                {% if lecture.thumbnail_url %}
-                    <img src="{{ lecture.thumbnail_url }}" alt="썸네일" style="margin: 15px 0; border-radius: 8px; max-width: 320px;">
-                {% endif %}
-
-                <div style="margin: 15px 0; padding: 12px; background: #f8f9fa; border-radius: 8px;">
-                    <p style="margin: 5px 0;">
-                        <strong>요약 상태:</strong>
-                        {% if lecture.summary_text %}
-                            <span style="color: #27ae60; font-weight: bold;">완료</span>
-                        {% else %}
-                            <span style="color: #c0392b; font-weight: bold;">미완료</span>
-                        {% endif %}
-                    </p>
-
-                    <p style="margin: 5px 0;">
-                        <strong>예상 문제 상태:</strong>
-                        {% if lecture.has_quiz %}
-                            <span style="color: #27ae60; font-weight: bold;">
-                                생성 완료{% if lecture.quiz_count %} / {{ lecture.quiz_count }}차까지 생성{% endif %}
-                            </span>
-                        {% else %}
-                            <span style="color: #e67e22; font-weight: bold;">미생성</span>
-                        {% endif %}
-                    </p>
+{% block content_area %}
+    <div class="history-page">
+        <div class="hero-banner">
+            <div class="hero-text">
+                <h1><i class="fas fa-clock-rotate-left"></i> {% trans "내 강의 히스토리" %}</h1>
+                <p>{% trans "업로드한 강의의 요약·예상 문제·학습 피드백을 한곳에서 확인하세요." %}</p>
+                <div class="hero-badges">
+                    {% if page_obj.paginator.count %}
+                        <span class="hero-badge"><i class="fas fa-book"></i> {% blocktrans %}총 {{ page_obj.paginator.count }}개 강의{% endblocktrans %}</span>
+                        <span class="hero-badge">
+                            <i class="fas fa-list-ol"></i>
+                            {% blocktrans %}{{ page_obj.start_index }}–{{ page_obj.end_index }}번째 표시{% endblocktrans %}
+                        </span>
+                    {% else %}
+                        <span class="hero-badge"><i class="fas fa-inbox"></i> {% trans "검색 결과 또는 강의 없음" %}</span>
+                    {% endif %}
                 </div>
-
-                <div style="margin: 15px 0;">
-                    <a href="{% url 'summary' %}?lecture_id={{ lecture.id }}"
-                       style="display: inline-block; padding: 8px 14px; background-color: #273c75; color: white; border-radius: 6px; text-decoration: none;">
-                        요약 다시 보기
-                    </a>
-
-                    <a href="{% url 'quiz' %}?lecture_id={{ lecture.id }}"
-                       style="display: inline-block; padding: 8px 14px; background-color: #e67e22; color: white; border-radius: 6px; text-decoration: none; margin-left: 10px;">
-                        예상 문제 보기
-                    </a>
-
-                    <a href="{% url 'feedback' %}?lecture_id={{ lecture.id }}"
-                       style="display: inline-block; padding: 8px 14px; background-color: #44bd32; color: white; border-radius: 6px; text-decoration: none; margin-left: 10px;">
-                        학습 피드백
-                    </a>
-                </div>
-
-                <h4>요약 내용</h4>
-                <div style="background: #f1f3f5; padding: 15px; border-radius: 8px; white-space: pre-wrap; max-height: 220px; overflow: hidden;">
-                    {{ lecture.summary_text|default:"아직 요약 내용이 없습니다." }}
-                </div>
-
-                <p style="font-size: 13px; color: #7f8c8d; margin-top: 8px;">
-                    요약 내용은 일부만 표시됩니다. 전체 내용은 ‘요약 다시 보기’에서 확인할 수 있습니다.
-                </p>
             </div>
-        {% endfor %}
-    {% else %}
-        <div style="background: white; padding: 30px; border-radius: 12px; border: 1px solid #ddd;">
-            아직 저장된 강의가 없습니다.
+            <div class="hero-icon"><i class="fas fa-history"></i></div>
         </div>
-    {% endif %}
+
+        <div class="history-filter-container"
+             style="clear: both; max-width: 1200px; margin: 25px auto 15px auto; padding: 0 4px;">
+            <form method="GET" action="{% url 'history' %}"
+                  style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; width: 100%;">
+
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <select name="sort"
+                            style="padding: 0 10px; height: 40px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 13px; cursor: pointer; outline: none;">
+                        <option value="-created_at" {% if sort_by == '-created_at' %}selected{% endif %}>{% trans "최신 등록순" %}</option>
+                        <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>{% trans "오래된순" %}</option>
+                        <option value="title" {% if sort_by == 'title' %}selected{% endif %}>{% trans "강의 제목순" %}</option>
+                    </select>
+
+                    <select name="quiz"
+                            style="padding: 0 10px; height: 40px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 13px; cursor: pointer; outline: none;">
+                        <option value="all" {% if quiz_filter == 'all' %}selected{% endif %}>{% trans "퀴즈 전체" %}</option>
+                        <option value="quiz_exist" {% if quiz_filter == 'quiz_exist' %}selected{% endif %}>
+                            {% trans "예상 문제 생성 완료" %}
+                        </option>
+                        <option value="no_quiz" {% if quiz_filter == 'no_quiz' %}selected{% endif %}>{% trans "예상 문제 미생성" %}</option>
+                    </select>
+
+                    <select name="duration"
+                            style="padding: 0 10px; height: 40px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 13px; cursor: pointer; outline: none;">
+                        <option value="all" {% if duration_filter == 'all' %}selected{% endif %}>{% trans "영상 길이 전체" %}</option>
+                        <option value="short" {% if duration_filter == 'short' %}selected{% endif %}>
+                            {% trans "10분 미만 (숏폼/핵심)" %}
+                        </option>
+                        <option value="medium" {% if duration_filter == 'medium' %}selected{% endif %}>
+                            {% trans "10분 ~ 30분 (일반)" %}
+                        </option>
+                        <option value="long" {% if duration_filter == 'long' %}selected{% endif %}>
+                            {% trans "30분 초과 (장편 특강)" %}
+                        </option>
+                    </select>
+
+                    <select name="subject"
+                            style="padding: 0 10px; height: 40px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 13px; cursor: pointer; outline: none; font-weight: 500;">
+                        <option value="all" {% if subject_filter == 'all' %}selected{% endif %}>{% trans "과목 전체" %}</option>
+                        <option value="auto" {% if subject_filter == 'auto' %}selected{% endif %}>{% trans "AI 자동 생성" %}</option>
+                        <option value="1" {% if subject_filter == '1' %}selected{% endif %}>{% trans "역사/인문학" %}</option>
+                        <option value="2" {% if subject_filter == '2' %}selected{% endif %}>{% trans "프로그래밍/IT" %}</option>
+                        <option value="3" {% if subject_filter == '3' %}selected{% endif %}>{% trans "수학/과학" %}</option>
+                        <option value="4" {% if subject_filter == '4' %}selected{% endif %}>{% trans "일반 강의" %}</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 8px; width: 100%; max-width: 380px;">
+                    <div style="position: relative; flex: 1;">
+                        <input type="text"
+                               name="search"
+                               value="{{ search_query|default:'' }}"
+                               placeholder="{% trans '강의 제목 검색' %}"
+                               style="width: 100%; padding: 10px 12px 10px 35px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 14px; box-sizing: border-box; height: 40px;">
+                        <i class="fas fa-search"
+                           style="position: absolute; left: 12px; top: 13px; color: var(--text-sub); font-size: 13px;"></i>
+                    </div>
+
+                    <button type="submit"
+                            style="padding: 0 16px; background: var(--grad); color: white; border: none; border-radius: 10px; font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap; height: 40px; box-shadow: 0 2px 4px rgba(99,102,241,0.15);">
+                        {% trans "적용" %}
+                    </button>
+
+                    {% if search_query or quiz_filter != 'all' or duration_filter != 'all' or subject_filter != 'all' or sort_by != '-created_at' %}
+                        <a href="{% url 'history' %}"
+                           style="padding: 0 12px; background: var(--bg-card); color: var(--text-sub); border-radius: 10px; text-decoration: none; font-size: 13px; display: flex; align-items: center; white-space: nowrap; height: 40px; border: 1px solid var(--border);">
+                            {% trans "초기화" %}
+                        </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+
+        {% if page_obj.paginator.count %}
+            <div class="history-list">
+                {% for lecture in page_obj %}
+                    <article class="history-card">
+                        <div class="hcard-header">
+                            <div class="hcard-title-group">
+                                <div class="hcard-title">
+                                    <i class="fab fa-youtube"></i>
+                                    {{ lecture.display_title|default:lecture.title }}
+                                </div>
+                                <div class="hcard-date">
+                                    <i class="fas fa-clock"></i>
+                                    {% trans "등록 시간:" %} {{ lecture.created_at|date:"Y-m-d H:i" }}
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                {% if lecture.detected_subject == 'auto' %}
+                                    <span class="status-chip"
+                                          style="background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; font-weight:600;">
+                                        <i class="fas fa-wand-magic-sparkles" style="margin-right:4px;"></i>{% trans "AI 자동 생성" %}
+                                    </span>
+                                {% elif lecture.detected_subject == '1' %}
+                                    <span class="status-chip"
+                                          style="background:#fffbeb; color:#b45309; border:1px solid #fde68a; font-weight:600;">
+                                        <i class="fas fa-landmark" style="margin-right:4px;"></i>{% trans "역사/인문학" %}
+                                    </span>
+                                {% elif lecture.detected_subject == '2' %}
+                                    <span class="status-chip"
+                                          style="background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe; font-weight:600;">
+                                        <i class="fas fa-code" style="margin-right:4px;"></i>{% trans "프로그래밍/IT" %}
+                                    </span>
+                                {% elif lecture.detected_subject == '3' %}
+                                    <span class="status-chip"
+                                          style="background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; font-weight:600;">
+                                        <i class="fas fa-flask" style="margin-right:4px;"></i>{% trans "수학/과학" %}
+                                    </span>
+                                {% else %}
+                                    <span class="status-chip"
+                                          style="background:#f9fafb; color:#4b5563; border:1px solid #e5e7eb; font-weight:600;">
+                                        <i class="fas fa-graduation-cap" style="margin-right:4px;"></i>{% trans "일반 강의" %}
+                                    </span>
+                                {% endif %}
+
+                                {% if lecture.summary_text %}
+                                    <div class="status-chip done">{% trans "분석 완료" %}</div>
+                                {% else %}
+                                    <div class="status-chip pending">{% trans "분석 중" %}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="hcard-body">
+                            {% if lecture.thumbnail_url %}
+                                <div class="hcard-section hcard-section--thumb">
+                                    <div class="hcard-thumb-wrap">
+                                        <img src="{{ lecture.thumbnail_url }}"
+                                             alt="{% blocktrans with title=lecture.display_title|default:lecture.title %}{{ title }} 썸네일{% endblocktrans %}">
+                                        <div class="thumb-overlay"></div>
+                                        <div class="thumb-badge">
+                                            <i class="fab fa-youtube"></i> YouTube
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            <div class="hcard-section hcard-section--meta">
+                                <div class="hcard-meta">
+                                    <div class="meta-row">
+                                        <span class="meta-label">
+                                            <i class="fas fa-check-circle"
+                                               style="color:#4ade80;margin-right:4px"></i>{% trans "요약 상태" %}
+                                        </span>
+                                        {% if lecture.summary_text %}
+                                            <span class="meta-value complete">{% trans "완료" %}</span>
+                                        {% else %}
+                                            <span class="meta-value pending">{% trans "미완료" %}</span>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="meta-row">
+                                        <span class="meta-label">
+                                            <i class="fas fa-question-circle"
+                                               style="color:{% if lecture.quiz_count %}#4ade80{% else %}#fbbf24{% endif %};margin-right:4px"></i>{% trans "예상 문제" %}
+                                        </span>
+                                        {% if lecture.quiz_count %}
+                                            <span class="meta-value {% if lecture.quiz_count > 1 %}complete{% else %}partial{% endif %}">
+                                                {% blocktrans %}생성 완료 / {{ lecture.quiz_count }}차까지 생성{% endblocktrans %}
+                                            </span>
+                                        {% else %}
+                                            <span class="meta-value pending">{% trans "미생성" %}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="hcard-section hcard-section--actions">
+                                <div class="hcard-actions">
+                                    <a href="{% url 'summary' %}?lecture_id={{ lecture.id }}" class="act-btn blue">
+                                        <i class="fas fa-book-open"></i> {% trans "요약 다시 보기" %}
+                                    </a>
+                                    {% if lecture.summary_text %}
+                                        <a href="{% url 'download_summary_pdf' lecture_id=lecture.id %}" class="act-btn teal">
+                                            <i class="fas fa-file-pdf"></i> {% trans "PDF 다운로드" %}
+                                        </a>
+                                    {% endif %}
+                                    <a href="{% url 'quiz' %}?lecture_id={{ lecture.id }}" class="act-btn orange">
+                                        <i class="fas fa-pencil-alt"></i> {% trans "예상 문제 풀기" %}
+                                    </a>
+                                    <a href="{% url 'quiz_answer' %}?lecture_id={{ lecture.id }}" class="act-btn teal">
+                                        <i class="fas fa-list-ul"></i> {% trans "모범 답안 확인하기" %}
+                                    </a>
+                                    <a href="{% url 'feedback' %}?lecture_id={{ lecture.id }}" class="act-btn green">
+                                        <i class="fas fa-chart-bar"></i> {% trans "학습 피드백" %}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+
+            {% if page_obj.has_other_pages %}
+                <div class="history-pagination"
+                     style="display:flex; justify-content:center; align-items:center; gap:8px; margin:28px 0 10px; flex-wrap:wrap;">
+
+                    {% if page_obj.has_previous %}
+                        <a href="?page=1&sort={{ sort_by|urlencode }}&quiz={{ quiz_filter|urlencode }}&duration={{ duration_filter|urlencode }}&subject={{ subject_filter|urlencode }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}"
+                           style="padding:9px 13px; border:1px solid var(--border); border-radius:10px; background:var(--bg-card); color:var(--text-sub); text-decoration:none; font-size:13px; font-weight:600;">
+                            {% trans "처음" %}
+                        </a>
+
+                        <a href="?page={{ page_obj.previous_page_number }}&sort={{ sort_by|urlencode }}&quiz={{ quiz_filter|urlencode }}&duration={{ duration_filter|urlencode }}&subject={{ subject_filter|urlencode }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}"
+                           style="padding:9px 13px; border:1px solid var(--border); border-radius:10px; background:var(--bg-card); color:var(--text-sub); text-decoration:none; font-size:13px; font-weight:600;">
+                            {% trans "이전" %}
+                        </a>
+                    {% endif %}
+
+                    <span style="padding:9px 16px; border-radius:10px; background:var(--grad); color:white; font-size:13px; font-weight:700; box-shadow:0 3px 8px rgba(99,102,241,0.18);">
+                        {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+                    </span>
+
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}&sort={{ sort_by|urlencode }}&quiz={{ quiz_filter|urlencode }}&duration={{ duration_filter|urlencode }}&subject={{ subject_filter|urlencode }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}"
+                           style="padding:9px 13px; border:1px solid var(--border); border-radius:10px; background:var(--bg-card); color:var(--text-sub); text-decoration:none; font-size:13px; font-weight:600;">
+                            {% trans "다음" %}
+                        </a>
+
+                        <a href="?page={{ page_obj.paginator.num_pages }}&sort={{ sort_by|urlencode }}&quiz={{ quiz_filter|urlencode }}&duration={{ duration_filter|urlencode }}&subject={{ subject_filter|urlencode }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}"
+                           style="padding:9px 13px; border:1px solid var(--border); border-radius:10px; background:var(--bg-card); color:var(--text-sub); text-decoration:none; font-size:13px; font-weight:600;">
+                            {% trans "마지막" %}
+                        </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+        {% else %}
+            <div class="history-empty">
+                <i class="fas fa-inbox"
+                   style="font-size:32px;color:var(--text-muted);margin-bottom:16px;display:block;"></i>
+                {% trans "해당 조건의 강의 내역을 찾을 수 없습니다." %}
+            </div>
+        {% endif %}
+    </div>
 {% endblock %}
