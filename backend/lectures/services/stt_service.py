@@ -23,28 +23,66 @@ AUDIO_SEGMENT_SECONDS = 180
 
 # 각 스레드마다 Whisper 모델을 따로 가지게 하기 위한 저장소
 thread_local = threading.local()
-
-
 def get_whisper_model():
     """현재 스레드 전용 Whisper 모델을 가져온다.
 
-    업로드 페이지에서 선택한 모델이 바뀐 경우,
-    기존 thread_local 모델을 재사용하지 않고 새 모델을 로딩한다.
-    """
-    current_model_name = WHISPER_MODEL_NAME
+    CUDA를 사용할 수 있으면 GPU를 사용하고,
+    사용할 수 없으면 CPU를 사용한다.
 
-    cached_model_name = getattr(thread_local, "whisper_model_name", None)
+    모델명이나 실행 장치가 변경되면 모델을 다시 로딩한다.
+    """
+    import sys
+    import torch
+
+    current_model_name = WHISPER_MODEL_NAME
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    cached_model_name = getattr(
+        thread_local, "whisper_model_name", None
+    )
+
+    cached_model = getattr(
+        thread_local, "whisper_model", None
+    )
+
+    if cached_model is not None:
+        cached_device = next(cached_model.parameters()).device.type
+    else:
+        cached_device = None
 
     if (
-        not hasattr(thread_local, "whisper_model")
+        cached_model is None
         or cached_model_name != current_model_name
+        or cached_device != device
     ):
-        print(f"[Whisper 로딩] thread 전용 모델 로딩 시작: {current_model_name}")
-        thread_local.whisper_model = whisper.load_model(current_model_name)
-        thread_local.whisper_model_name = current_model_name
-        print(f"[Whisper 로딩] thread 전용 모델 로딩 완료: {current_model_name}")
+        print(
+            f"[Whisper 로딩] 시작: "
+            f"{current_model_name} / device={device}"
+        )
 
-    return thread_local.whisper_model
+        thread_local.whisper_model = whisper.load_model(
+            current_model_name,
+            device=device,
+        )
+
+        thread_local.whisper_model_name = current_model_name
+
+        print(
+            f"[Whisper 로딩] 완료: "
+            f"{current_model_name}"
+        )
+
+    local_model = thread_local.whisper_model
+
+    print(f"[Python 경로] {sys.executable}")
+    print(f"[PyTorch 버전] {torch.__version__}")
+    print(f"[CUDA 사용 가능] {torch.cuda.is_available()}")
+    print(
+        "[Whisper 실행 장치]",
+        next(local_model.parameters()).device
+    )
+
+    return local_model
 
 def cleanup_audio_segments(segments=None):
     """분석 후 남은 chunk 파일을 정리한다."""
@@ -359,6 +397,7 @@ def process_segment_task(args):
         print(f"[구간 STT 시작] {segment_name} / offset={offset_seconds}s")
 
         local_model = get_whisper_model()
+
 
         stt_start_time = time.time()
         result = local_model.transcribe(

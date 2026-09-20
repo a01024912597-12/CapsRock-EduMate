@@ -26,7 +26,7 @@ _gemini_client = None
 # 로컬 테스트 편의를 위해 하드코딩 방식으로 둔다.
 # 실제 GitHub 업로드/팀원 공유 전에는 반드시 키를 제거하거나 환경변수 방식으로 바꿔야 한다.
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL_NAME = "gpt-5.6-terra"
+OPENAI_MODEL_NAME = "gpt-5.6-sol"
 _openai_client = None
 
 
