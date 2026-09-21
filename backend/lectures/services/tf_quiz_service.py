@@ -35,132 +35,155 @@ def get_sbert_model():
 
 
 def clean_quiz_text(text):
-    """
-    문장 내/외부에 포함된 [AI가 분석한 강의 요약] 등 불필요한 메타 구문을
-    강력하게 제거하는 헬퍼 함수
-    """
     if not text:
         return ""
 
-    # 1. 대괄호 및 안의 내용 전체 삭제 (예: [AI가 분석한 강의 요약], [요약] 등)
     cleaned = re.sub(r"\[.*?\]", "", text)
-
-    # 2. 대괄호가 없는 형태의 AI 요약/헤더 메타 문구 제거
     cleaned = re.sub(
         r"(AI가\s*분석한\s*강의\s*요약|강의\s*요약|요약\s*본문|학습\s*목표|목차|참고자료)",
         "",
         cleaned,
         flags=re.IGNORECASE,
     )
-
-    # 3. 마크다운 특수문자(#, *, `, _, >, ~ 등) 및 앞쪽 숫자/기호 목록 제거
     cleaned = re.sub(r"[#\*`_>~]", " ", cleaned)
-    cleaned = re.sub(r"^[0-9\.\-\s\:\;]+", "", cleaned).strip()
+
+    # [수정] '숫자 + 세기' 및 순번 표기 보호를 위해 앞쪽 마크다운식 목록 숫자만 선택 제거
+    cleaned = re.sub(r"^[0-9]+[\.\)\-]\s*", "", cleaned).strip()
 
     return cleaned
 
 
-def filter_valid_sentences(summary_text):
+def extract_nouns_from_sent(sentence):
     """
-    강의 요약 본문에서 메타문구를 완벽히 제거하고
-    순수한 '단일 명제 문장'만 추출합니다.
+    단일 문장에서 명사를 추출하되,
+    '숫자 + 세기' 패턴(예: 20세기, 21세기, 19세기)은 하나의 단위로 결합하여 추출합니다.
     """
-    if not summary_text:
-        return []
+    tokens = kiwi.tokenize(sentence)
+    raw_nouns = [t.form for t in tokens if t.tag.startswith("N") and len(t.form) > 1]
 
-    # 1차 전처리: 전체 텍스트에서 대괄호 및 메타구문 1차 삭제
+    # '숫자+세기' (예: 21세기, 20세기) 패턴 감지 및 수집
+    century_matches = re.findall(r"\b\d+\s*세기\b", sentence)
+
+    final_nouns = []
+    for noun in raw_nouns:
+        # 단독으로 '세기'만 추출된 경우 제거 (숫자와 결합된 표기로만 사용하도록)
+        if noun == "세기":
+            continue
+        final_nouns.append(noun)
+
+    # '숫자 세기'를 키워드 목록에 통합
+    for c_match in century_matches:
+        c_clean = c_match.replace(" ", "")
+        if c_clean not in final_nouns:
+            final_nouns.append(c_clean)
+
+    return final_nouns
+
+
+def filter_valid_sentences(summary_text):
+    valid_sentences = []
+
+    if not summary_text:
+        return valid_sentences
+
     text_clean = clean_quiz_text(summary_text)
 
-    # KiWi 문장 분리
     try:
         raw_sents = [s.text.strip() for s in kiwi.split_into_sents(text_clean)]
     except Exception:
         raw_sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text_clean)]
 
-    valid_sentences = []
-
-    # O/X 명제로 사용할 수 없는 금지 키워드
     EXCLUDE_KEYWORDS = [
         "분석한", "요약", "다음은", "소개", "목차", "학습 목표",
         "무엇인가", "알아봅시다", "설명하시오", "출처", "작성일",
         "첫째", "둘째", "셋째", "결론적으로", "위의 내용"
     ]
 
-    for sent in raw_sents:
-        # 2차 전처리: 각 문장별로 혹시 남아있을 지 모르는 메타 텍스트 완벽 지우기
-        sent_str = clean_quiz_text(sent)
-
-        # 1) 길이기준: 너무 짧거나(단순 헤더) 너무 긴 문장 스킵
-        if len(sent_str) < 15 or len(sent_str) > 100:
+    processed_sents = []
+    for s in raw_sents:
+        s_clean = clean_quiz_text(s)
+        if len(s_clean) < 15 or any(kw in s_clean for kw in EXCLUDE_KEYWORDS):
+            continue
+        if s_clean.endswith("?") or "무엇" in s_clean or "어떻게" in s_clean:
             continue
 
-        # 2) 금지 키워드 검사
-        if any(kw in sent_str for kw in EXCLUDE_KEYWORDS):
-            continue
+        nouns = extract_nouns_from_sent(s_clean)
+        if nouns:
+            processed_sents.append({"text": s_clean, "nouns": set(nouns)})
 
-        # 3) 질문 형태(~입니까?, ?, 무엇 등) 제외
-        if sent_str.endswith("?") or "무엇" in sent_str or "어떻게" in sent_str:
-            continue
+    # 키워드 공유 기반 문장 결합
+    i = 0
+    while i < len(processed_sents):
+        curr = processed_sents[i]
+        group = [curr["text"]]
+        group_nouns = set(curr["nouns"])
 
-        # 4) KiWi 형태소 분석으로 완전한 서술문 구조(명사 + 동사/형용사) 검증
-        tokens = kiwi.tokenize(sent_str)
-        pos_tags = [t.tag for t in tokens]
+        j = i + 1
+        while j < len(processed_sents) and len(group) < 3:
+            next_sent = processed_sents[j]
+            common_keywords = group_nouns.intersection(next_sent["nouns"])
+            if common_keywords or len(group) == 1:
+                group.append(next_sent["text"])
+                group_nouns.update(next_sent["nouns"])
+                j += 1
+            else:
+                break
 
-        has_noun = any(tag.startswith("N") for tag in pos_tags)
-        has_verb_or_adj = any(tag.startswith("V") or tag.startswith("X") for tag in pos_tags)
-        ends_with_ef = any(tokens[-1].tag.startswith(t) for t in ["EF", "SF"]) or sent_str.endswith(("다.", "다"))
+        combined_text = " ".join(group).strip()
 
-        if has_noun and has_verb_or_adj and ends_with_ef:
-            valid_sentences.append(sent_str)
+        if 70 <= len(combined_text) <= 280:
+            valid_sentences.append(combined_text)
 
-    # 중복 문장 제거
+        i = j if j > i + 1 else i + 1
+
     return list(dict.fromkeys(valid_sentences))
 
 
 def generate_tf_quiz_items(summary_text, question_count=20):
-    """
-    정제된 문장으로 O/X 퀴즈 항목을 생성합니다.
-    """
     sentences = filter_valid_sentences(summary_text)
 
     if not sentences:
         return []
 
-    all_nouns = extract_keywords_with_kiwi_for_objective(summary_text)
+    # 전체 본문 키워드 추출 시에도 '숫자+세기' 보존
+    raw_all_nouns = extract_keywords_with_kiwi_for_objective(summary_text)
+    century_matches_all = re.findall(r"\b\d+\s*세기\b", summary_text)
+
+    all_nouns = [n for n in raw_all_nouns if n != "세기"]
+    for cm in century_matches_all:
+        cm_clean = cm.replace(" ", "")
+        if cm_clean not in all_nouns:
+            all_nouns.append(cm_clean)
+
     selected_sentences = sentences[:question_count]
     quiz_items = []
 
     model = get_sbert_model()
 
     for idx, sent in enumerate(selected_sentences, start=1):
-        # 3차 전처리: final 퀴즈 text 직전 단 한번 더 검증
         sent_final = clean_quiz_text(sent)
-        is_true = (idx % 2 != 0)  # 홀수 번호: O, 짝수 번호: X
+        is_true = (idx % 2 != 0)
 
         if is_true:
             quiz_items.append({
                 "number": idx,
                 "question_text": sent_final,
                 "correct_answer": "O",
-                "explanation": "강의 본문 내용과 정확히 일치하는 명제입니다.",
+                "explanation": "강의 본문의 키워드 설명 내용 및 맥락과 정확히 일치하는 명제입니다.",
                 "original_sentence": sent_final,
             })
         else:
-            sent_nouns = extract_keywords_with_kiwi_for_objective(sent_final)
+            sent_nouns = extract_nouns_from_sent(sent_final)
             distorted_sent = sent_final
             replaced_word = ""
             new_word = ""
 
             if sent_nouns and len(all_nouns) > 3:
-                # 문장 안에 실제로 존재하는 명제 단어 선택
-                target_word = None
-                for n in sent_nouns:
-                    if n in sent_final and len(n) > 1:
-                        target_word = n
-                        break
+                # 타겟 키워드 선정 ('세기' 단독 단어 제외)
+                target_word = next((n for n in sent_nouns if n in sent_final and n != "세기" and len(n) > 1), None)
 
                 if target_word:
-                    candidates = [n for n in all_nouns if n != target_word and len(n) > 1]
+                    candidates = [n for n in all_nouns if n != target_word and n != "세기" and len(n) > 1]
 
                     if candidates:
                         try:
@@ -168,25 +191,22 @@ def generate_tf_quiz_items(summary_text, question_count=20):
                             cand_embs = model.encode(candidates, convert_to_tensor=True)
                             scores = util.cos_sim(target_emb, cand_embs)
 
-                            # 유사도 텐서 치수 안전 처리
                             if scores.dim() > 1:
                                 scores = scores.squeeze(0)
 
                             top_idx = int(torch.argmax(scores))
                             candidate_word = candidates[top_idx]
 
-                            # 실제 치환이 성공한 경우에만 변수 업데이트
                             if target_word in sent_final:
                                 distorted_sent = sent_final.replace(target_word, candidate_word, 1)
                                 replaced_word = target_word
                                 new_word = candidate_word
                         except Exception:
-                            # SBERT 처리 실패 시 기본 폴백
                             pass
 
             explanation = (
-                f"강의 본문의 '{replaced_word}'(이)가 '{new_word}'(으)로 잘못 변경된 명제입니다."
-                if (replaced_word and new_word) else "강의 내용과 일치하지 않는 명제입니다."
+                f"강의 본문의 핵심 개념인 '{replaced_word}'(이)가 '{new_word}'(으)로 잘못 설명된 명제입니다."
+                if (replaced_word and new_word) else "강의 내용의 맥락과 일치하지 않는 명제입니다."
             )
 
             quiz_items.append({
@@ -201,15 +221,10 @@ def generate_tf_quiz_items(summary_text, question_count=20):
 
 
 def save_tf_questions(quiz, quiz_items):
-    """
-    생성된 O/X 문항들을 QuizQuestion 모델에 저장합니다.
-    """
-    # 1. 부모 Quiz 모델의 explanation 필드가 "tf"로 설정되도록 보장
     if quiz.explanation != TF_QUIZ_TYPE:
         quiz.explanation = TF_QUIZ_TYPE
         quiz.save(update_fields=["explanation"])
 
-    # 2. 기존 문제 삭제 후 재생성
     QuizQuestion.objects.filter(quiz=quiz).delete()
 
     for item in quiz_items:
