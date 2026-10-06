@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div style="max-width: 550px; margin: 40px auto; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+        <h2 style="text-align: center; color: #273c75; margin-bottom: 10px;">EduMate 회원가입</h2>
+        <p style="text-align: center; color: #7f8c8d; margin-bottom: 30px;">서비스 이용을 위해 정보를 입력해주세요.</p>
+
+        <form method="post">
+            {% csrf_token %}
+
+            <h3 style="font-size: 16px; border-left: 4px solid #273c75; padding-left: 10px; margin-bottom: 15px;">기본 계정
+                정보</h3>
+            {% for field in form %}
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 8px; color: #2f3640;">
+                        {% if field.name == 'username' %}아이디
+                        {% elif field.name == 'password1' %}비밀번호
+                        {% elif field.name == 'password2' %}비밀번호 확인
+                        {% else %}{{ field.label }}{% endif %}
+                    </label>
+                    {{ field }}
+
+                    {% if field.name == 'password1' %}
+                        <div id="pw-status" style="font-size: 12px; margin-top: 5px; font-weight: bold;"></div>
+                    {% elif field.name == 'password2' %}
+                        <div id="pw-match-status" style="font-size: 12px; margin-top: 5px; font-weight: bold;"></div>
+                    {% endif %}
+
+                    {% if field.errors %}
+                        <p style="color: #c23616; font-size: 13px; margin-top: 5px;">{{ field.errors.0 }}</p>{% endif %}
+                </div>
+            {% endfor %}
+
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
+
+            <h3 style="font-size: 16px; border-left: 4px solid #273c75; padding-left: 10px; margin-bottom: 15px;">사용자 상세
+                정보</h3>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px;">이름</label>
+                <input type="text" name="name" placeholder="이름을 입력하세요" required>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px;">나이</label>
+                <input type="number" name="age" placeholder="나이를 입력하세요"
+                       style="width: 100%; padding: 12px; border: 1px solid #dcdde1; border-radius: 6px;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px;">전화번호</label>
+                <input type="tel" name="phone" placeholder="010-0000-0000" required>
+            </div>
+
+            <h3 style="font-size: 16px; border-left: 4px solid #273c75; padding-left: 10px; margin-bottom: 15px;">학습
+                프로필</h3>
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px;">준비 중인 자격증</label>
+                <input type="text" name="certification" placeholder="예: 정보처리기사, ADsP">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px;">가입 이유</label>
+                <textarea name="reason" rows="3"
+                          style="width: 100%; padding: 12px; border: 1px solid #dcdde1; border-radius: 6px;"></textarea>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px;">관심 분야</label>
+                <textarea name="interest" rows="3"
+                    style="width: 100%; padding: 12px; border: 1px solid #dcdde1; border-radius: 6px;"
+                    placeholder="예: 파이썬, 장고, 정보처리기사, NLP"></textarea>
+            </div>
+
+
+            <button type="submit" id="submitBtn"
+                    style="width: 100%; padding: 14px; background-color: #273c75; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;
+                           opacity: 0.6; cursor: not-allowed; transition: all 0.3s ease;">
+                회원가입 완료
+            </button>
+        </form>
+
+        <div style="margin-top: 25px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
+            <span style="color: #7f8c8d;">이미 계정이 있으신가요?</span>
+            <a href="javascript:void(0);" onclick="openLogin()"
+               style="color: #273c75; text-decoration: none; font-weight: bold; margin-left: 10px;">
+                로그인
+            </a>
+        </div>
+    </div>
+
+    <style>
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #dcdde1;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            border-color: #273c75;
+            outline: none;
+        }
+
+        ul.errorlist {
+            display: none;
+        }
+    </style>
+
+    <script>
+        // 1. 모든 입력 필드 가져오기
+        const username = document.querySelector('input[name="username"]');
+        const pw1 = document.querySelector('input[name="password1"]');
+        const pw2 = document.querySelector('input[name="password2"]');
+        const nameInput = document.querySelector('input[name="name"]');
+        const ageInput = document.querySelector('input[name="age"]');
+        const phoneInput = document.querySelector('input[name="phone"]');
+
+        const pwStatus = document.getElementById('pw-status');
+        const pwMatchStatus = document.getElementById('pw-match-status');
+        const submitBtn = document.getElementById('submitBtn');
+
+        function validateForm() {
+            // 값 가져오기
+            const vUser = username.value.trim();
+            const vPw1 = pw1.value;
+            const vPw2 = pw2.value;
+            const vName = nameInput.value.trim();
+            const vAge = ageInput.value.trim();
+            const vPhone = phoneInput.value.trim();
+
+            // 검증 조건
+            const isPwLengthValid = vPw1.length >= 8;
+            const isPwMatchValid = (vPw1 === vPw2 && vPw2 !== "");
+            const isAllFilled = (vUser !== "" && vName !== "" && vAge !== "" && vPhone !== "");
+
+            // 2. 비밀번호 상태 메시지 및 색상 변경
+            if (vPw1.length > 0) {
+                pwStatus.textContent = isPwLengthValid ? "✓ 8자 이상 충족" : "✗ 8자 이상 입력해주세요";
+                pwStatus.style.color = isPwLengthValid ? "#2ecc71" : "#e84118"; // 초록색 또는 빨간색
+            } else {
+                pwStatus.textContent = "";
+            }
+
+            if (vPw2.length > 0) {
+                pwMatchStatus.textContent = isPwMatchValid ? "✓ 비밀번호가 일치합니다" : "✗ 비밀번호가 일치하지 않습니다";
+                pwMatchStatus.style.color = isPwMatchValid ? "#2ecc71" : "#e84118"; // 초록색 또는 빨간색
+            } else {
+                pwMatchStatus.textContent = "";
+            }
+
+            // 3. 버튼 활성화 및 클릭 차단 제어
+            if (isPwLengthValid && isPwMatchValid && isAllFilled) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = "1";
+                submitBtn.style.cursor = "pointer";
+                submitBtn.style.pointerEvents = "auto"; // 클릭 허용
+            } else {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = "0.6";
+                submitBtn.style.cursor = "not-allowed";
+                submitBtn.style.pointerEvents = "none"; // 클릭 원천 차단
+            }
+        }
+
+        // 모든 필드에 이벤트 연결
+        [username, pw1, pw2, nameInput, ageInput, phoneInput].forEach(input => {
+            if (input) input.addEventListener('input', validateForm);
+        });
+    </script>
+{% endblock %}

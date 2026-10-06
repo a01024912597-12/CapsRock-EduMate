@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h2>강의 요약</h2>
+
+    <p><strong>강의 제목:</strong> {{ lecture_title }}</p>
+    <p><strong>유튜브 링크:</strong> {{ youtube_link }}</p>
+
+    {% if thumbnail_url %}
+        <h3>영상 썸네일</h3>
+        <img src="{{ thumbnail_url }}" alt="유튜브 썸네일" style="max-width: 100%; border-radius: 10px;">
+    {% else %}
+        <p>썸네일을 불러올 수 없습니다.</p>
+    {% endif %}
+
+    <div style="margin-top: 30px;">
+        <h3 style="font-size: 18px; color: #2f3640; margin-bottom: 15px;">📋 AI 요약</h3>
+
+        <div id="analysis-container"
+             style="background: white; border: 1px solid #dcdde1; padding: 25px; border-radius: 10px; line-height: 1.8; white-space: pre-wrap; font-size: 15px; color: #353b48; min-height: 200px;">
+            <div id="loading-area" style="text-align: center; padding: 40px;">
+                <div class="loader"
+                     style="border: 6px solid #f3f3f3; border-top: 6px solid #273c75; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px auto;"></div>
+                <p id="status-text" style="font-weight: bold; color: #7f8c8d;">
+                    AI가 강의 내용을 분석 중입니다... <br>
+                    <span style="font-size: 12px; font-weight: normal;">(영상 길이에 따라 최대 몇 분이 소요될 수 있습니다)</span>
+                </p>
+            </div>
+
+            <div id="result-text" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div style="margin-top: 40px; text-align: center;">
+        <button onclick="location.href='{% url 'upload' %}'" style="background-color: #7f8c8d; padding: 12px 24px;">
+            새로운 강의 분석
+        </button>
+
+        <button onclick="location.href='{% url 'quiz' %}?lecture_id={{ lecture_id }}'" style="padding: 12px 24px; margin-left: 10px;">
+            예상 문제 보기
+        </button>
+    </div>
+
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const lectureId = "{{ lecture_id }}";
+            const loadingArea = document.getElementById('loading-area');
+            const resultArea = document.getElementById('result-text');
+
+            fetch(`/analyze-api/?lecture_id=${lectureId}`)
+                .then(response => response.json())
+                .then(data => {
+                    loadingArea.style.display = 'none';
+                    resultArea.style.display = 'block';
+
+                    if (data.status === 'success') {
+                        resultArea.innerText = data.result;
+                    } else {
+                        resultArea.innerHTML = `<span style="color: #e84118; font-weight: bold;">${data.message}</span>`;
+                    }
+                })
+                .catch(error => {
+                    loadingArea.style.display = 'none';
+                    resultArea.style.display = 'block';
+                    resultArea.innerText = "서버 통신 중 오류가 발생했습니다.";
+                    console.error('Error:', error);
+                });
+        });
+    </script>
+{% endblock %}

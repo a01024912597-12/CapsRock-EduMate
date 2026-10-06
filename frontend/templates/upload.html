@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>강의 링크 입력</h2>
+<p>유튜브 강의 링크를 입력하세요.</p>
+
+<form action="/upload/" method="post">
+    {% csrf_token %}
+
+    <label>강의 제목</label>
+    <input type="text" name="title" placeholder="강의 제목 입력" required>
+
+    <label>유튜브 링크</label>
+    <input type="text" name="youtube_link" placeholder="https://www.youtube.com/watch?v=..." required>
+
+    <button type="submit">분석 시작</button>
+</form>
+{% endblock %}

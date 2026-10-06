@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h2>내 강의 히스토리</h2>
+
+    {% if lectures %}
+        {% for lecture in lectures %}
+            <div style="background: white; border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-bottom: 25px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);">
+                <h3>{{ lecture.title }}</h3>
+                <p><strong>검색 시간:</strong> {{ lecture.created_at|date:"Y-m-d H:i" }}</p>
+
+                {% if lecture.thumbnail_url %}
+                    <img src="{{ lecture.thumbnail_url }}" alt="썸네일" style="margin: 15px 0; border-radius: 8px; max-width: 320px;">
+                {% endif %}
+
+                <div style="margin: 15px 0; padding: 12px; background: #f8f9fa; border-radius: 8px;">
+                    <p style="margin: 5px 0;">
+                        <strong>요약 상태:</strong>
+                        {% if lecture.summary_text %}
+                            <span style="color: #27ae60; font-weight: bold;">완료</span>
+                        {% else %}
+                            <span style="color: #c0392b; font-weight: bold;">미완료</span>
+                        {% endif %}
+                    </p>
+
+                    <p style="margin: 5px 0;">
+                        <strong>예상 문제 상태:</strong>
+                        {% if lecture.has_quiz %}
+                            <span style="color: #27ae60; font-weight: bold;">
+                                생성 완료{% if lecture.quiz_count %} / {{ lecture.quiz_count }}차까지 생성{% endif %}
+                            </span>
+                        {% else %}
+                            <span style="color: #e67e22; font-weight: bold;">미생성</span>
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div style="margin: 15px 0;">
+                    <a href="{% url 'summary' %}?lecture_id={{ lecture.id }}"
+                       style="display: inline-block; padding: 8px 14px; background-color: #273c75; color: white; border-radius: 6px; text-decoration: none;">
+                        요약 다시 보기
+                    </a>
+
+                    <a href="{% url 'quiz' %}?lecture_id={{ lecture.id }}"
+                       style="display: inline-block; padding: 8px 14px; background-color: #e67e22; color: white; border-radius: 6px; text-decoration: none; margin-left: 10px;">
+                        예상 문제 보기
+                    </a>
+
+                    <a href="{% url 'feedback' %}?lecture_id={{ lecture.id }}"
+                       style="display: inline-block; padding: 8px 14px; background-color: #44bd32; color: white; border-radius: 6px; text-decoration: none; margin-left: 10px;">
+                        학습 피드백
+                    </a>
+                </div>
+
+                <h4>요약 내용</h4>
+                <div style="background: #f1f3f5; padding: 15px; border-radius: 8px; white-space: pre-wrap; max-height: 220px; overflow: hidden;">
+                    {{ lecture.summary_text|default:"아직 요약 내용이 없습니다." }}
+                </div>
+
+                <p style="font-size: 13px; color: #7f8c8d; margin-top: 8px;">
+                    요약 내용은 일부만 표시됩니다. 전체 내용은 ‘요약 다시 보기’에서 확인할 수 있습니다.
+                </p>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div style="background: white; padding: 30px; border-radius: 12px; border: 1px solid #ddd;">
+            아직 저장된 강의가 없습니다.
+        </div>
+    {% endif %}
+{% endblock %}
