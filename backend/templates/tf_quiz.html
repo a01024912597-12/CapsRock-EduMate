@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <style>
+        /* O/X 커스텀 라디오 버튼 스타일 */
+        .ox-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .ox-option {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 16px 20px;
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .ox-option:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        /* 완벽한 원형 라디오 버튼 설정 */
+        .ox-option input[type="radio"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 20px !important;
+            height: 20px !important;
+            min-width: 20px !important;
+            min-height: 20px !important;
+            flex-shrink: 0;
+            border: 2px solid var(--border2);
+            border-radius: 50% !important;
+            outline: none;
+            transition: all 0.2s ease;
+            margin: 0;
+            padding: 0;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        /* 선택되었을 때 내부 작은 원 */
+        .ox-option input[type="radio"]:checked::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #fff;
+        }
+
+        /* O 선택 카드 활성화 스타일 */
+        .ox-option.o-card:has(input:checked) {
+            border-color: #2563eb;
+            background: rgba(37, 99, 235, 0.06);
+        }
+
+        .ox-option.o-card input:checked {
+            border-color: #2563eb;
+            background-color: #2563eb;
+        }
+
+        .ox-option.o-card .ox-symbol {
+            color: #2563eb;
+        }
+
+        /* X 선택 카드 활성화 스타일 */
+        .ox-option.x-card:has(input:checked) {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.06);
+        }
+
+        .ox-option.x-card input:checked {
+            border-color: #ef4444;
+            background-color: #ef4444;
+        }
+
+        .ox-option.x-card .ox-symbol {
+            color: #ef4444;
+        }
+
+        .ox-symbol {
+            font-size: 20px;
+            font-weight: 900;
+        }
+
+        .ox-label {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+    </style>
+
+    <div class="page-content">
+        <!-- 페이지 타이틀 영역 -->
+        <div class="page-title-row">
+            <h1>
+                <span class="title-icon"><i class="fa-solid fa-file-signature"></i></span>
+                O/X 명제 검증 퀴즈
+            </h1>
+            <p>강의 스크립트에서 추출된 주요 명제의 참/거짓을 판별해 보세요.</p>
+        </div>
+
+        <!-- 퀴즈 유형 전환 탭 (객관식/주관식 퀴즈 ↔ O/X 명제 퀴즈) -->
+        <div class="quiz-type-navigation" style="display: flex; gap: 12px; margin-bottom: 24px;">
+            <a href="{% url 'quiz' %}?lecture_id={{ lecture.id }}"
+               class="btn-tab"
+               style="padding: 10px 20px; border-radius: 8px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: var(--bg-card); color: var(--text-sub); border: 1px solid var(--border);">
+                <i class="fa-solid fa-list-check"></i> 객관식 퀴즈
+            </a>
+
+            <a href="{% url 'tf_quiz' %}?lecture_id={{ lecture.id }}"
+               class="btn-tab active"
+               style="padding: 10px 20px; border-radius: 8px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #ffffff;">
+                <i class="fa-solid fa-file-signature"></i> O/X 명제 퀴즈
+            </a>
+        </div>
+
+        <!-- 메인 퀴즈 카드 -->
+        <div class="main-card">
+            <!-- 카드 헤더 (회차 네비게이션 및 새 퀴즈 생성 버튼) -->
+            <div class="main-card-header"
+                 style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+
+                <!-- 타이틀 & 회차 컨트롤 -->
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <h2 style="margin: 0;"><i class="fa-solid fa-book-open"></i> {{ lecture.title }}</h2>
+
+                    <!-- 회차 이동 컨트롤러 -->
+                    <div class="generation-selector"
+                         style="display: inline-flex; align-items: center; background: var(--bg-inner); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; gap: 8px;">
+                        <!-- 이전 회차 버튼 -->
+                        {% if has_prev %}
+                            <a href="?lecture_id={{ lecture.id }}&gen={{ prev_gen }}"
+                               class="btn-gen-nav" title="이전 회차로 이동"
+                               style="color: var(--text-main); text-decoration: none; padding: 2px 8px; border-radius: 4px; background: var(--bg-card); border: 1px solid var(--border2); font-size: 13px;">
+                                <i class="fa-solid fa-chevron-left"></i> 이전
+                            </a>
+                        {% else %}
+                            <span style="color: var(--text-muted); padding: 2px 8px; font-size: 13px; opacity: 0.5; cursor: not-allowed;">
+                    <i class="fa-solid fa-chevron-left"></i> 이전
+                </span>
+                        {% endif %}
+
+                        <!-- 현재 회차 표시 -->
+                        <span style="font-weight: 700; font-size: 14px; color: var(--accent); padding: 0 4px;">
+                {{ current_gen }}회차
+            </span>
+
+                        <!-- 다음 회차 버튼 -->
+                        {% if has_next %}
+                            <a href="?lecture_id={{ lecture.id }}&gen={{ next_gen }}"
+                               class="btn-gen-nav" title="다음 회차로 이동"
+                               style="color: var(--text-main); text-decoration: none; padding: 2px 8px; border-radius: 4px; background: var(--bg-card); border: 1px solid var(--border2); font-size: 13px;">
+                                다음 <i class="fa-solid fa-chevron-right"></i>
+                            </a>
+                        {% else %}
+                            <span style="color: var(--text-muted); padding: 2px 8px; font-size: 13px; opacity: 0.5; cursor: not-allowed;">
+                    다음 <i class="fa-solid fa-chevron-right"></i>
+                </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 새 퀴즈 생성 버튼 -->
+                <form method="post" style="margin: 0;">
+                    {% csrf_token %}
+                    <input type="hidden" name="generate_quiz" value="1">
+                    <button type="submit" class="btn-secondary" style="padding: 8px 16px; font-weight: 600;">
+                        <i class="fa-solid fa-plus"></i> 새 회차 퀴즈 생성
+                    </button>
+                </form>
+            </div>
+
+            <div class="main-card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="save_user_answers" value="1">
+
+                    <div style="display: flex; flex-direction: column; gap: 24px;">
+                        {% for item in quiz_items %}
+                            <div style="background: var(--bg-inner); border: 1px solid var(--border2); border-radius: 12px; padding: 20px;">
+
+                                <!-- 문제 텍스트 -->
+                                <div style="font-weight: 700; font-size: 16px; line-height: 1.5; color: var(--text-main);">
+                                    Q{{ item.number }}. {{ item.question_text }}
+                                </div>
+
+                                <!-- O / X 선택 버튼 카드 -->
+                                <div class="ox-container">
+                                    <label class="ox-option o-card">
+                                        <input type="radio" name="question_{{ item.id }}" value="O"
+                                               {% if item.user_answer == 'O' %}checked{% endif %} required>
+                                        <span class="ox-symbol">O</span>
+                                        <span class="ox-label">참 (True)</span>
+                                    </label>
+
+                                    <label class="ox-option x-card">
+                                        <input type="radio" name="question_{{ item.id }}" value="X"
+                                               {% if item.user_answer == 'X' %}checked{% endif %}>
+                                        <span class="ox-symbol">X</span>
+                                        <span class="ox-label">거짓 (False)</span>
+                                    </label>
+                                </div>
+
+                                <!-- 결과 및 해설 표시 -->
+                                {% if show_result %}
+                                    <div style="margin-top: 16px; padding: 14px; border-radius: 8px; background: {% if item.is_correct %}rgba(34, 197, 94, 0.1){% else %}rgba(239, 68, 68, 0.1){% endif %}; border: 1px solid {% if item.is_correct %}var(--green){% else %}var(--accent3){% endif %};">
+                                        <div style="font-weight: 700; color: {% if item.is_correct %}var(--green){% else %}var(--accent3){% endif %};">
+                                            {% if item.is_correct %}
+                                                <i class="fa-solid fa-circle-check"></i> 정답입니다! (정답:
+                                                {{ item.model_answer }})
+                                            {% else %}
+                                                <i class="fa-solid fa-circle-xmark"></i> 오답입니다. (제출:
+                                                {{ item.user_answer|default:"미제출" }} / 정답: {{ item.model_answer }})
+                                            {% endif %}
+                                        </div>
+
+                                        <div style="font-size: 13px; color: var(--text-sub); margin-top: 6px;">
+                                            <strong>해설:</strong> {{ item.explanation }}
+                                        </div>
+
+                                        {% if item.original_sentence and item.model_answer == 'X' %}
+                                            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                                                <strong>원문:</strong> {{ item.original_sentence }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- 제출 버튼 -->
+                    <div class="btn-area" style="margin-top: 30px; text-align: right;">
+                        <button type="submit" class="btn-primary" style="padding: 12px 24px; font-weight: 700;">
+                            <i class="fa-solid fa-paper-plane"></i> 답안 제출 및 채점하기
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

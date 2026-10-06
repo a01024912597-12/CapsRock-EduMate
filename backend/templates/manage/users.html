@@ -1,0 +1,263 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}EduMate — {% trans "사용자 목록" %}{% endblock %}
+{% block breadcrumb %}{% trans "사용자 목록" %}{% endblock %}
+{% block page_content_class %} page-content--manage{% endblock %}
+
+{% block extra_head %}
+{% include 'manage/_styles.html' %}
+{% endblock %}
+
+{% block content_area %}
+<div class="history-page">
+    <a href="{% url 'manage_dashboard' %}" style="display:inline-flex;align-items:center;gap:6px;color:var(--text-sub);text-decoration:none;font-size:13px;margin-bottom:16px;">
+        <i class="fas fa-arrow-left"></i> {% trans "학습 관리로" %}
+    </a>
+    <div class="hero-banner">
+        <div class="hero-text">
+            <h1><i class="fas fa-users"></i> {% trans "사용자 목록" %}</h1>
+            <p>{% trans "등록된 사용자와 프로필 정보를 확인·수정합니다." %}</p>
+            <div class="hero-badges">
+                <span class="hero-badge"><i class="fas fa-users"></i> {% trans "전체" %} {{ total_count }}{% trans "명" %}</span>
+                <span class="hero-badge"><i class="fas fa-list-check"></i> {% trans "검색 결과" %} {{ page_obj.paginator.count }}{% trans "명" %}</span>
+            </div>
+        </div>
+        <div class="hero-icon"><i class="fas fa-users"></i></div>
+    </div>
+
+    <form class="mng-filter" method="get" action="{% url 'manage_users' %}">
+        <div class="mng-field mng-field--grow">
+                            <label for="q">{% trans "검색" %}</label>
+            <input type="text" id="q" name="q" value="{{ search }}"
+                   placeholder="{% trans '아이디 / 이름 / 이메일' %}">
+        </div>
+        <div class="mng-filter-actions">
+            <button type="submit" class="btn-app btn-app--primary"><i class="fas fa-search"></i> {% trans "검색" %}</button>
+            <a href="{% url 'manage_users' %}" class="btn-app btn-app--orange" style="text-decoration:none;">{% trans "초기화" %}</a>
+        </div>
+    </form>
+
+    <div class="mng-result-bar">
+        <span>
+            {% trans "검색 결과" %} <strong style="color:var(--text-main);">{{ page_obj.paginator.count }}</strong>{% trans "명" %}
+            {% if page_obj.paginator.count %}
+            ({{ page_obj.start_index }}–{{ page_obj.end_index }} {% trans "표시" %})
+            {% endif %}
+        </span>
+    </div>
+
+    <div class="mng-table-wrap">
+        {% if items %}
+        <table class="mng-table mng-table--users">
+            <thead>
+                <tr>
+                    <th class="mng-col-id">{% trans "아이디" %}</th>
+                    <th class="mng-col-name">{% trans "이름" %}</th>
+                    <th class="mng-col-role">{% trans "권한" %}</th>
+                    <th class="mng-col-num">{% trans "강의 수" %}</th>
+                    <th class="mng-col-num">{% trans "제출 답안" %}</th>
+                    <th class="mng-col-date">{% trans "가입일" %}</th>
+                    <th class="mng-col-actions">{% trans "관리" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                {% with u=item.user profile=item.profile %}
+                <tr>
+                    <td style="font-weight:600;">{{ u.username }}</td>
+                    <td>
+                        {% if item.display_name %}
+                            {{ item.display_name }}
+                        {% else %}
+                            <span style="color:var(--text-muted);">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.is_staff %}
+                        <span class="mng-pill good">{% trans "관리자" %}</span>
+                        {% elif u.is_active %}
+                        <span class="mng-pill muted">{% trans "일반" %}</span>
+                        {% else %}
+                        <span class="mng-pill bad">{% trans "비활성" %}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ u.lecture_count }}</td>
+                    <td>{{ u.answer_count }}</td>
+                    <td style="color:var(--text-sub);white-space:nowrap;">{{ u.date_joined|date:"Y-m-d H:i" }}</td>
+                    <td class="mng-actions-cell">
+                        <button type="button" class="mng-link-btn mng-profile-toggle"
+                                data-target="profile-row-{{ u.id }}"
+                                aria-expanded="{% if edit_user_id == u.id|stringformat:'s' %}true{% else %}false{% endif %}">
+                            <i class="fas fa-user-edit"></i> {% trans "프로필 수정" %}
+                        </button>
+                        <span style="color:var(--text-muted);margin:0 6px;">·</span>
+                        <a href="{% url 'manage_answers' %}?q={{ u.username|urlencode }}"
+                           style="color:var(--accent);text-decoration:none;font-size:13px;">
+                            {% trans "답안" %}
+                        </a>
+                    </td>
+                </tr>
+                <tr id="profile-row-{{ u.id }}" class="mng-profile-edit-row"
+                    {% if edit_user_id != u.id|stringformat:'s' %}hidden{% endif %}>
+                    <td colspan="7">
+                        <form class="mng-profile-form" method="post" action="{% url 'manage_users' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="user_id" value="{{ u.id }}">
+                            <input type="hidden" name="querystring" value="{{ current_query }}">
+
+                            <div class="mng-field">
+                                <label for="role-{{ u.id }}">{% trans "권한" %}</label>
+                                <select id="role-{{ u.id }}" name="role" aria-label="{% trans '권한' %}"
+                                        {% if item.is_self %}disabled title="{% trans '본인 권한은 변경할 수 없습니다.' %}"{% endif %}>
+                                    {% for value, label in user_roles %}
+                                    <option value="{{ value }}" {% if item.role == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                                {% if item.is_self %}
+                                <input type="hidden" name="role" value="{{ item.role }}">
+                                <span style="color:var(--text-muted);font-size:12px;margin-top:4px;">{% trans "본인 권한은 변경할 수 없습니다." %}</span>
+                                {% endif %}
+                            </div>
+                            <div class="mng-field">
+                                <label for="name-{{ u.id }}">{% trans "이름" %}</label>
+                                <input type="text" id="name-{{ u.id }}" name="name" maxlength="100"
+                                       value="{% if profile %}{{ profile.name }}{% endif %}"
+                                       placeholder="{% trans '실명 또는 표시 이름' %}">
+                            </div>
+                            <div class="mng-field">
+                                <label for="age-{{ u.id }}">{% trans "나이" %}</label>
+                                <input type="number" id="age-{{ u.id }}" name="age" min="1" max="150"
+                                       value="{% if profile and profile.age %}{{ profile.age }}{% endif %}"
+                                       placeholder="{% trans '예) 25' %}">
+                            </div>
+                            <div class="mng-field">
+                                <label for="phone-{{ u.id }}">{% trans "연락처" %}</label>
+                                <input type="text" id="phone-{{ u.id }}" name="phone" maxlength="20"
+                                       value="{% if profile %}{{ profile.phone }}{% endif %}"
+                                       placeholder="010-0000-0000">
+                            </div>
+                            <div class="mng-field mng-field--full">
+                                <label for="certification-{{ u.id }}">{% trans "자격/전공" %}</label>
+                                <input type="text" id="certification-{{ u.id }}" name="certification" maxlength="200"
+                                       value="{% if profile %}{{ profile.certification }}{% endif %}"
+                                       placeholder="{% trans '자격증, 전공, 직무 등' %}">
+                            </div>
+                            <div class="mng-field mng-field--full">
+                                <label for="reason-{{ u.id }}">{% trans "가입 목적" %}</label>
+                                <textarea id="reason-{{ u.id }}" name="reason"
+                                          placeholder="{% trans '서비스 이용 목적' %}">{% if profile %}{{ profile.reason }}{% endif %}</textarea>
+                            </div>
+                            <div class="mng-field mng-field--full">
+                                <label for="interest-{{ u.id }}">{% trans "관심 분야" %}</label>
+                                <textarea id="interest-{{ u.id }}" name="interest"
+                                          placeholder="{% trans '관심 있는 학습 주제' %}">{% if profile %}{{ profile.interest }}{% endif %}</textarea>
+                            </div>
+
+                            <div class="mng-profile-form-actions">
+                                <button type="submit" class="mng-save-btn"><i class="fas fa-save"></i> {% trans "저장" %}</button>
+                                <button type="button" class="btn-app btn-app--orange mng-profile-close"
+                                        data-target="profile-row-{{ u.id }}" style="padding:8px 14px;">
+                                    {% trans "닫기" %}
+                                </button>
+                                {% if not profile %}
+                                <span style="color:var(--text-muted);font-size:12.5px;">{% trans "프로필이 없습니다. 저장 시 새로 생성됩니다." %}</span>
+                                {% endif %}
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+                {% endwith %}
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="mng-empty">
+            <i class="fas fa-inbox" style="font-size:28px;display:block;margin-bottom:12px;"></i>
+            {% trans "조건에 맞는 사용자가 없습니다." %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-wrap">
+        <nav class="history-pagination" aria-label="{% trans '사용자 목록 페이지' %}">
+            <div class="pagination-group pagination-group--nav">
+                {% if page_obj.has_previous %}
+                <a href="?{% if base_query %}{{ base_query }}&{% endif %}page=1" class="pg-btn nav"><i class="fas fa-angle-double-left"></i> {% trans "처음" %}</a>
+                <a href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="pg-btn nav"><i class="fas fa-angle-left"></i> {% trans "이전" %}</a>
+                {% else %}
+                <span class="pg-btn nav disabled"><i class="fas fa-angle-double-left"></i> {% trans "처음" %}</span>
+                <span class="pg-btn nav disabled"><i class="fas fa-angle-left"></i> {% trans "이전" %}</span>
+                {% endif %}
+            </div>
+
+            <div class="pg-divider" aria-hidden="true"></div>
+
+            <div class="pagination-group pagination-pages">
+                {% for num in page_obj.paginator.page_range %}
+                    {% if num == page_obj.number %}
+                    <span class="pg-btn active">{{ num }}</span>
+                    {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                    <a href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ num }}" class="pg-btn">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="pg-divider" aria-hidden="true"></div>
+
+            <div class="pagination-group pagination-group--nav">
+                {% if page_obj.has_next %}
+                <a href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="pg-btn nav">{% trans "다음" %} <i class="fas fa-angle-right"></i></a>
+                <a href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="pg-btn nav">{% trans "마지막" %} <i class="fas fa-angle-double-right"></i></a>
+                {% else %}
+                <span class="pg-btn nav disabled">{% trans "다음" %} <i class="fas fa-angle-right"></i></span>
+                <span class="pg-btn nav disabled">{% trans "마지막" %} <i class="fas fa-angle-double-right"></i></span>
+                {% endif %}
+            </div>
+
+            <div class="pg-divider" aria-hidden="true"></div>
+            <span class="pg-info"><span>{{ page_obj.number }}</span> / {{ page_obj.paginator.num_pages }} {% trans "페이지" %}</span>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    function closeAllProfileRows(exceptId) {
+        document.querySelectorAll('.mng-profile-edit-row').forEach(function (row) {
+            if (exceptId && row.id === exceptId) return;
+            row.hidden = true;
+            var toggle = document.querySelector('.mng-profile-toggle[data-target="' + row.id + '"]');
+            if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    document.querySelectorAll('.mng-profile-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var targetId = btn.getAttribute('data-target');
+            var row = document.getElementById(targetId);
+            if (!row) return;
+
+            var willOpen = row.hidden;
+            closeAllProfileRows(willOpen ? targetId : null);
+            row.hidden = !willOpen;
+            btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        });
+    });
+
+    document.querySelectorAll('.mng-profile-close').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var targetId = btn.getAttribute('data-target');
+            var row = document.getElementById(targetId);
+            if (row) row.hidden = true;
+            var toggle = document.querySelector('.mng-profile-toggle[data-target="' + targetId + '"]');
+            if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        });
+    });
+})();
+</script>
+{% endblock %}

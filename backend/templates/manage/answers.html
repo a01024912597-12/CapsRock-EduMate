@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}EduMate — {% trans "답안 검수" %}{% endblock %}
+{% block breadcrumb %}{% trans "답안 검수" %}{% endblock %}
+{% block page_content_class %} page-content--manage{% endblock %}
+
+{% block extra_head %}
+{% include 'manage/_styles.html' %}
+{% endblock %}
+
+{% block content_area %}
+<div class="history-page">
+    <a href="{% url 'manage_dashboard' %}" style="display:inline-flex;align-items:center;gap:6px;color:var(--text-sub);text-decoration:none;font-size:13px;margin-bottom:16px;">
+        <i class="fas fa-arrow-left"></i> {% trans "학습 관리로" %}
+    </a>
+    <div class="hero-banner">
+        <div class="hero-text">
+            <h1><i class="fas fa-clipboard-check"></i> {% trans "답안 검수" %}</h1>
+            <p>{% trans "자동 채점된 답안을 검토하고 사람 라벨·점수를 부여하세요." %}</p>
+            <div class="hero-badges">
+                <span class="hero-badge"><i class="fas fa-list-check"></i> {% trans "검색 결과" %} {{ page_obj.paginator.count }}{% trans "건" %}</span>
+                <span class="hero-badge"><i class="fas fa-clipboard-check"></i> {% trans "검수" %} {{ reviewed_count }} / {{ total_count }}</span>
+            </div>
+        </div>
+        <div class="hero-icon"><i class="fas fa-clipboard-check"></i></div>
+    </div>
+
+    <form class="mng-filter" method="get" action="{% url 'manage_answers' %}">
+        <div class="mng-field mng-field--grow">
+            <label for="q">{% trans "검색" %}</label>
+            <input type="text" id="q" name="q" value="{{ search }}"
+                   placeholder="{% trans '사용자 / 강의 / 문제 / 답안 내용' %}">
+        </div>
+
+        <div class="mng-field">
+            <label for="lecture">{% trans "강의" %}</label>
+            <select id="lecture" name="lecture">
+                <option value="">{% trans "전체" %}</option>
+                {% for lec in lectures %}
+                <option value="{{ lec.id }}" {% if lecture_id == lec.id|stringformat:"s" %}selected{% endif %}>
+                    {{ lec.title }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mng-field">
+            <label for="generation">{% trans "차수" %}</label>
+            <select id="generation" name="generation">
+                <option value="">{% trans "전체" %}</option>
+                {% for gen in generations %}
+                <option value="{{ gen }}" {% if generation == gen|stringformat:"s" %}selected{% endif %}>
+                    {{ gen }}{% trans "차" %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mng-field">
+            <label for="label">{% trans "자동 라벨" %}</label>
+            <select id="label" name="label">
+                <option value="">{% trans "전체" %}</option>
+                {% for lb in predicted_labels %}
+                <option value="{{ lb }}" {% if label == lb %}selected{% endif %}>{{ lb }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mng-field">
+            <label for="review">{% trans "검수 상태" %}</label>
+            <select id="review" name="review">
+                <option value="">{% trans "전체" %}</option>
+                <option value="pending" {% if review_state == 'pending' %}selected{% endif %}>{% trans "검수 대기" %}</option>
+                <option value="reviewed" {% if review_state == 'reviewed' %}selected{% endif %}>{% trans "검수 완료" %}</option>
+            </select>
+        </div>
+
+        <div class="mng-filter-actions">
+            <button type="submit" class="btn-app btn-app--primary"><i class="fas fa-search"></i> {% trans "검색" %}</button>
+            <a href="{% url 'manage_answers' %}" class="btn-app btn-app--orange" style="text-decoration:none;">{% trans "초기화" %}</a>
+        </div>
+    </form>
+
+    <div class="mng-result-bar">
+        <span>
+            {% trans "검색 결과" %} <strong style="color:var(--text-main);">{{ page_obj.paginator.count }}</strong>{% trans "건" %}
+            {% if page_obj.paginator.count %}
+            ({{ page_obj.start_index }}–{{ page_obj.end_index }} {% trans "표시" %})
+            {% endif %}
+        </span>
+        <span>{% trans "전체 검수 진행:" %} <strong style="color:var(--text-main);">{{ reviewed_count }}</strong> / {{ total_count }}</span>
+    </div>
+
+    <div class="mng-table-wrap">
+        {% if items %}
+        <table class="mng-table mng-table--answers">
+            <colgroup>
+                <col class="mng-col-user">
+                <col class="mng-col-lecture">
+                <col class="mng-col-question">
+                <col class="mng-col-answer">
+                <col class="mng-col-score">
+                <col class="mng-col-label">
+                <col class="mng-col-review">
+                <col class="mng-col-time">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th class="mng-th-user">{% trans "사용자" %}</th>
+                    <th class="mng-th-lecture">{% trans "강의" %}</th>
+                    <th class="mng-th-question">{% trans "문제" %}</th>
+                    <th class="mng-th-answer">{% trans "제출 답안" %}</th>
+                    <th class="mng-th-score">{% trans "점수" %}</th>
+                    <th class="mng-th-label">{% trans "자동 라벨" %}</th>
+                    <th class="mng-th-time">{% trans "제출 시각" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                {% with answer=item.obj %}
+                <tr>
+                    <td class="mng-cell-user">{{ answer.user.username }}</td>
+                    <td class="mng-cell-lecture" title="{{ answer.quiz_question.quiz.lecture.title }}">
+                        <span class="mng-lecture-title">{{ answer.quiz_question.quiz.lecture.title }}</span>
+                        <span class="mng-lecture-sub">{{ answer.quiz_question.quiz.generation_number }}{% trans "차" %} · {{ answer.quiz_question.number }}{% trans "번" %}</span>
+                    </td>
+                    <td class="mng-q-cell" title="{{ answer.quiz_question.question_text }}">
+                        {{ answer.quiz_question.question_text }}
+                    </td>
+                    <td class="mng-answer-cell" title="{{ answer.user_answer }}">
+                        {% if answer.user_answer %}{{ answer.user_answer }}{% else %}<span class="mng-muted">{% trans "(빈 답안)" %}</span>{% endif %}
+                    </td>
+                    <td class="mng-cell-score"><strong>{{ item.percent }}%</strong></td>
+                    <td class="mng-cell-label">
+                        {% if answer.predicted_label == '정답 가능성 높음' %}
+                        <span class="mng-pill good">{% trans answer.predicted_label %}</span>
+                        {% elif answer.predicted_label == '검토 필요' %}
+                        <span class="mng-pill review">{% trans answer.predicted_label %}</span>
+                        {% elif answer.predicted_label == '오답 가능성 높음' %}
+                        <span class="mng-pill bad">{% trans answer.predicted_label %}</span>
+                        {% else %}
+                        <span class="mng-pill muted">{% trans "미판정" %}</span>
+                        {% endif %}
+                    </td>
+                    <td class="mng-cell-review">
+                        <form class="mng-review-form mng-review-form--stack" method="post" action="{% url 'manage_answers' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="answer_id" value="{{ answer.id }}">
+                            <input type="hidden" name="querystring" value="{{ current_query }}">
+                            <select name="human_label" aria-label="{% trans '사람 라벨' %}">
+                                <option value="">{% trans "미검수" %}</option>
+                                {% for hl in human_labels %}
+                                <option value="{{ hl }}" {% if answer.human_label == hl %}selected{% endif %}>{% trans hl %}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="mng-review-row">
+                                <input class="mng-score" type="text" inputmode="decimal" name="human_score" step="0.1" min="0" max="100"
+                                       value="{{ answer.human_score|default_if_none:'' }}" aria-label="{% trans '사람 점수' %}">
+                                <button type="submit" class="mng-save-btn">{% trans "저장" %}</button>
+                            </div>
+                        </form>
+                    </td>
+                    <td class="mng-cell-time">
+                        <span class="mng-time-date">{{ answer.created_at|date:"Y-m-d" }}</span>
+                        <span class="mng-time-hour">{{ answer.created_at|date:"H:i" }}</span>
+                    </td>
+                </tr>
+                {% endwith %}
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="mng-empty">
+            <i class="fas fa-inbox" style="font-size:28px;display:block;margin-bottom:12px;"></i>
+            {% trans "조건에 맞는 답안이 없습니다." %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-wrap">
+        <nav class="history-pagination" aria-label="{% trans '답안 목록 페이지' %}">
+            <div class="pagination-group pagination-group--nav">
+                {% if page_obj.has_previous %}
+                <a href="?{% if base_query %}{{ base_query }}&{% endif %}page=1" class="pg-btn nav"><i class="fas fa-angle-double-left"></i> {% trans "처음" %}</a>
+                <a href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="pg-btn nav"><i class="fas fa-angle-left"></i> {% trans "이전" %}</a>
+                {% else %}
+                <span class="pg-btn nav disabled"><i class="fas fa-angle-double-left"></i> {% trans "처음" %}</span>
+                <span class="pg-btn nav disabled"><i class="fas fa-angle-left"></i> {% trans "이전" %}</span>
+                {% endif %}
+            </div>
+
+            <div class="pg-divider" aria-hidden="true"></div>
+
+            <div class="pagination-group pagination-pages">
+                {% for num in page_obj.paginator.page_range %}
+                    {% if num == page_obj.number %}
+                    <span class="pg-btn active">{{ num }}</span>
+                    {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                    <a href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ num }}" class="pg-btn">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="pg-divider" aria-hidden="true"></div>
+
+            <div class="pagination-group pagination-group--nav">
+                {% if page_obj.has_next %}
+                <a href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="pg-btn nav">{% trans "다음" %} <i class="fas fa-angle-right"></i></a>
+                <a href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="pg-btn nav">{% trans "마지막" %} <i class="fas fa-angle-double-right"></i></a>
+                {% else %}
+                <span class="pg-btn nav disabled">{% trans "다음" %} <i class="fas fa-angle-right"></i></span>
+                <span class="pg-btn nav disabled">{% trans "마지막" %} <i class="fas fa-angle-double-right"></i></span>
+                {% endif %}
+            </div>
+
+            <div class="pg-divider" aria-hidden="true"></div>
+            <span class="pg-info"><span>{{ page_obj.number }}</span> / {{ page_obj.paginator.num_pages }} {% trans "페이지" %}</span>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

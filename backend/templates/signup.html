@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "회원가입" %} — EduMate{% endblock %}
+
+{% block content %}
+    <div class="signup-card">
+        <h2>{% trans "EduMate 회원가입" %}</h2>
+        <p class="signup-desc">{% trans "서비스 이용을 위해 정보를 입력해주세요." %}</p>
+
+        <form method="post">
+            {% csrf_token %}
+
+            <h3 class="signup-section-title">{% trans "기본 계정 정보" %}</h3>
+            {% for field in form %}
+                <div class="signup-field">
+                    <label>
+                        {% if field.name == 'username' %}{% trans "아이디" %}
+                        {% elif field.name == 'password1' %}{% trans "비밀번호" %}
+                        {% elif field.name == 'password2' %}{% trans "비밀번호 확인" %}
+                        {% else %}{{ field.label }}{% endif %}
+                    </label>
+                    {{ field }}
+
+                    {% if field.name == 'password1' %}
+                        <div id="pw-status" class="signup-status"></div>
+                    {% elif field.name == 'password2' %}
+                        <div id="pw-match-status" class="signup-status"></div>
+                    {% endif %}
+
+                    {% if field.errors %}
+                        <p class="signup-field-error">{{ field.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+
+            <hr class="signup-divider">
+
+            <h3 class="signup-section-title">{% trans "사용자 상세 정보" %}</h3>
+
+            <div class="signup-field">
+                <label>{% trans "이름" %}</label>
+                <input type="text" name="name" placeholder="{% trans '이름을 입력하세요' %}" required>
+            </div>
+
+            <div class="signup-field">
+                <label>{% trans "나이" %}</label>
+                <input type="number" name="age" placeholder="{% trans '나이를 입력하세요' %}">
+            </div>
+
+            <div class="signup-field">
+                <label>{% trans "전화번호" %}</label>
+                <input type="tel" name="phone" placeholder="010-0000-0000" required>
+            </div>
+
+            <h3 class="signup-section-title">{% trans "학습 프로필" %}</h3>
+            <div class="signup-field">
+                <label>{% trans "준비 중인 자격증" %}</label>
+                <input type="text" name="certification" placeholder="{% trans '예: 정보처리기사, ADsP' %}">
+            </div>
+
+            <div class="signup-field">
+                <label>{% trans "가입 이유" %}</label>
+                <textarea name="reason" rows="3"></textarea>
+            </div>
+
+            <div class="signup-field">
+                <label>{% trans "관심 분야" %}</label>
+                <textarea name="interest" rows="3" placeholder="{% trans '예: 파이썬, 장고, 정보처리기사, NLP' %}"></textarea>
+            </div>
+
+            <button type="submit" id="submitBtn" class="signup-submit">
+                {% trans "회원가입 완료" %}
+            </button>
+        </form>
+
+        <div class="signup-footer">
+            <span>{% trans "이미 계정이 있으신가요?" %}</span>
+            <a href="javascript:void(0);" onclick="openLogin()">{% trans "로그인" %}</a>
+        </div>
+    </div>
+
+    <script>
+        const username = document.querySelector('input[name="username"]');
+        const pw1 = document.querySelector('input[name="password1"]');
+        const pw2 = document.querySelector('input[name="password2"]');
+        const nameInput = document.querySelector('input[name="name"]');
+        const ageInput = document.querySelector('input[name="age"]');
+        const phoneInput = document.querySelector('input[name="phone"]');
+
+        const pwStatus = document.getElementById('pw-status');
+        const pwMatchStatus = document.getElementById('pw-match-status');
+        const submitBtn = document.getElementById('submitBtn');
+        const I18N = {
+            pwOk: "{% trans '✓ 8자 이상 충족' %}",
+            pwShort: "{% trans '✗ 8자 이상 입력해주세요' %}",
+            pwMatch: "{% trans '✓ 비밀번호가 일치합니다' %}",
+            pwMismatch: "{% trans '✗ 비밀번호가 일치하지 않습니다' %}"
+        };
+
+        function validateForm() {
+            const vUser = username.value.trim();
+            const vPw1 = pw1.value;
+            const vPw2 = pw2.value;
+            const vName = nameInput.value.trim();
+            const vAge = ageInput.value.trim();
+            const vPhone = phoneInput.value.trim();
+
+            const isPwLengthValid = vPw1.length >= 8;
+            const isPwMatchValid = (vPw1 === vPw2 && vPw2 !== "");
+            const isAllFilled = (vUser !== "" && vName !== "" && vAge !== "" && vPhone !== "");
+
+            if (vPw1.length > 0) {
+                pwStatus.textContent = isPwLengthValid ? I18N.pwOk : I18N.pwShort;
+                pwStatus.className = 'signup-status ' + (isPwLengthValid ? 'signup-status--ok' : 'signup-status--err');
+            } else {
+                pwStatus.textContent = "";
+                pwStatus.className = 'signup-status';
+            }
+
+            if (vPw2.length > 0) {
+                pwMatchStatus.textContent = isPwMatchValid ? I18N.pwMatch : I18N.pwMismatch;
+                pwMatchStatus.className = 'signup-status ' + (isPwMatchValid ? 'signup-status--ok' : 'signup-status--err');
+            } else {
+                pwMatchStatus.textContent = "";
+                pwMatchStatus.className = 'signup-status';
+            }
+
+            if (isPwLengthValid && isPwMatchValid && isAllFilled) {
+                submitBtn.disabled = false;
+                submitBtn.classList.add('is-ready');
+            } else {
+                submitBtn.disabled = true;
+                submitBtn.classList.remove('is-ready');
+            }
+        }
+
+        [username, pw1, pw2, nameInput, ageInput, phoneInput].forEach(input => {
+            if (input) input.addEventListener('input', validateForm);
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}EduMate — {% trans "학습 관리" %}{% endblock %}
+{% block breadcrumb %}{% trans "학습 관리" %}{% endblock %}
+{% block page_content_class %} page-content--manage{% endblock %}
+
+{% block extra_head %}
+{% include 'manage/_styles.html' %}
+{% endblock %}
+
+{% block content_area %}
+<div class="history-page">
+    <div class="hero-banner">
+        <div class="hero-text">
+            <h1><i class="fas fa-tasks"></i> {% trans "학습 관리" %}</h1>
+            <p>{% trans "학습 데이터 현황과 답안 검수를 한곳에서 관리합니다." %}</p>
+            <div class="hero-badges">
+                <span class="hero-badge"><i class="fas fa-comment-dots"></i> {% trans "제출 답안" %} {{ answer_count }}</span>
+                <span class="hero-badge"><i class="fas fa-clipboard-check"></i> {% trans "검수 완료" %} {{ reviewed_count }}</span>
+                <span class="hero-badge"><i class="fas fa-hourglass-half"></i> {% trans "검수 대기" %} {{ pending_review_count }}</span>
+            </div>
+        </div>
+        <div class="hero-icon"><i class="fas fa-chart-line"></i></div>
+    </div>
+
+    <div class="mng-stat-grid">
+        <div class="mng-stat-card mng-stat-card--accent">
+            <div class="mng-stat-icon"><i class="fas fa-book"></i></div>
+            <div class="mng-stat-meta">
+                <span class="mng-stat-value">{{ lecture_count }}</span>
+                <span class="mng-stat-label">{% trans "전체 강의" %}</span>
+            </div>
+        </div>
+        <div class="mng-stat-card mng-stat-card--green">
+            <div class="mng-stat-icon green"><i class="fas fa-check-circle"></i></div>
+            <div class="mng-stat-meta">
+                <span class="mng-stat-value">{{ analyzed_count }}</span>
+                <span class="mng-stat-label">{% trans "분석 완료 강의" %}</span>
+            </div>
+        </div>
+        <div class="mng-stat-card mng-stat-card--orange">
+            <div class="mng-stat-icon orange"><i class="fas fa-pencil-alt"></i></div>
+            <div class="mng-stat-meta">
+                <span class="mng-stat-value">{{ quiz_count }}</span>
+                <span class="mng-stat-label">{% trans "생성된 퀴즈" %}</span>
+            </div>
+        </div>
+        <div class="mng-stat-card mng-stat-card--teal">
+            <div class="mng-stat-icon teal"><i class="fas fa-question-circle"></i></div>
+            <div class="mng-stat-meta">
+                <span class="mng-stat-value">{{ question_count }}</span>
+                <span class="mng-stat-label">{% trans "전체 문제" %}</span>
+            </div>
+        </div>
+        <a href="{% url 'manage_answers' %}" class="mng-stat-card mng-stat-card--fill-violet">
+            <div class="mng-stat-icon violet"><i class="fas fa-comment-dots"></i></div>
+            <div class="mng-stat-meta">
+                <span class="mng-stat-value">{{ answer_count }}</span>
+                <span class="mng-stat-label">{% trans "제출된 답안" %}</span>
+            </div>
+        </a>
+        <a href="{% url 'manage_answers' %}?review=reviewed" class="mng-stat-card mng-stat-card--fill-green">
+            <div class="mng-stat-icon green"><i class="fas fa-clipboard-check"></i></div>
+            <div class="mng-stat-meta">
+                <span class="mng-stat-value">{{ reviewed_count }}</span>
+                <span class="mng-stat-label">{% trans "검수 완료" %}</span>
+            </div>
+        </a>
+        <a href="{% url 'manage_answers' %}?review=pending" class="mng-stat-card mng-stat-card--fill-red">
+            <div class="mng-stat-icon red"><i class="fas fa-hourglass-half"></i></div>
+            <div class="mng-stat-meta">
+                <span class="mng-stat-value">{{ pending_review_count }}</span>
+                <span class="mng-stat-label">{% trans "검수 대기" %}</span>
+            </div>
+        </a>
+        <a href="{% url 'manage_users' %}" class="mng-stat-card mng-stat-card--fill-accent">
+            <div class="mng-stat-icon"><i class="fas fa-users"></i></div>
+            <div class="mng-stat-meta">
+                <span class="mng-stat-value">{{ user_count }}</span>
+                <span class="mng-stat-label">{% trans "사용자" %}</span>
+            </div>
+        </a>
+    </div>
+
+    <div class="mng-table-wrap">
+        <h3>{% trans "최근 제출된 답안" %}</h3>
+        {% if recent_answers %}
+        <table class="mng-table">
+            <thead>
+                <tr>
+                    <th>{% trans "사용자" %}</th>
+                    <th>{% trans "강의 / 차수 / 번호" %}</th>
+                    <th>{% trans "자동 점수" %}</th>
+                    <th>{% trans "자동 라벨" %}</th>
+                    <th>{% trans "검수" %}</th>
+                    <th>{% trans "제출 시각" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for answer in recent_answers %}
+                <tr>
+                    <td>{{ answer.user.username }}</td>
+                    <td class="mng-truncate" title="{{ answer.quiz_question.quiz.lecture.title }}">
+                        {{ answer.quiz_question.quiz.lecture.title }}
+                        · {{ answer.quiz_question.quiz.generation_number }}{% trans "차" %} {{ answer.quiz_question.number }}{% trans "번" %}
+                    </td>
+                    <td>
+                        {% if answer.similarity_score is not None %}
+                            {{ answer.similarity_score|floatformat:2 }}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if answer.predicted_label == '정답 가능성 높음' %}
+                        <span class="mng-pill good">{% trans answer.predicted_label %}</span>
+                        {% elif answer.predicted_label == '검토 필요' %}
+                        <span class="mng-pill review">{% trans answer.predicted_label %}</span>
+                        {% elif answer.predicted_label == '오답 가능성 높음' %}
+                        <span class="mng-pill bad">{% trans answer.predicted_label %}</span>
+                        {% else %}
+                        <span class="mng-pill muted">{% trans "미판정" %}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if answer.human_label or answer.human_score is not None %}
+                        <span class="mng-pill good">{% trans "검수됨" %}</span>
+                        {% else %}
+                        <span class="mng-pill muted">{% trans "대기" %}</span>
+                        {% endif %}
+                    </td>
+                    <td style="color:var(--text-sub);white-space:nowrap;">{{ answer.created_at|date:"Y-m-d H:i" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="mng-empty">
+            <i class="fas fa-inbox" style="font-size:28px;display:block;margin-bottom:12px;"></i>
+            {% trans "아직 제출된 답안이 없습니다." %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
