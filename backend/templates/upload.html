@@ -124,68 +124,68 @@
 
             <div class="analysis-option-box">
                 <div class="analysis-option-header">
-                    <h3><i class="fas fa-sliders-h"></i> {% trans "분석 옵션 설정" %}</h3>
-                    <p>{% trans "PC 성능, 정확도, 강의 과목에 맞춰 분석 방식을 선택할 수 있습니다." %}</p>
+                    <h3><i class="fas fa-sliders-h"></i> {% trans "강의 분석 설정" %}</h3>
+                    <p>{% trans "원하는 분석 방식과 강의 유형을 선택해 주세요." %}</p>
                 </div>
 
                 <div class="analysis-option-grid">
                     <div class="analysis-option-card">
                         <div class="analysis-option-label-row">
                             <label for="whisperModelSelect" class="analysis-option-label-text">
-                                <i class="fas fa-brain"></i> {% trans "Whisper 모델 선택" %}
+                                <i class="fas fa-brain"></i> {% trans "분석 정확도" %}
                             </label>
                             <span class="option-info-trigger" tabindex="0" aria-describedby="modelDesc">
                                 <i class="fas fa-info-circle" aria-hidden="true"></i>
                                 <div class="option-desc" id="modelDesc" role="tooltip">
-                                    {% trans "base는 빠른 분석에 적합하며, large는 가장 높은 정확도를 제공하지만 CPU 환경에서는 매우 느릴 수 있습니다." %}
+                                    {% trans "음성을 글로 변환하는 정확도를 설정합니다. 정확도를 높일수록 분석 시간이 길어질 수 있습니다." %}
                                 </div>
                             </span>
                         </div>
 
                         <select name="whisper_model" id="whisperModelSelect" class="analysis-select">
-                            <option value="base" selected>{% trans "base — 빠른 분석" %}</option>
-                            <option value="small">{% trans "small — 속도/정확도 균형" %}</option>
-                            <option value="medium">{% trans "medium — 높은 정확도" %}</option>
-                            <option value="large">{% trans "large — 최고 정확도" %}</option>
+                            <option value="base" selected>{% trans "base-빠른 분석" %}</option>
+                            <option value="small">{% trans "small-균형 분석" %}</option>
+                            <option value="medium">{% trans "medium-정확한 분석" %}</option>
+                            <option value="large">{% trans "large-고정밀 분석" %}</option>
                         </select>
                     </div>
 
                     <div class="analysis-option-card">
                         <div class="analysis-option-label-row">
                             <label for="workersSelect" class="analysis-option-label-text">
-                                <i class="fas fa-users-cog"></i> {% trans "작업 스레드 수 설정" %}
+                                <i class="fas fa-users-cog"></i> {% trans "처리 속도" %}
                             </label>
                             <span class="option-info-trigger" tabindex="0" aria-describedby="workersDesc">
                                 <i class="fas fa-info-circle" aria-hidden="true"></i>
                                 <div class="option-desc" id="workersDesc" role="tooltip">
-                                    {% trans "2개는 현재 권장 기본값입니다. CPU 사용량과 처리 속도의 균형이 좋아 노트북 환경에 적합합니다." %}
+                                    {% trans "강의 처리 속도를 설정합니다. 기본 모드는 대부분의 환경에서 안정적으로 사용할 수 있습니다." %}
                                 </div>
                             </span>
                         </div>
 
                         <select name="workers" id="workersSelect" class="analysis-select">
-                            <option value="1">{% trans "1개 — 저사양 PC 권장" %}</option>
-                            <option value="2" selected>{% trans "2개 — 기본 권장값" %}</option>
-                            <option value="3">{% trans "3개 — 고성능 병렬 처리" %}</option>
-                            <option value="4">{% trans "4개 — 고성능 PC용" %}</option>
+                            <option value="1">{% trans "안정 모드 — 낮은 사양 권장" %}</option>
+                            <option value="2" selected>{% trans "기본 모드 — 권장" %}</option>
+                            <option value="3">{% trans "빠른 모드 — 높은 성능 필요" %}</option>
+                            <option value="4">{% trans "최대 속도 — 고성능 환경" %}</option>
                         </select>
                     </div>
 
                     <div class="analysis-option-card full-option">
                         <div class="analysis-option-label-row">
                             <label for="subjectSelect" class="analysis-option-label-text">
-                                <i class="fas fa-book-open"></i> {% trans "과목 유형 선택" %}
+                                <i class="fas fa-book-open"></i> {% trans "강의 유형" %}
                             </label>
                             <span class="option-info-trigger" tabindex="0" aria-describedby="subjectDesc">
                                 <i class="fas fa-info-circle" aria-hidden="true"></i>
                                 <div class="option-desc" id="subjectDesc" role="tooltip">
-                                    {% trans "AI 자동 생성은 API가 강의 성격을 판단하여 시험 대비에 적합한 방식으로 요약합니다." %}
+                                    {% trans "자동 선택은 강의 내용을 바탕으로 적합한 학습 요약 방식을 적용합니다." %}
                                 </div>
                             </span>
                         </div>
 
                         <select name="subject_code" id="subjectSelect" class="analysis-select">
-                            <option value="auto" selected>{% trans "AI 자동 생성 — 시험 대비 맞춤 요약" %}</option>
+                            <option value="auto" selected>{% trans "자동 선택 — 강의 내용에 맞게 분석" %}</option>
                             <option value="4">{% trans "일반 강의 — 범용 요약" %}</option>
                             <option value="1">{% trans "역사/인문학 — 사건 흐름과 인과관계 중심" %}</option>
                             <option value="2">{% trans "프로그래밍/IT — 코드 흐름과 실습 중심" %}</option>
@@ -196,26 +196,26 @@
                     <div class="analysis-option-card full-option">
                         <div class="analysis-option-label-row">
                             <label for="summaryApiSelect" class="analysis-option-label-text">
-                                <i class="fas fa-microchip"></i> {% trans "요약 API 선택" %}
+                                <i class="fas fa-microchip"></i> {% trans "요약 방식" %}
                             </label>
                             <span class="option-info-trigger" tabindex="0" aria-describedby="summaryApiDesc">
                                 <i class="fas fa-info-circle" aria-hidden="true"></i>
                                 <div class="option-desc" id="summaryApiDesc" role="tooltip">
-                                    {% trans "Gemini API는 기존 EduMate 요약 방식입니다. Gemini 사용량이 많거나 503 오류가 반복될 경우 GPT API를 선택할 수 있습니다." %}
+                                    {% trans "요약에 사용할 외부 AI 서비스를 선택합니다. 기본 요약은 Gemini, 정밀 요약은 GPT를 활용합니다." %}
                                 </div>
                             </span>
                         </div>
 
                         <select name="summary_api" id="summaryApiSelect" class="analysis-select">
-                            <option value="gemini" selected>{% trans "Gemini API — 기존 요약 방식" %}</option>
-                            <option value="gpt">{% trans "GPT API — OpenAI 기반 요약 방식" %}</option>
+                            <option value="gemini" selected>{% trans "기본 요약 — Gemini 활용" %}</option>
+                            <option value="gpt">{% trans "정밀 요약 — GPT 활용" %}</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="analysis-warning">
                     <i class="fas fa-info-circle"></i>
-                    {% trans "각 설정에 맞는 설명은 아이콘에 마우스를 올리면 표시됩니다. 요약 API는 Gemini 또는 GPT 중 선택할 수 있으며, 이후 객관식 문제 생성과 서술형 피드백은 생성된 요약문을 기반으로 진행됩니다." %}
+                    {% trans "설정을 선택한 뒤 강의 분석을 시작해 주세요. 분석이 완료되면 강의 요약, 핵심 개념, 주요 장면과 학습 문제를 확인할 수 있습니다. 각 설정의 자세한 설명은 정보 아이콘에서 확인할 수 있습니다." %}
                 </div>
             </div>
 
@@ -223,19 +223,19 @@
 
             <div class="btn-area">
                 <button type="submit" class="btn-primary">
-                    <i class="fas fa-robot"></i> {% trans "AI 분석 시작" %}
+                    <i class="fas fa-robot"></i> {% trans "강의 분석 시작" %}
                 </button>
                 <button type="reset" class="btn-secondary" id="resetBtn">
-                    <i class="fas fa-redo"></i> {% trans "초기화" %}
+                    <i class="fas fa-redo"></i> {% trans "설정 초기화" %}
                 </button>
             </div>
 
             <div class="feature-tags">
-                <div class="feature-tag"><i class="fas fa-file-alt"></i> {% trans "자동 요약" %}</div>
-                <div class="feature-tag"><i class="fas fa-question-circle"></i> {% trans "퀴즈 생성" %}</div>
-                <div class="feature-tag"><i class="fas fa-lightbulb"></i> {% trans "핵심 키워드" %}</div>
-                <div class="feature-tag"><i class="fas fa-clock"></i> {% trans "타임라인 분석" %}</div>
-                <div class="feature-tag"><i class="fas fa-brain"></i> {% trans "이해도 측정" %}</div>
+                <div class="feature-tag"><i class="fas fa-file-alt"></i> {% trans "강의 요약" %}</div>
+                <div class="feature-tag"><i class="fas fa-question-circle"></i> {% trans "연습 문제" %}</div>
+                <div class="feature-tag"><i class="fas fa-lightbulb"></i> {% trans "핵심 개념" %}</div>
+                <div class="feature-tag"><i class="fas fa-clock"></i> {% trans "핵심 장면" %}</div>
+                <div class="feature-tag"><i class="fas fa-brain"></i> {% trans "학습 점검" %}</div>
             </div>
         </form>
     </div>
@@ -653,7 +653,7 @@
 
     const workerDescriptions = {
         1: '{% trans "1개는 가장 안정적이며 저사양 PC에 적합합니다. 대신 분석 시간이 길어질 수 있습니다." %}',
-        2: '{% trans "2개는 현재 권장 기본값입니다. CPU 사용량과 처리 속도의 균형이 좋아 노트북 환경에 적합합니다." %}',
+        2: '{% trans "강의 처리 속도를 설정합니다. 기본 모드는 대부분의 환경에서 안정적으로 사용할 수 있습니다." %}',
         3: '{% trans "3개는 고성능 병렬 처리용입니다. CPU 사용량은 늘어나지만 여러 구간을 동시에 처리할 수 있습니다." %}',
         4: '{% trans "4개는 고성능 PC에 적합합니다. CPU와 메모리 사용량이 높아질 수 있습니다." %}'
     };
@@ -667,7 +667,7 @@
     };
 
     const summaryApiDescriptions = {
-        gemini: '{% trans "Gemini API는 기존 EduMate 요약 방식입니다. Gemini 사용량이 많거나 503 오류가 반복될 경우 GPT API를 선택할 수 있습니다." %}',
+        gemini: '{% trans "요약에 사용할 외부 AI 서비스를 선택합니다. 기본 요약은 Gemini, 정밀 요약은 GPT를 활용합니다." %}',
         gpt: '{% trans "GPT API는 OpenAI 기반 요약 방식입니다. 기존 요약 구조와 출력 형식은 유지하고, 요약 호출 API만 GPT로 변경합니다." %}'
     };
 

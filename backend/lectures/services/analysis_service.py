@@ -39,7 +39,7 @@ from .summary_service import (
 # 요약 속도 최적화 설정
 # =========================
 # 값이 클수록 chunk 개수가 줄어 GPT/Gemini 호출 횟수가 줄어든다.
-SUMMARY_CHUNK_SEGMENTS = 24
+SUMMARY_CHUNK_SEGMENTS = 96
 SUMMARY_CHUNK_MAX_CHARS = 8000
 
 # chunk 요약 API 병렬 처리 수.
@@ -142,6 +142,16 @@ def analyze_video_request(request):
     print("=" * 60)
 
     analysis_start_time = time.time()
+
+    # 성능 측정용 세부 타이머.
+    # 기존 DB 필드는 그대로 유지하고, 상세 시간은 로그와 JSON 응답으로만 제공한다.
+    stt_wall_duration = 0.0
+    chunk_build_duration = 0.0
+    chunk_summary_duration = 0.0
+    final_summary_api_duration = 0.0
+    summary_text_postprocess_duration = 0.0
+    image_processing_duration = 0.0
+
     segments = []
     timeline_frames = []
     temp_video_path = os.path.join(settings.BASE_DIR, "temp_video.mp4")
@@ -195,6 +205,8 @@ def analyze_video_request(request):
         for index, segment_path in enumerate(segments):
             offset_seconds = index * AUDIO_SEGMENT_SECONDS
             segment_tasks.append((segment_path, offset_seconds))
+
+        stt_wall_start_time = time.time()
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=selected_workers) as executor:
             results = list(executor.map(process_segment_task, segment_tasks))
@@ -255,6 +267,9 @@ def analyze_video_request(request):
                     fixed_results.append(result)
 
             results = fixed_results
+
+        # 최초 병렬 처리 + 실패 구간 재시도까지 실제 경과 시간을 측정한다.
+        stt_wall_duration = time.time() - stt_wall_start_time
 
         # 파일명 순서대로 정렬해서 강의 순서 유지
         results = sorted(results, key=lambda x: x.get("segment", ""))
@@ -332,11 +347,32 @@ def analyze_video_request(request):
         print(f"4. {summary_model_label} 요약 시작")
         summary_start_time = time.time()
 
+        chunk_build_start_time = time.time()
+
         timeline_chunks = chunks_from_whisper_segments(
             all_whisper_segments,
             segments_per_chunk=SUMMARY_CHUNK_SEGMENTS,
             max_chars_per_chunk=SUMMARY_CHUNK_MAX_CHARS,
         )
+        print(
+            f"--- [요약 청크 설정] "
+            f"전체 Whisper 세그먼트={len(all_whisper_segments)}, "
+            f"segments_per_chunk={SUMMARY_CHUNK_SEGMENTS}, "
+            f"max_chars={SUMMARY_CHUNK_MAX_CHARS}, "
+            f"생성 청크={len(timeline_chunks)} ---"
+        )
+
+        if timeline_chunks:
+            chunk_lengths = [len(chunk) for chunk in timeline_chunks]
+
+            print(
+                f"--- [요약 청크 길이] "
+                f"평균={sum(chunk_lengths) / len(chunk_lengths):.0f}자, "
+                f"최소={min(chunk_lengths)}자, "
+                f"최대={max(chunk_lengths)}자 ---"
+            )
+
+        chunk_build_duration = time.time() - chunk_build_start_time
 
         if timeline_chunks:
             print(
@@ -359,6 +395,8 @@ def analyze_video_request(request):
                 len(chunk_summary_tasks),
             )
 
+            chunk_summary_start_time = time.time()
+
             if chunk_summary_workers <= 1:
                 chunk_summaries = [
                     summarize_chunk_task(task)
@@ -376,6 +414,13 @@ def analyze_video_request(request):
                     )
 
             merged_chunk_summaries = "\n\n".join(chunk_summaries)
+            chunk_summary_duration = time.time() - chunk_summary_start_time
+
+            print(
+                f"--- [{summary_model_label} chunk 요약 결과] "
+                f"청크 수={len(timeline_chunks)}, "
+                f"병합 텍스트 길이={len(merged_chunk_summaries)} ---"
+            )
 
         else:
             print(f"--- [{summary_model_label} 요약 방식] 세그먼트 없음, 전체 전사문 기반 요약 ---")
@@ -384,21 +429,41 @@ def analyze_video_request(request):
         # =========================
         # 4. 멀티모달 최종 요약
         # =========================
+        final_summary_api_start_time = time.time()
+
         final_summary = make_final_summary(
             merged_chunk_summaries,
             timeline_frames=[] if not SUMMARY_PASS_IMAGES_TO_FINAL_MODEL else timeline_frames,
             subject_code=selected_subject_code,
             summary_api=selected_summary_api,
+            source_char_count=len(full_transcript),
         )
+
+        final_summary_api_duration = time.time() - final_summary_api_start_time
+
+        final_summary_text_chars = len(final_summary or "")
+
+        print(
+            f"[최종 요약 분량 결과] "
+            f"STT 원문={len(full_transcript):,}자, "
+            f"청크 병합={len(merged_chunk_summaries):,}자, "
+            f"최종 요약={final_summary_text_chars:,}자"
+        )
+
+        postprocess_start_time = time.time()
 
         final_summary = replace_image_markers_with_html(
             ai_summary_text=final_summary,
             lecture_id=lecture.id,
         )
 
+        summary_text_postprocess_duration = time.time() - postprocess_start_time
+
         # =========================
         # 5. 핵심 개념 타임라인 기반 이미지 자동 삽입
         # =========================
+        image_processing_start_time = time.time()
+
         core_timeline_items = parse_summary_timeline_items(
             final_summary,
             max_items=4,
@@ -461,6 +526,7 @@ def analyze_video_request(request):
             except OSError:
                 pass
 
+        image_processing_duration = time.time() - image_processing_start_time
         summary_duration = time.time() - summary_start_time
 
         result_text = "[AI가 분석한 강의 요약]\n\n" + final_summary
@@ -498,7 +564,18 @@ def analyze_video_request(request):
         print("[병렬 STT + 선택 API 멀티모달 요약 완료]")
         print(f"전체 분석 시간: {analysis_duration:.2f}초")
         print(f"구간별 STT 시간 합계: {total_stt_duration:.2f}초")
-        print(f"{summary_model_label} 요약 시간: {summary_duration:.2f}초")
+        print(f"실제 STT 경과 시간(wall): {stt_wall_duration:.2f}초")
+        print(f"{summary_model_label} 요약 전체 시간: {summary_duration:.2f}초")
+        print("-" * 60)
+        print(f"[요약 세부] 청크 생성: {chunk_build_duration:.2f}초")
+        print(
+            f"[요약 세부] 청크 요약 API: {chunk_summary_duration:.2f}초 "
+            f"/ 청크 수={len(timeline_chunks)}"
+        )
+        print(f"[요약 세부] 최종 요약 API: {final_summary_api_duration:.2f}초")
+        print(f"[요약 세부] 텍스트 후처리: {summary_text_postprocess_duration:.2f}초")
+        print(f"[요약 세부] 이미지 처리: {image_processing_duration:.2f}초")
+        print("-" * 60)
         print(f"추출 이미지 프레임 수: {len(timeline_frames)}")
         print(f"whisper_model: {selected_whisper_model}")
         print(f"workers: {selected_workers}")
@@ -516,6 +593,20 @@ def analyze_video_request(request):
             "selected_whisper_model": selected_whisper_model,
             "selected_workers": selected_workers,
             "selected_summary_api": selected_summary_api,
+            "timing_breakdown": {
+                "stt_wall_seconds": stt_wall_duration,
+                "stt_segment_sum_seconds": total_stt_duration,
+                "summary_total_seconds": summary_duration,
+                "summary_chunk_build_seconds": chunk_build_duration,
+                "summary_chunk_api_seconds": chunk_summary_duration,
+                "summary_final_api_seconds": final_summary_api_duration,
+                "summary_text_postprocess_seconds": summary_text_postprocess_duration,
+                "summary_image_processing_seconds": image_processing_duration,
+                "summary_chunk_count": len(timeline_chunks),
+                "summary_source_chars": len(full_transcript),
+                "summary_merged_chunk_chars": len(merged_chunk_summaries),
+                "summary_final_chars": final_summary_text_chars,
+            },
             "timeline_frame_count": len(timeline_frames),
         })
 

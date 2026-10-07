@@ -2,16 +2,18 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: EduMate\n"
+"Project-Id-Version:  EduMate\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-08-29 00:00+0900\n"
 "PO-Revision-Date: 2026-08-29 00:00+0900\n"
 "Last-Translator: \n"
-"Language-Team: Chinese (Simplified)\n"
 "Language: zh_Hans\n"
+"Language-Team: Chinese (Simplified)\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
 
 msgid "AI 학습 플랫폼"
 msgstr "AI学习平台"
@@ -214,6 +216,7 @@ msgstr "暂无相关信息"
 msgid "유튜브 영상 ID를 확인할 수 없어 재생할 수 없습니다."
 msgstr "无法确认 YouTube 视频 ID，无法播放。"
 
+#, python-format
 msgid "현재 %(objective_generation)s차 객관식 오답을 기반으로 서술형 피드백 문제를 생성할 수 있습니다."
 msgstr "可根据第%(objective_generation)s轮选择题错题生成论述反馈题。"
 
@@ -340,6 +343,7 @@ msgstr "共 %(page_obj.paginator.count)s 个讲座"
 msgid "%(page_obj.start_index)s–%(page_obj.end_index)s번째 표시"
 msgstr "显示第 %(page_obj.start_index)s–%(page_obj.end_index)s 条"
 
+#, python-format
 msgid "%(title)s 썸네일"
 msgstr "%(title)s 缩略图"
 
@@ -508,15 +512,19 @@ msgstr "要删除该日期的备忘吗？"
 msgid "로그인 후 강의 업로드와 히스토리 기능을 사용할 수 있습니다."
 msgstr "登录后即可使用讲座上传和记录功能。"
 
+#, python-format
 msgid "이번 달 %(lectures_this_month)s개 추가"
 msgstr "本月新增 %(lectures_this_month)s 个"
 
+#, python-format
 msgid "정답률 %(accuracy_rate)s%"
 msgstr "正确率 %(accuracy_rate)s%"
 
+#, python-format
 msgid "%(study_streak)s일"
 msgstr "%(study_streak)s天"
 
+#, python-format
 msgid "최고 %(best_streak)s일"
 msgstr "最高 %(best_streak)s天"
 
@@ -707,7 +715,7 @@ msgid "✗ 비밀번호가 일치하지 않습니다"
 msgstr "✗ 密码不一致"
 
 msgid "강의 요약"
-msgstr "讲座摘要"
+msgstr "课程总结"
 
 msgid "업로드 파일:"
 msgstr "上传文件："
@@ -1171,6 +1179,7 @@ msgstr "日期格式不正确。"
 msgid "메모는 500자까지 입력할 수 있습니다."
 msgstr "备忘最多可输入 500 个字符。"
 
+#, python-format
 msgid "%(username)s님, 환영합니다!"
 msgstr "欢迎，%(username)s！"
 
@@ -1183,6 +1192,7 @@ msgstr "注册完成，请登录。"
 msgid "회원가입에 실패했습니다. 입력값을 다시 확인해주세요."
 msgstr "注册失败，请检查输入内容。"
 
+#, python-format
 msgid "지원하지 않는 영상 형식입니다. (%(ext)s)"
 msgstr "不支持的视频格式。(%(ext)s)"
 
@@ -1213,9 +1223,11 @@ msgstr "无法停用本人账号。"
 msgid "본인 계정의 관리자 권한은 해제할 수 없습니다."
 msgstr "无法取消本人账号的管理员权限。"
 
+#, python-format
 msgid "%(username)s님의 답안 검수 결과를 저장했습니다."
 msgstr "已保存 %(username)s 的答案复核结果。"
 
+#, python-format
 msgid "%(username)s님의 프로필과 권한을 저장했습니다."
 msgstr "已保存 %(username)s 的资料和权限。"
 
@@ -1228,6 +1240,7 @@ msgstr "未提供 lecture_id。"
 msgid "오디오 추출 또는 분할에 실패했습니다."
 msgstr "音频提取或分割失败。"
 
+#, python-format
 msgid "일부 구간 STT에 실패했습니다: %(names)s"
 msgstr "部分片段语音识别失败：%(names)s"
 
@@ -1247,4 +1260,88 @@ msgstr "月"
 msgctxt "date-day-suffix"
 msgid "일"
 msgstr "日"
+
+msgid "강의 분석 설정"
+msgstr "课程分析设置"
+
+msgid "원하는 분석 방식과 강의 유형을 선택해 주세요."
+msgstr "请选择所需的分析方式和课程类型。"
+
+msgid "분석 정확도"
+msgstr "分析准确度"
+
+msgid "음성을 글로 변환하는 정확도를 설정합니다. 정확도를 높일수록 분석 시간이 길어질 수 있습니다."
+msgstr "设置语音转文字的准确度。准确度越高，分析时间可能越长。"
+
+msgid "빠른 분석"
+msgstr "快速分析"
+
+msgid "균형 분석"
+msgstr "均衡分析"
+
+msgid "정확한 분석"
+msgstr "精准分析"
+
+msgid "고정밀 분석"
+msgstr "高精度分析"
+
+msgid "처리 속도"
+msgstr "处理速度"
+
+msgid "강의 처리 속도를 설정합니다. 기본 모드는 대부분의 환경에서 안정적으로 사용할 수 있습니다."
+msgstr "设置课程处理速度。默认模式适用于大多数环境并能稳定运行。"
+
+msgid "안정 모드 — 낮은 사양 권장"
+msgstr "稳定模式 — 推荐低配置设备"
+
+msgid "기본 모드 — 권장"
+msgstr "默认模式 — 推荐"
+
+msgid "빠른 모드 — 높은 성능 필요"
+msgstr "快速模式 — 需要较高性能"
+
+msgid "최대 속도 — 고성능 환경"
+msgstr "最高速度 — 高性能环境"
+
+msgid "강의 유형"
+msgstr "课程类型"
+
+msgid "자동 선택은 강의 내용을 바탕으로 적합한 학습 요약 방식을 적용합니다."
+msgstr "自动选择会根据课程内容采用合适的学习总结方式。"
+
+msgid "자동 선택 — 강의 내용에 맞게 분석"
+msgstr "自动选择 — 根据课程内容分析"
+
+msgid "요약 방식"
+msgstr "总结方式"
+
+msgid "요약에 사용할 외부 AI 서비스를 선택합니다. 기본 요약은 Gemini, 정밀 요약은 GPT를 활용합니다."
+msgstr "选择用于总结的外部 AI 服务。基础总结使用 Gemini，精细总结使用 GPT。"
+
+msgid "기본 요약 — Gemini 활용"
+msgstr "基础总结 — 使用 Gemini"
+
+msgid "정밀 요약 — GPT 활용"
+msgstr "精细总结 — 使用 GPT"
+
+msgid "설정을 선택한 뒤 강의 분석을 시작해 주세요. 분석이 완료되면 강의 요약, 핵심 개념, 주요 장면과 학습 문제를 확인할 수 있습니다. 각 설정의 자세한 설명은 정보 아이콘에서 확인할 수 있습니다."
+msgstr "请选择设置后开始课程分析。分析完成后，可查看课程总结、核心概念、关键画面和练习题。每项设置的详细说明可通过信息图标查看。"
+
+msgid "강의 분석 시작"
+msgstr "开始课程分析"
+
+msgid "설정 초기화"
+msgstr "重置设置"
+
+msgid "연습 문제"
+msgstr "练习题"
+
+msgid "핵심 개념"
+msgstr "核心概念"
+
+msgid "핵심 장면"
+msgstr "关键画面"
+
+msgid "학습 점검"
+msgstr "学习检查"
 

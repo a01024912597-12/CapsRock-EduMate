@@ -17,18 +17,40 @@ from .media_service import format_seconds_to_mmss
 # Gemini API 설정
 # =========================
 
-GEMINI_MODEL_NAME = getattr(settings, "GEMINI_MODEL_NAME", "gemini-3.5-flash")
+GEMINI_MODEL_NAME = getattr(settings, "GEMINI_MODEL_NAME", "gemini-3.8-flash")
 _gemini_client = None
 
 # =========================
 # OpenAI GPT API 설정
 # =========================
+# OpenAI GPT API 설정
+# =========================
+
 # 로컬 테스트 편의를 위해 하드코딩 방식으로 둔다.
 # 실제 GitHub 업로드/팀원 공유 전에는 반드시 키를 제거하거나 환경변수 방식으로 바꿔야 한다.
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL_NAME = "gpt-5.6-sol"
-_openai_client = None
 
+# GPT 모델 설정
+# 청크 요약: 비용 절감을 위해 Terra 사용
+OPENAI_CHUNK_MODEL_NAME = "gpt-5.6-terra"
+
+# 최종 요약: 품질 유지를 위해 Sol 사용
+OPENAI_FINAL_MODEL_NAME = "gpt-5.6-sol"
+
+# GPT 최종 요약 성능 테스트 설정
+OPENAI_FINAL_REASONING_EFFORT = "none"
+OPENAI_FINAL_MAX_OUTPUT_TOKENS = 7000
+
+
+# 최종 요약 분량 자동 조정 설정
+# STT 원문 글자 수를 기준으로 권장 요약 분량을 계산한다.
+ADAPTIVE_SUMMARY_RATIO = 0.10
+ADAPTIVE_SUMMARY_MIN_CHARS = 1000
+ADAPTIVE_SUMMARY_MAX_CHARS = 7000
+ADAPTIVE_SUMMARY_MAX_RANGE_CHARS = 8000
+
+
+_openai_client = None
 
 def get_gemini_client():
     """Gemini API 클라이언트를 지연 생성한다."""
@@ -118,7 +140,10 @@ def get_summary_model_label(summary_api="gemini"):
     summary_api = normalize_summary_api(summary_api)
 
     if summary_api == "gpt":
-        return f"GPT/{OPENAI_MODEL_NAME}"
+        return (
+            f"GPT/chunk={OPENAI_CHUNK_MODEL_NAME}, "
+            f"final={OPENAI_FINAL_MODEL_NAME}"
+        )
 
     return f"Gemini/{GEMINI_MODEL_NAME}"
 
@@ -173,10 +198,15 @@ def _extract_openai_output_text(response):
 
     return "\n".join(collected).strip()
 
-
 def openai_generate_text(prompt):
     """OpenAI GPT API를 호출하여 텍스트 응답을 반환한다."""
     client = get_openai_client()
+
+    print(
+        f"[GPT 청크 요약 설정] "
+        f"model={OPENAI_CHUNK_MODEL_NAME}, "
+        f"reasoning=none"
+    )
 
     retry_wait_seconds = [5, 15, 30]
     last_error = None
@@ -184,8 +214,11 @@ def openai_generate_text(prompt):
     for attempt, wait_seconds in enumerate(retry_wait_seconds, start=1):
         try:
             response = client.responses.create(
-                model=OPENAI_MODEL_NAME,
+                model=OPENAI_CHUNK_MODEL_NAME,
                 input=prompt,
+                reasoning={
+                    "effort": "none",
+                },
                 max_output_tokens=5000,
             )
 
@@ -238,7 +271,101 @@ def _image_file_to_data_url(filepath):
     return f"data:{mime_type};base64,{encoded}"
 
 
-def openai_generate_multimodal_text(prompt_text, timeline_frames=None):
+def build_adaptive_summary_plan(source_char_count):
+    """STT 원문 길이를 기준으로 최종 요약 권장 분량과 구조를 계산한다.
+
+    영상 길이가 아니라 실제 전사 텍스트의 양을 기준으로 하므로,
+    말이 적은 긴 영상과 말이 많은 짧은 영상을 더 자연스럽게 구분할 수 있다.
+    """
+    try:
+        source_chars = max(int(source_char_count or 0), 0)
+    except (TypeError, ValueError):
+        source_chars = 0
+
+    target_chars = int(source_chars * ADAPTIVE_SUMMARY_RATIO)
+    target_chars = max(ADAPTIVE_SUMMARY_MIN_CHARS, target_chars)
+    target_chars = min(ADAPTIVE_SUMMARY_MAX_CHARS, target_chars)
+
+    target_min_chars = max(800, int(target_chars * 0.85))
+    target_max_chars = min(
+        ADAPTIVE_SUMMARY_MAX_RANGE_CHARS,
+        max(target_min_chars + 200, int(target_chars * 1.15)),
+    )
+
+    if source_chars <= 8000:
+        overview_paragraph_max = 1
+        concept_max = 3
+    elif source_chars <= 15000:
+        overview_paragraph_max = 2
+        concept_max = 4
+    elif source_chars <= 30000:
+        overview_paragraph_max = 3
+        concept_max = 6
+    elif source_chars <= 60000:
+        overview_paragraph_max = 4
+        concept_max = 8
+    else:
+        overview_paragraph_max = 5
+        concept_max = 10
+
+    return {
+        "source_chars": source_chars,
+        "target_chars": target_chars,
+        "target_min_chars": target_min_chars,
+        "target_max_chars": target_max_chars,
+        "overview_paragraph_max": overview_paragraph_max,
+        "concept_max": concept_max,
+    }
+
+
+def _get_openai_usage_value(usage, field_name):
+    """OpenAI usage 객체에서 토큰 값을 안전하게 읽는다."""
+    if usage is None:
+        return None
+
+    if isinstance(usage, dict):
+        return usage.get(field_name)
+
+    return getattr(usage, field_name, None)
+
+
+def _log_openai_response_metadata(response, label="GPT 응답"):
+    """Responses API의 완료 여부와 실제 토큰 사용량을 로그에 남긴다."""
+    status = getattr(response, "status", None) or "unknown"
+    incomplete_details = getattr(response, "incomplete_details", None)
+
+    if isinstance(incomplete_details, dict):
+        incomplete_reason = incomplete_details.get("reason")
+    else:
+        incomplete_reason = getattr(incomplete_details, "reason", None)
+
+    usage = getattr(response, "usage", None)
+    input_tokens = _get_openai_usage_value(usage, "input_tokens")
+    output_tokens = _get_openai_usage_value(usage, "output_tokens")
+    total_tokens = _get_openai_usage_value(usage, "total_tokens")
+
+    print(
+        f"[{label}] status={status}, "
+        f"incomplete_reason={incomplete_reason or '없음'}, "
+        f"input_tokens={input_tokens if input_tokens is not None else '확인불가'}, "
+        f"output_tokens={output_tokens if output_tokens is not None else '확인불가'}, "
+        f"total_tokens={total_tokens if total_tokens is not None else '확인불가'}"
+    )
+
+    return {
+        "status": status,
+        "incomplete_reason": incomplete_reason,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
+    }
+
+
+def openai_generate_multimodal_text(
+    prompt_text,
+    timeline_frames=None,
+    target_max_chars=None,
+):
     """OpenAI GPT API를 이용해 텍스트와 이미지 프레임을 함께 요약한다."""
     client = get_openai_client()
 
@@ -273,20 +400,109 @@ def openai_generate_multimodal_text(prompt_text, timeline_frames=None):
 
     for attempt, wait_seconds in enumerate(retry_wait_seconds, start=1):
         try:
+            print(
+                f"[GPT 최종 요약 설정] "
+                f"model={OPENAI_FINAL_MODEL_NAME}, "
+                f"reasoning={OPENAI_FINAL_REASONING_EFFORT}, "
+                f"max_output_tokens={OPENAI_FINAL_MAX_OUTPUT_TOKENS}"
+            )
+
             response = client.responses.create(
-                model=OPENAI_MODEL_NAME,
+                model=OPENAI_FINAL_MODEL_NAME,
                 input=[
                     {
                         "role": "user",
                         "content": content,
                     }
                 ],
-                max_output_tokens=7000,
+                reasoning={
+                    "effort": OPENAI_FINAL_REASONING_EFFORT,
+                },
+                max_output_tokens=OPENAI_FINAL_MAX_OUTPUT_TOKENS,
             )
-
+            response_meta = _log_openai_response_metadata(
+                response,
+                label="GPT 최종 요약 응답",
+            )
             text = _extract_openai_output_text(response)
 
-            if text:
+            is_incomplete = (
+                response_meta.get("status") == "incomplete"
+                or bool(response_meta.get("incomplete_reason"))
+            )
+
+            if text and not is_incomplete:
+                print(f"[GPT 최종 요약 길이] {len(text)}자")
+                return text.strip()
+
+            if text and is_incomplete:
+                # 토큰 제한 등으로 문장이 중간에서 잘렸다면, 같은 원문으로 한 번만
+                # 더 짧고 완결된 결과를 재생성한다. 평소에는 추가 호출이 발생하지 않는다.
+                safe_max_chars = target_max_chars or ADAPTIVE_SUMMARY_MAX_RANGE_CHARS
+                print(
+                    f"[GPT 최종 요약 경고] 응답이 완결되지 않았습니다. "
+                    f"reason={response_meta.get('incomplete_reason') or response_meta.get('status')} / "
+                    f"{safe_max_chars}자 이내 완성본으로 1회 재생성합니다."
+                )
+
+                retry_prompt = (
+                    prompt_text
+                    + "\n\n[길이 초과 재생성 필수 규칙]\n"
+                    + f"- 이전 생성은 출력 제한으로 완결되지 않았다. 이번에는 반드시 {safe_max_chars:,}자 이내에서 끝낼 것.\n"
+                    + "- 기존 내용을 그대로 반복해 분량을 늘리지 말 것.\n"
+                    + "- 중요한 개념, 예시, 수치, 인과관계는 보존하되 중복 표현을 압축할 것.\n"
+                    + "- 1~4번 섹션을 모두 완성하고 마지막 문장을 완결한 뒤 종료할 것.\n"
+                )
+
+                retry_content = [
+                    {
+                        "type": "input_text",
+                        "text": retry_prompt,
+                    }
+                ]
+
+                if timeline_frames:
+                    for frame in timeline_frames:
+                        filepath = frame.get("filepath")
+                        if not filepath or not os.path.exists(filepath):
+                            continue
+
+                        try:
+                            retry_content.append({
+                                "type": "input_text",
+                                "text": f"[{frame.get('time_str', '')} 시점의 칠판/PPT 화면]",
+                            })
+                            retry_content.append({
+                                "type": "input_image",
+                                "image_url": _image_file_to_data_url(filepath),
+                            })
+                        except Exception as e:
+                            print(f"[GPT 요약 재생성] 이미지 첨부 실패: {e}")
+
+                retry_response = client.responses.create(
+                    model=OPENAI_FINAL_MODEL_NAME,
+                    input=[
+                        {
+                            "role": "user",
+                            "content": retry_content,
+                        }
+                    ],
+                    reasoning={
+                        "effort": OPENAI_FINAL_REASONING_EFFORT,
+                    },
+                    max_output_tokens=OPENAI_FINAL_MAX_OUTPUT_TOKENS,
+                )
+                _log_openai_response_metadata(
+                    retry_response,
+                    label="GPT 최종 요약 재생성 응답",
+                )
+                retry_text = _extract_openai_output_text(retry_response)
+
+                if retry_text:
+                    print(f"[GPT 최종 요약 재생성 길이] {len(retry_text)}자")
+                    return retry_text.strip()
+
+                print("[GPT 경고] 재생성 응답 text가 비어 있어 최초 결과를 사용합니다.")
                 return text.strip()
 
             print(f"[GPT 경고] 멀티모달 응답 text가 비어 있습니다. attempt={attempt}")
@@ -900,10 +1116,48 @@ def inject_core_timeline_images(summary_text, timeline_frames=None, lecture_id=N
     return "\n".join(output_lines)
 
 
-def make_final_summary(chunk_summaries_text, timeline_frames=None, subject_code="auto", summary_api="gemini"):
-    """여러 부분 요약과 추출된 판서 이미지들을 결합하여 과목 맞춤형 최종 요약을 수행한다."""
+def make_final_summary(
+    chunk_summaries_text,
+    timeline_frames=None,
+    subject_code="auto",
+    summary_api="gemini",
+    source_char_count=None,
+):
+    """여러 부분 요약을 결합해 과목 맞춤형 최종 요약을 수행한다.
+
+    source_char_count에는 최종 요약의 재료인 청크 요약 길이가 아니라
+    STT 전체 원문의 글자 수를 전달한다. 이 값을 기준으로 요약 분량을 자동 조절한다.
+    """
     try:
         subject_code = normalize_subject_code(subject_code)
+
+        if not source_char_count:
+            source_char_count = len(chunk_summaries_text or "")
+
+        summary_plan = build_adaptive_summary_plan(source_char_count)
+        target_min_chars = summary_plan["target_min_chars"]
+        target_max_chars = summary_plan["target_max_chars"]
+        overview_paragraph_max = summary_plan["overview_paragraph_max"]
+        concept_max = summary_plan["concept_max"]
+
+        print(
+            f"[적응형 최종 요약] STT 원문={summary_plan['source_chars']:,}자, "
+            f"청크 병합={len(chunk_summaries_text or ''):,}자, "
+            f"권장 최종={target_min_chars:,}~{target_max_chars:,}자, "
+            f"전체흐름 최대={overview_paragraph_max}문단, "
+            f"필수개념 최대={concept_max}개"
+        )
+
+        adaptive_length_instruction = f"""
+[적응형 요약 분량 규칙]
+- STT 전체 원문 분량은 약 {summary_plan['source_chars']:,}자입니다.
+- 최종 요약은 약 {target_min_chars:,}~{target_max_chars:,}자를 권장합니다.
+- 위 범위를 크게 초과하지 마세요. 원문이 짧거나 정보가 적으면 분량을 채우기 위해 같은 말을 반복하거나 강의에 없는 배경지식을 추가하지 마세요.
+- 반대로 원문에 실제로 존재하는 중요한 개념, 예시, 수치, 비교, 순서, 원인과 결과는 분량을 줄이기 위해 임의로 삭제하지 마세요.
+- 1번 전체 흐름은 강의 정보량에 맞춰 최대 {overview_paragraph_max}개 문단까지만 작성하세요. 짧은 강의는 1개 문단으로 끝내도 됩니다.
+- 3번 필수 개념은 실제로 중요한 항목만 최대 {concept_max}개까지 선정하세요. 개수를 채우기 위해 중요하지 않은 항목을 추가하지 마세요.
+- 최종 결과는 반드시 1~4번 섹션을 모두 완성하고, 마지막 문장을 완결한 상태로 종료하세요.
+"""
 
         image_time_list = []
 
@@ -941,6 +1195,8 @@ def make_final_summary(chunk_summaries_text, timeline_frames=None, subject_code=
 - HTML 태그를 직접 출력하지 말 것.
 - 모든 문장의 끝맺음은 '~했다', '~이다', '~하다' 형식의 객관적인 평어체로 통일할 것.
 - (분:초) 형식의 일반 타임라인은 오직 3번 섹션의 키워드 옆에만 표기할 것.
+
+{adaptive_length_instruction}
 """
 
         if subject_code == "auto":
@@ -954,7 +1210,7 @@ def make_final_summary(chunk_summaries_text, timeline_frames=None, subject_code=
 - 사용자가 원본 강의를 듣지 않아도 강의의 종합적인 내용과 핵심 내용을 이해할 수 있어야 합니다.
 - 단순히 짧게 줄이는 것보다 중요한 정보 보존을 우선합니다.
 - 시험 대비에 필요한 내용뿐 아니라, 강의 흐름을 이해하는 데 필요한 배경·예시·원인·결과·비교·순서를 포함합니다.
-- 내용이 길어져도 좋으니, 강의의 핵심 설명이 빠지지 않게 작성합니다.
+- 원문의 정보량에 맞는 분량으로 작성합니다. 짧은 강의는 짧게, 정보가 많은 강의는 충분히 자세하게 정리합니다.
 
 [AI 자동 판단 기준]
 - 역사/인문학: 사건의 원인, 전개, 결과, 인물, 제도, 조약, 사상, 시대적 의미를 중심으로 정리합니다.
@@ -986,7 +1242,7 @@ def make_final_summary(chunk_summaries_text, timeline_frames=None, subject_code=
 1. 강의 유형 판단 및 전체 흐름
 - 판단한 강의 유형을 한 줄로 밝힙니다.
 - 그렇게 판단한 근거를 강의 내용 기준으로 2~3개 제시합니다.
-- 강의 전체가 어떤 문제의식에서 시작해 어떤 결론으로 이어지는지 3~5문단으로 설명합니다.
+- 강의 전체가 어떤 문제의식에서 시작해 어떤 결론으로 이어지는지 정보량에 맞춰 설명합니다. 짧은 강의는 불필요하게 문단 수를 늘리지 않습니다.
 
 2. 강의 대체 상세 정리
 - 이 섹션은 가장 중요합니다.
@@ -1000,7 +1256,7 @@ def make_final_summary(chunk_summaries_text, timeline_frames=None, subject_code=
 - 제공된 이미지가 설명에 직접 도움이 되는 경우에만 [IMG: 분:초] 마커를 삽입합니다.
 
 3. 꼭 알아야 할 필수 개념
-- 시험 대비와 강의 이해에 중요한 키워드를 7~12개 선정합니다.
+- 시험 대비와 강의 이해에 실제로 중요한 키워드만 선정합니다. 위의 적응형 요약 분량 규칙에서 제시한 최대 개수를 넘기지 않습니다.
 - 각 항목은 반드시 아래 형식을 지킵니다.
 - 키워드명 (분:초)
   - 의미: 강의 내용 기준의 핵심 정의 또는 설명
@@ -1031,14 +1287,14 @@ def make_final_summary(chunk_summaries_text, timeline_frames=None, subject_code=
 
 [출력 양식]
 1. 심층 배경 및 전체 요약
-- 강의가 다루는 시대적 배경과 전체 흐름을 3~5개 문단으로 정리할 것.
+- 강의가 다루는 시대적 배경과 전체 흐름을 정보량에 맞춰 정리할 것. 짧은 강의는 불필요하게 문단 수를 늘리지 말 것.
 
 2. 흐름별 상세 전개
 - [도입] - [전개] - [위기/절정] - [결말/영향] 단계로 나누어 설명할 것.
 - 제공된 이미지가 설명에 직접 도움이 되는 경우에만 [IMG: 분:초] 마커를 삽입할 것.
 
 3. 꼭 알아야 할 필수 개념 및 고유명사 사전
-- 핵심 키워드를 7~10개 선정할 것.
+- 핵심 키워드는 실제로 중요한 항목만 선정하고, 위의 적응형 요약 분량 규칙에서 제시한 최대 개수를 넘기지 말 것.
 - 키워드 이름 (분:초)
   - 구체적 의미 및 발생 원인
   - 역사적 결과 및 영향
@@ -1062,14 +1318,14 @@ def make_final_summary(chunk_summaries_text, timeline_frames=None, subject_code=
 
 [출력 양식]
 1. 강의 개요 및 기술 스택
-- 강의의 핵심 목표와 사용된 기술을 2~3개 문단으로 요약할 것.
+- 강의의 핵심 목표와 사용된 기술을 정보량에 맞춰 요약할 것. 짧은 강의는 1개 문단으로 끝내도 됨.
 
 2. 핵심 기술 및 로직 전개
 - [환경 설정/도입] - [핵심 문법 및 로직] - [실전 구현 방식] - [주의사항 및 트러블슈팅] 단계로 정리할 것.
 - 제공된 이미지가 코드 흐름이나 화면 설명에 도움이 되는 경우에만 [IMG: 분:초] 마커를 삽입할 것.
 
 3. 꼭 알아야 할 필수 개념 및 함수 사전
-- 중요한 IT 개념, 함수명, 클래스명, 명령어를 5개 이상 정리할 것.
+- 중요한 IT 개념, 함수명, 클래스명, 명령어만 정리하고, 위의 적응형 요약 분량 규칙에서 제시한 최대 개수를 넘기지 말 것.
 - 키워드/함수명 (분:초)
   - 정의 및 작동 원리
   - 실무 적용 주의사항
@@ -1100,7 +1356,7 @@ def make_final_summary(chunk_summaries_text, timeline_frames=None, subject_code=
 - 제공된 이미지가 문제 풀이 또는 공식 설명에 도움이 되는 경우에만 [IMG: 분:초] 마커를 삽입할 것.
 
 3. 꼭 알아야 할 필수 개념 및 주요 공식 사전
-- 핵심 공식, 법칙, 개념을 5개 이상 정리할 것.
+- 실제로 중요한 공식, 법칙, 개념만 정리하고, 위의 적응형 요약 분량 규칙에서 제시한 최대 개수를 넘기지 말 것.
 - 공식 및 개념 이름 (분:초)
   - 구체적 의미 및 유도 원리
   - 활용 방법 및 특징
@@ -1123,14 +1379,14 @@ def make_final_summary(chunk_summaries_text, timeline_frames=None, subject_code=
 
 [출력 양식]
 1. 심층 배경 및 전체 요약
-- 강의의 핵심 주제와 전체 흐름을 3~5개 문단으로 정리할 것.
+- 강의의 핵심 주제와 전체 흐름을 정보량에 맞춰 정리할 것. 짧은 강의는 불필요하게 문단 수를 늘리지 말 것.
 
 2. 흐름별 상세 전개
 - [도입] - [주요 개념 전개] - [핵심 결론] 순으로 정리할 것.
 - 제공된 이미지가 설명에 직접 도움이 되는 경우에만 [IMG: 분:초] 마커를 삽입할 것.
 
 3. 꼭 알아야 할 필수 개념 및 고유명사 사전
-- 중요한 키워드를 5개 이상 정리할 것.
+- 실제로 중요한 키워드만 정리하고, 위의 적응형 요약 분량 규칙에서 제시한 최대 개수를 넘기지 말 것.
 - 키워드 이름 (분:초)
   - 구체적 의미 및 특징
   - 주요 영향 및 결론
@@ -1146,6 +1402,7 @@ def make_final_summary(chunk_summaries_text, timeline_frames=None, subject_code=
             raw = openai_generate_multimodal_text(
                 prompt_text=prompt_text,
                 timeline_frames=timeline_frames,
+                target_max_chars=target_max_chars,
             )
         else:
             contents_to_send = [prompt_text]
