@@ -36,6 +36,31 @@ class Lecture(models.Model):
     summary_duration_seconds = models.FloatField(null=True, blank=True)
     whisper_model_name = models.CharField(max_length=50, blank=True)
     analyzed_at = models.DateTimeField(null=True, blank=True)
+    # ------------------ [대기열] ------------------
+    STATUS_PENDING = "pending"  # 대기 중
+    STATUS_PROCESSING = "processing"  # 현재 분석 중
+    STATUS_COMPLETED = "completed"  # 요약 완료
+    STATUS_FAILED = "failed"  # 요약 실패
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "대기 중"),
+        (STATUS_PROCESSING, "분석 중"),
+        (STATUS_COMPLETED, "완료"),
+        (STATUS_FAILED, "실패"),
+    ]
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    error_message = models.TextField(blank=True, default="")
+
+    # ------------------------------------------------------------
+
+    def __str__(self):
+        return self.title
 
     def __str__(self):
         return self.title

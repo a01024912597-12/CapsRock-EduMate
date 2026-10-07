@@ -510,6 +510,18 @@ def upload_page(request):
             f"subject_code={subject_code}, "
             f"summary_api={summary_api}"
         )
+        # 1시간 이상 지난 '진짜 옛날 찌꺼기'만 정리하고, 방금 전 돌려둔 1번째 강의는 절대 건드리지 않음
+        stale_threshold = timezone.now() - timedelta(hours=1)
+        Lecture.objects.filter(
+            user=request.user,
+            status__in=[Lecture.STATUS_PENDING, Lecture.STATUS_PROCESSING],
+            created_at__lt=stale_threshold
+        ).update(status=Lecture.STATUS_FAILED)
+
+        # 대기열 등록 (세션 옵션 함께 전달)
+        from .queue_worker import add_lecture_to_queue
+        session_opts = request.session.get(f"lecture_analysis_options_{lecture.id}", {})
+        add_lecture_to_queue(lecture.id, session_opts)
 
         return redirect(f"/summary/?lecture_id={lecture.id}")
 
@@ -676,9 +688,93 @@ def stream_lecture_video(request, lecture_id):
 
 @login_required(login_url="home")
 def analyze_video_api(request):
-    """강의 분석 API wrapper. 실제 분석 흐름은 services/analysis_service.py에서 처리한다."""
-    return analyze_video_request(request)
+    """강의 대기열 순번, 요약 상태 및 최근 내 작업 목록 조회 API (완벽한 FIFO 순서 보장)"""
+    lecture_id = request.GET.get("lecture_id")
+    if not lecture_id:
+        return JsonResponse({"status": "error", "message": "lecture_id가 전달되지 않았습니다."}, status=400)
 
+    lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
+
+    # 1. 20분 이상 멈춰있는 과거 유령 데이터 정리
+    stale_threshold = timezone.now() - timedelta(minutes=20)
+    Lecture.objects.filter(
+        user=request.user,
+        status__in=[Lecture.STATUS_PENDING, Lecture.STATUS_PROCESSING],
+        created_at__lt=stale_threshold
+    ).update(status=Lecture.STATUS_FAILED)
+
+    # 2. 이미 요약이 완료된 경우
+    if lecture.status == Lecture.STATUS_COMPLETED:
+        return JsonResponse({
+            "status": "success",
+            "state": "completed",
+            "result": lecture.summary_text,
+            "summary_timeline": getattr(lecture, "summary_timeline", ""),
+            "recent_tasks": [],
+        })
+
+    # 3. 분석 실패
+    if lecture.status == Lecture.STATUS_FAILED:
+        return JsonResponse({
+            "status": "failed",
+            "state": "failed",
+            "message": lecture.error_message or "분석 중 오류가 발생했습니다.",
+            "recent_tasks": [],
+        })
+
+    # 4. 활성 작업 전체 조회 (생성시간 기준 오름차순: 먼저 등록한 게 무조건 앞)
+    active_lectures = list(Lecture.objects.filter(
+        user=request.user,
+        status__in=[Lecture.STATUS_PROCESSING, Lecture.STATUS_PENDING],
+        created_at__gte=stale_threshold
+    ).order_by("created_at"))
+
+    # 내 강의의 실제 순번 계산 (시간순 인덱스 + 1)
+    my_order = 1
+    for idx, item in enumerate(active_lectures):
+        if item.id == lecture.id:
+            my_order = idx + 1
+            break
+
+    # 1번 강의(가장 먼저 등록된 작업)만 processing, 2번부터는 무조건 pending
+    if my_order == 1:
+        current_state = Lecture.STATUS_PROCESSING
+    else:
+        current_state = Lecture.STATUS_PENDING
+
+    # 우측 대시보드용 목록 구성: 현재 진행 작업 -> 대기 1번 -> 대기 2번...
+    my_tasks = []
+    for idx, item in enumerate(active_lectures):
+        is_first = (idx == 0)
+        # 1위, 2위 대신 직관적인 진행 상태 및 대기 순번으로 표기
+        status_label = "분석 진행 중" if is_first else f"대기 {idx}번"
+        status_color = "processing" if is_first else "waiting"
+        clean_title = re.sub(r"\s*\[\s*SUB\s*:\s*(?:auto|[1-4])\s*\]", "", item.title or "제목 없음").strip()
+
+        my_tasks.append({
+            "id": item.id,
+            "title": clean_title,
+            "order_num": idx + 1,
+            "status_label": status_label,
+            "status_color": status_color,
+            "is_current": (item.id == lecture.id)
+        })
+
+    return JsonResponse({
+        "status": "waiting",
+        "state": current_state,
+        "queue_order": my_order,
+        "ahead_count": max(0, my_order - 1),
+        "recent_tasks": my_tasks,
+    })
+
+    return JsonResponse({
+        "status": "waiting",
+        "state": current_state,
+        "queue_order": my_order,
+        "ahead_count": max(0, my_order - 1),
+        "recent_tasks": my_tasks,
+    })
 @login_required(login_url="home")
 def history_page(request):
     """사용자별 강의 히스토리 페이지."""
