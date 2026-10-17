@@ -531,26 +531,72 @@
                 return '<span class="summary-ts" role="button" tabindex="0" data-seconds="' + seconds + '">' + match + '</span>';
             });
         }
+function renderSummaryHtml(text) {
+    const lines = String(text || '').split('\n');
+    let html = '';
+    let insideTimelineImage = false;
+    let timelineImageHtml = '';
 
-        function renderSummaryHtml(text) {
-            const lines = String(text || '').split('\n');
-            let html = '';
-            for (let i = 0; i < lines.length; i++) {
-                const trimmed = lines[i].trim();
-                if (!trimmed) {
-                    html += '<div style="height:8px;"></div>';
-                    continue;
-                }
-                const sectionMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
-                if (sectionMatch) {
-                    html += '<h4 style="margin:18px 0 10px; font-size:17px; color:var(--text-main); line-height:1.6;">' +
-                        escapeHtml(sectionMatch[1] + '. ' + sectionMatch[2]) + '</h4>';
-                    continue;
-                }
-                html += '<p style="margin:6px 0; color:var(--text-sub); line-height:1.7;">' + linkifyTimestampsInLine(escapeHtml(trimmed)) + '</p>';
+    for (let i = 0; i < lines.length; i++) {
+        const rawLine = lines[i];
+        const trimmed = rawLine.trim();
+
+        // 서버가 생성한 타임라인 이미지 HTML 블록 시작
+        if (trimmed.startsWith('<div class="timeline-image-wrapper"')) {
+            insideTimelineImage = true;
+            timelineImageHtml = rawLine + '\n';
+
+            // 혹시 한 줄 안에서 div까지 끝나는 경우
+            if (trimmed.endsWith('</div>')) {
+                html += timelineImageHtml;
+                insideTimelineImage = false;
+                timelineImageHtml = '';
             }
-            return html;
+
+            continue;
         }
+
+        // 이미지 HTML 블록 내부
+        if (insideTimelineImage) {
+            timelineImageHtml += rawLine + '\n';
+
+            if (trimmed.endsWith('</div>')) {
+                html += timelineImageHtml;
+                insideTimelineImage = false;
+                timelineImageHtml = '';
+            }
+
+            continue;
+        }
+
+        if (!trimmed) {
+            html += '<div style="height:8px;"></div>';
+            continue;
+        }
+
+        const sectionMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
+
+        if (sectionMatch) {
+            html +=
+                '<h4 style="margin:18px 0 10px; font-size:17px; color:var(--text-main); line-height:1.6;">' +
+                escapeHtml(sectionMatch[1] + '. ' + sectionMatch[2]) +
+                '</h4>';
+            continue;
+        }
+
+        html +=
+            '<p style="margin:6px 0; color:var(--text-sub); line-height:1.7;">' +
+            linkifyTimestampsInLine(escapeHtml(trimmed)) +
+            '</p>';
+    }
+
+    // 비정상적으로 닫히지 않은 이미지 블록 방어
+    if (timelineImageHtml) {
+        html += escapeHtml(timelineImageHtml);
+    }
+
+    return html;
+}
 
         function playVideoAt(seconds) {
             const t = Math.max(0, Math.floor(seconds));
