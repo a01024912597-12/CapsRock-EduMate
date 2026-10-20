@@ -49,7 +49,9 @@ from .services.subjective_quiz_service import (
     build_quiz_items_for_display,
     save_user_answers_to_quiz_answer,
     split_quiz_reference,
+    parse_quiz_text,
 )
+from .services.answer_feedback_generator import recurring_misconceptions, polite_hint, compare_attempts, normalize_feedback_statuses
 
 # 페이지네이션/관리자 화면 설정
 HISTORY_PAGE_SIZE = 5
@@ -145,9 +147,9 @@ def set_preferred_language(request):
     """사이드바 언어 선택: 쿠키 저장 + 로그인 시 UserProfile.preferred_language 반영."""
     next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or "/"
     if not url_has_allowed_host_and_scheme(
-        url=next_url,
-        allowed_hosts={request.get_host()},
-        require_https=request.is_secure(),
+            url=next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
     ):
         next_url = "/"
 
@@ -224,6 +226,7 @@ def _lecture_card_thumbnail(lecture):
     if lecture.video_id:
         return f"https://img.youtube.com/vi/{lecture.video_id}/0.jpg"
     return ""
+
 
 def home(request):
     """메인(홈) 페이지. 로그인 시 학습 현황 통계를 함께 보여준다."""
@@ -367,6 +370,7 @@ def logout_page(request):
     logout(request)
     return redirect("home")
 
+
 def signup_page(request):
     """회원가입 및 추가 프로필 정보 저장."""
     if request.method == "POST":
@@ -401,6 +405,7 @@ def signup_page(request):
     form = UserCreationForm()
     return render(request, "signup.html", {"form": form})
 
+
 def validate_lecture_video_file(uploaded_file):
     """업로드 영상 파일 확장자·용량 검증. 문제 없으면 None."""
     if not uploaded_file:
@@ -415,6 +420,7 @@ def validate_lecture_video_file(uploaded_file):
         return "영상 파일은 500MB 이하여야 합니다."
 
     return None
+
 
 @login_required(login_url="home")
 def upload_page(request):
@@ -637,6 +643,7 @@ def download_summary_pdf(request, lecture_id):
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
 
+
 @login_required(login_url="home")
 def stream_lecture_video(request, lecture_id):
     """업로드 영상을 HTTP Range(206)로 스트리밍해 재생·탐색이 즉시 가능하도록 한다."""
@@ -685,6 +692,7 @@ def stream_lecture_video(request, lecture_id):
     response["Content-Length"] = str(file_size)
     response["Accept-Ranges"] = "bytes"
     return response
+
 
 @login_required(login_url="home")
 def analyze_video_api(request):
@@ -775,6 +783,8 @@ def analyze_video_api(request):
         "ahead_count": max(0, my_order - 1),
         "recent_tasks": my_tasks,
     })
+
+
 @login_required(login_url="home")
 def history_page(request):
     """사용자별 강의 히스토리 페이지."""
@@ -845,9 +855,9 @@ def history_page(request):
         _decorate_lecture_for_display(lecture)
 
         if (
-            lecture.source_type == Lecture.SOURCE_FILE
-            and not lecture.thumbnail_url
-            and lecture.video_file
+                lecture.source_type == Lecture.SOURCE_FILE
+                and not lecture.thumbnail_url
+                and lecture.video_file
         ):
             thumbnail_url = capture_lecture_video_thumbnail(lecture)
 
@@ -1263,6 +1273,14 @@ def tf_quiz_page(request):
     })
 
 
+def _valid_feedback_quiz_text(quiz_text):
+    items = parse_quiz_text(quiz_text)
+    numbers = [item["number"] for item in items]
+    return bool(items) and len(numbers) == len(set(numbers)) and all(
+        item["question"].strip() and item["answer"].strip() for item in items
+    )
+
+
 @login_required(login_url="home")
 def feedback_page(request):
     """학습 피드백 페이지.
@@ -1305,12 +1323,43 @@ def feedback_page(request):
     objective_generation = request.GET.get("objective_generation") or request.POST.get("objective_generation")
     auto_generate_feedback = request.GET.get("auto_generate_feedback") == "1"
 
+    # 1. 해당 강의의 피드백 차수 목록 전체 가져오기
     feedback_quizzes = (
         Quiz.objects
         .filter(lecture=lecture, explanation=FEEDBACK_QUIZ_TYPE)
         .exclude(quiz_text="")
         .order_by("generation_number", "id")
     )
+
+    has_quiz = feedback_quizzes.exists()
+    selected_quiz = None
+    selected_generation = None
+    quiz_items = []
+    raw_user_answer = ""
+
+    if has_quiz:
+        # 2. GET 또는 POST로 전달된 generation 파라미터 안전하게 가져오기 (.strip() 처리)
+        generation_param = request.GET.get("generation") or request.POST.get("generation")
+
+        if generation_param and str(generation_param).strip().isdigit():
+            gen_num = int(generation_param.strip())
+            selected_quiz = feedback_quizzes.filter(generation_number=gen_num).first()
+
+        # 3. 파라미터가 없거나 일치하는 퀴즈가 없으면 가장 최신 퀴즈 선택
+        if not selected_quiz:
+            selected_quiz = feedback_quizzes.order_by("-generation_number", "-id").first()
+
+        if not selected_quiz:
+            selected_quiz = feedback_quizzes.first()
+
+        selected_generation = selected_quiz.generation_number if selected_quiz else None
+
+        # 4. 선택된 퀴즈의 문항 표시용 데이터 생성
+        quiz_items, raw_user_answer = build_quiz_items_for_display(
+            quiz_text=selected_quiz.quiz_text,
+            quiz=selected_quiz,
+            user=request.user,
+        )
 
     def create_feedback_quiz_from_objective(next_generation):
         wrong_items = []
@@ -1338,6 +1387,10 @@ def feedback_page(request):
         max_generation = feedback_quizzes.aggregate(max_number=Max("generation_number"))["max_number"] or 0
         next_generation = max_generation + 1
         quiz_text = create_feedback_quiz_from_objective(next_generation)
+
+        if not _valid_feedback_quiz_text(quiz_text):
+            messages.error(request, "서술형 문제를 생성하지 못했습니다. 다시 시도해주세요.")
+            return redirect(f"/feedback/?lecture_id={lecture.id}")
 
         new_quiz = Quiz.objects.create(
             lecture=lecture,
@@ -1369,6 +1422,10 @@ def feedback_page(request):
                 previous_quiz_texts=previous_quiz_texts,
             )
 
+        if not _valid_feedback_quiz_text(quiz_text):
+            messages.error(request, "서술형 문제를 생성하지 못했습니다. 다시 시도해주세요.")
+            return redirect(f"/feedback/?lecture_id={lecture.id}")
+
         new_quiz = Quiz.objects.create(
             lecture=lecture,
             generation_number=next_generation,
@@ -1384,13 +1441,14 @@ def feedback_page(request):
             redirect_url += f"&objective_generation={objective_generation}"
         return redirect(redirect_url)
 
+    # 답안 저장 및 자동 채점 실행
     if request.method == "POST" and request.POST.get("save_feedback_answers"):
         gen_raw = request.POST.get("generation")
 
-        if not gen_raw or not str(gen_raw).isdigit():
+        if not gen_raw or not str(gen_raw).strip().isdigit():
             return redirect(f"/feedback/?lecture_id={lecture.id}")
 
-        gen = int(gen_raw)
+        gen = int(gen_raw.strip())
         quiz_to_update = feedback_quizzes.filter(generation_number=gen).first()
 
         if not quiz_to_update:
@@ -1407,39 +1465,8 @@ def feedback_page(request):
             redirect_url += f"&objective_generation={objective_generation}"
         return redirect(redirect_url)
 
-    feedback_quizzes = (
-        Quiz.objects
-        .filter(lecture=lecture, explanation=FEEDBACK_QUIZ_TYPE)
-        .exclude(quiz_text="")
-        .order_by("generation_number", "id")
-    )
-
-    has_quiz = feedback_quizzes.exists()
-    selected_quiz = None
-    selected_generation = None
-    quiz_items = []
-    raw_user_answer = ""
-
-    if has_quiz:
-        generation_param = request.GET.get("generation")
-
-        if generation_param and str(generation_param).isdigit():
-            selected_quiz = feedback_quizzes.filter(generation_number=int(generation_param)).first()
-
-        if not selected_quiz:
-            selected_quiz = feedback_quizzes.order_by("-generation_number", "-id").first()
-
-        if not selected_quiz:
-            selected_quiz = feedback_quizzes.first()
-
-        selected_generation = selected_quiz.generation_number
-
-        quiz_items, raw_user_answer = build_quiz_items_for_display(
-            quiz_text=selected_quiz.quiz_text,
-            quiz=selected_quiz,
-            user=request.user,
-        )
-
+    # 💡 [핵심 수정] 하단에서 selected_quiz를 재조회하던 중복 코드 블록을 제거하고
+    # 상단에서 선택된 selected_quiz 기반으로 답안 목록(answers)만 조회하도록 정리
     answers = QuizAnswer.objects.none()
 
     if selected_quiz:
@@ -1447,6 +1474,7 @@ def feedback_page(request):
             QuizAnswer.objects
             .filter(user=request.user, quiz_question__quiz=selected_quiz)
             .select_related("quiz_question", "quiz_question__quiz")
+            .prefetch_related("attempts")
             .order_by("quiz_question__number", "created_at")
         )
 
@@ -1459,7 +1487,9 @@ def feedback_page(request):
         label_no_space = label.replace(" ", "")
         if label_no_space in ["정답", "정답가능성높음"]:
             return "정답"
-        if label_no_space in ["부분정답", "검토필요"]:
+        if label_no_space == "검토필요":
+            return "검토필요"
+        if label_no_space == "부분정답":
             return "부분정답"
         if label_no_space in ["오답", "오답가능성높음"]:
             return "오답"
@@ -1478,18 +1508,37 @@ def feedback_page(request):
             return "부분정답"
         return "오답"
 
+    def parse_feedback_data(raw_feedback):
+        if not raw_feedback:
+            return None
+        if isinstance(raw_feedback, dict):
+            return raw_feedback
+        if isinstance(raw_feedback, str):
+            try:
+                return json.loads(raw_feedback)
+            except (json.JSONDecodeError, TypeError):
+                return {
+                    "messages": [raw_feedback],
+                    "matched_keywords": [],
+                    "missing_keywords": []
+                }
+        return None
+
     correct_like_count = 0
     review_needed_count = 0
     wrong_like_count = 0
     reviewed_count = 0
     review_agree_count = 0
     score_sum = 0.0
+    scored_answer_count = 0
     total_answer_count = 0
 
     for answer in answers:
         raw_score = answer.similarity_score if answer.similarity_score is not None else 0.0
         display_score = max(0.0, min(raw_score, 1.0))
-        score_sum += display_score
+        if answer.similarity_score is not None:
+            score_sum += display_score
+            scored_answer_count += 1
         total_answer_count += 1
 
         predicted_label = answer.predicted_label or ""
@@ -1497,7 +1546,7 @@ def feedback_page(request):
 
         if normalized_predicted == "정답":
             correct_like_count += 1
-        elif normalized_predicted == "부분정답":
+        elif normalized_predicted in ["부분정답", "검토필요"]:
             review_needed_count += 1
         elif normalized_predicted == "오답":
             wrong_like_count += 1
@@ -1521,6 +1570,31 @@ def feedback_page(request):
         if not keywords and timelines:
             keywords, timelines = split_quiz_reference(combined=timelines)
 
+        raw_fb = getattr(answer, "feedback_json", None) or getattr(answer, "feedback", None)
+        feedback_data = parse_feedback_data(raw_fb)
+        if feedback_data and isinstance(feedback_data.get("learning"), dict):
+            learning = normalize_feedback_statuses(feedback_data["learning"])
+            feedback_data["learning"] = learning
+            learning["hints"] = [polite_hint(hint) for hint in learning.get("hints", []) if isinstance(hint, str)]
+        attempts = list(answer.attempts.all())
+        previous_attempt = attempts[-2] if len(attempts) > 1 else None
+        # 기존에 저장된 내부 항목 이름도 구체적인 보완 안내로 바꾸어 표시한다.
+        if feedback_data and isinstance(feedback_data.get("learning"), dict):
+            previous_learning = (previous_attempt.feedback_json or {}).get("learning", {}) if previous_attempt else {}
+            feedback_data["comparison"] = compare_attempts(previous_learning, feedback_data["learning"])
+        history = [{
+            "number": index, "user_answer": attempt.user_answer,
+            "score_percent": round(attempt.score * 100, 1) if attempt.score is not None else None,
+            "created_at": attempt.created_at,
+        } for index, attempt in enumerate(attempts, 1)]
+        repeated = recurring_misconceptions(attempts)
+        current_keys = {m["key"] for m in (feedback_data or {}).get("learning", {}).get("misconceptions", [])}
+        for misconception in repeated:
+            misconception["resolved"] = (
+                (feedback_data or {}).get("learning", {}).get("status") == "ready"
+                and misconception["key"] not in current_keys
+            )
+
         answer_items.append({
             "id": answer.id,
             "generation_number": question.quiz.generation_number,
@@ -1531,15 +1605,21 @@ def feedback_page(request):
             "timelines": timelines,
             "user_answer": answer.user_answer,
             "similarity_score": raw_score,
-            "similarity_percent": round(display_score * 100, 1),
+            "similarity_percent": round(display_score * 100, 1) if answer.similarity_score is not None else None,
             "predicted_label": predicted_label,
             "human_score": human_score,
             "human_label": human_label,
             "is_reviewed": is_reviewed,
+            "feedback_json": feedback_data,
+            "feedback": raw_fb,
+            "attempt_history": history,
+            "attempt_count": len(attempts),
+            "previous_answer": previous_attempt.user_answer if previous_attempt else None,
+            "recurring_misconceptions": repeated,
             "created_at": answer.created_at,
         })
 
-    average_similarity = round((score_sum / total_answer_count) * 100, 1) if total_answer_count else 0
+    average_similarity = round((score_sum / scored_answer_count) * 100, 1) if scored_answer_count else None
     review_agreement_rate = round((review_agree_count / reviewed_count) * 100, 1) if reviewed_count else None
 
     return render(request, "feedback.html", {
@@ -1563,6 +1643,7 @@ def feedback_page(request):
         "objective_generation": objective_generation,
     })
 
+
 def test_api(request):
     """프론트-백엔드 연결 테스트용 API."""
     return JsonResponse(
@@ -1570,12 +1651,14 @@ def test_api(request):
         json_dumps_params={"ensure_ascii": False},
     )
 
+
 def _user_role_value(user):
     if not user.is_active:
         return "inactive"
     if user.is_staff:
         return "staff"
     return "active"
+
 
 def _apply_user_role(user, role, actor):
     """사용자 권한(is_staff / is_active)을 적용한다."""
@@ -1599,12 +1682,14 @@ def _apply_user_role(user, role, actor):
     user.save(update_fields=["is_staff", "is_active"])
     return True, ""
 
+
 def staff_required(view_func):
     """is_staff 사용자만 접근 가능. 비로그인/권한 없음은 홈으로 보낸다."""
     return user_passes_test(
         lambda u: u.is_active and u.is_staff,
         login_url="home",
     )(view_func)
+
 
 @staff_required
 def manage_dashboard(request):
@@ -1635,6 +1720,7 @@ def manage_dashboard(request):
         "recent_answers": recent_answers,
     }
     return render(request, "manage/dashboard.html", context)
+
 
 @staff_required
 def manage_answers(request):
@@ -1751,6 +1837,7 @@ def manage_answers(request):
         "total_count": QuizAnswer.objects.count(),
     }
     return render(request, "manage/answers.html", context)
+
 
 @staff_required
 def manage_users(request):

@@ -3,8 +3,10 @@ import re
 import json
 
 from django.conf import settings
+from django.db import transaction
 
-from ..models import QuizQuestion, QuizAnswer
+from ..models import QuizQuestion, QuizAnswer, QuizAnswerAttempt
+from .answer_feedback_generator import build_feedback_rubric, build_learning_feedback, compare_attempts, prepare_feedback_rubric, feedback_rule_signature
 from .summary_service import gemini_generate_text, extract_concept_entries_from_summary
 from .grading_service import calculate_grading_score, predict_answer_label
 
@@ -102,6 +104,7 @@ def generate_quiz_with_gemini(summary_text, generation_number=1, previous_quiz_t
         print("[Gemini 서술형 문제 생성 에러]", e)
         return "퀴즈 생성 중 오류가 발생했습니다."
 
+
 def make_short_model_answer(keyword, description):
     """개념 설명을 기반으로 짧은 모범 답안을 만든다.
 
@@ -145,6 +148,7 @@ def make_short_model_answer(keyword, description):
 
     return answer
 
+
 def build_template_question(keyword, index):
     """키워드와 번호를 바탕으로 짧고 명확한 서술형 문제를 만든다."""
     keyword = (keyword or "핵심 개념").strip()
@@ -157,6 +161,7 @@ def build_template_question(keyword, index):
 
     template = templates[index % len(templates)]
     return template.format(keyword=keyword)
+
 
 def generate_quiz_with_template(summary_text, generation_number=1, previous_quiz_texts=""):
     """Gemini API 없이 요약문 기반 템플릿 서술형 문제 3개를 생성한다."""
@@ -214,6 +219,7 @@ def generate_quiz_with_template(summary_text, generation_number=1, previous_quiz
 
     return quiz_text
 
+
 def generate_quiz(summary_text, generation_number=1, previous_quiz_texts=""):
     """설정값에 따라 Gemini 방식 또는 템플릿 방식으로 서술형 문제를 생성한다."""
     mode = (QUIZ_GENERATION_MODE or "gemini").lower().strip()
@@ -232,6 +238,7 @@ def generate_quiz(summary_text, generation_number=1, previous_quiz_texts=""):
         generation_number=generation_number,
         previous_quiz_texts=previous_quiz_texts,
     )
+
 
 def split_quiz_reference(keywords_text="", timeline_text="", combined=""):
     """관련 키워드와 타임라인 문자열을 화면 표시용으로 분리한다."""
@@ -275,6 +282,7 @@ def split_quiz_reference(keywords_text="", timeline_text="", combined=""):
 
     return keywords_str, timelines_str
 
+
 def _parse_quiz_block_body(rest):
     """한 문제 블록에서 문제, 관련 키워드, 관련 타임라인, 모범 답안을 분리한다."""
     answer_match = re.search(r"(?m)^\s*\**모범\s*답안\**\s*:\s*", rest)
@@ -306,6 +314,7 @@ def _parse_quiz_block_body(rest):
         keywords, timeline = split_quiz_reference(combined=timeline)
 
     return question, keywords, timeline, answer
+
 
 def parse_quiz_text(quiz_text):
     """AI가 생성한 텍스트를 문제/관련 키워드/관련 타임라인/모범답안 구조로 파싱한다."""
@@ -352,7 +361,7 @@ def parse_quiz_text(quiz_text):
     if quiz_items:
         return quiz_items
 
-    # 기존 형식 fallback
+    # 새 형식으로 분석하지 못하면 기존 형식으로 다시 분석한다.
     pattern = r"(\d+)\.\s*문제\s*:\s*(.*?)(?:\n|\r\n)\s*모범\s*답안\s*:\s*(.*?)(?=\n\s*\d+\.\s*문제\s*:|\Z)"
     matches = re.findall(pattern, quiz_text, re.DOTALL)
 
@@ -367,6 +376,7 @@ def parse_quiz_text(quiz_text):
         })
 
     return quiz_items
+
 
 def save_quiz_questions_from_text(quiz, quiz_text):
     """Quiz.quiz_text를 파싱하여 QuizQuestion에 개별 문제로 저장한다."""
@@ -395,16 +405,19 @@ def save_quiz_questions_from_text(quiz, quiz_text):
             number=number,
             question_text=item.get("question", ""),
             model_answer=item.get("answer", ""),
+            feedback_rubric=build_feedback_rubric(item.get("question", ""), item.get("answer", "")),
             explanation=keywords[:2000],
             related_timeline=timeline[:500],
         )
 
     print(f"[퀴즈 저장] {quiz.generation_number}차 문제 {len(quiz_items)}개를 QuizQuestion에 저장했습니다.")
 
+
 def ensure_quiz_questions_exist(quiz):
     """기존 quiz_text만 있고 QuizQuestion이 없는 경우 개별 문제를 생성한다."""
     if not quiz.questions.exists() and quiz.quiz_text:
         save_quiz_questions_from_text(quiz, quiz.quiz_text)
+
 
 def _user_answers_dict(quiz):
     """기존 호환용: Quiz.answer에 JSON으로 저장된 학습자 답안을 dict로 반환한다."""
@@ -423,6 +436,7 @@ def _user_answers_dict(quiz):
 
     return data
 
+
 def get_quiz_answer_dict_from_db(quiz, user):
     """QuizAnswer 테이블에서 현재 사용자의 답안을 dict 형태로 가져온다."""
     answer_dict = {}
@@ -438,34 +452,23 @@ def get_quiz_answer_dict_from_db(quiz, user):
 
     return answer_dict
 
-def save_user_answers_to_quiz_answer(user, quiz, post_data):
-    """POST로 넘어온 사용자 답안을 QuizAnswer 테이블에 저장한다."""
-    ensure_quiz_questions_exist(quiz)
 
+def save_user_answers_to_quiz_answer(user, quiz, post_data):
+    ensure_quiz_questions_exist(quiz)
     questions = quiz.questions.order_by("number")
 
     if not questions.exists():
-        print("[답안 저장] QuizQuestion이 없어 QuizAnswer 저장을 건너뜁니다.")
         return {}
 
-    question_map = {
-        str(question.number): question
-        for question in questions
-    }
-
+    question_map = {str(q.number): q for q in questions}
     legacy_json_data = {}
 
-    for key in post_data:
+    for key, value in post_data.items():
         if not key.startswith("user_answer_"):
             continue
 
         suffix = key[len("user_answer_"):]
-        value = post_data.get(key, "")
-
-        if not isinstance(value, str):
-            value = str(value)
-
-        value = value.strip()
+        value = (str(value) or "").strip()
 
         if suffix == "raw":
             if value:
@@ -476,40 +479,104 @@ def save_user_answers_to_quiz_answer(user, quiz, post_data):
             continue
 
         legacy_json_data[suffix] = value
-
         quiz_question = question_map.get(suffix)
 
         if not quiz_question:
             continue
 
-        grading_score = calculate_grading_score(
+        rubric = (prepare_feedback_rubric(quiz_question.question_text, quiz_question.model_answer, quiz_question.feedback_rubric)
+                  if quiz_question.feedback_rubric else build_feedback_rubric(quiz_question.question_text, quiz_question.model_answer))
+        if rubric != quiz_question.feedback_rubric:
+            quiz_question.feedback_rubric = rubric
+            quiz_question.save(update_fields=["feedback_rubric"])
+        previous = QuizAnswer.objects.filter(user=user, quiz_question=quiz_question).first()
+        if (previous and previous.user_answer == value and previous.similarity_score is not None
+                and previous.feedback_json.get("learning", {}).get("status") == "ready"
+                and previous.feedback_json.get("learning", {}).get("version") == 4
+                and previous.feedback_json.get("learning", {}).get("engine") == "rules"
+                and previous.feedback_json.get("learning", {}).get("rule_signature") == feedback_rule_signature(rubric)):
+            continue
+        if not quiz_question.feedback_rubric:
+            quiz_question.feedback_rubric = build_feedback_rubric(quiz_question.question_text, quiz_question.model_answer)
+            quiz_question.save(update_fields=["feedback_rubric"])
+
+        # 1. 자동 채점 수행 및 피드백 정보 수신
+        grading_score, feedback = calculate_grading_score(
             question_text=quiz_question.question_text,
             model_answer=quiz_question.model_answer,
             user_answer=value,
         )
         predicted_label = predict_answer_label(grading_score)
+        feedback["learning"] = build_learning_feedback(quiz_question, value)
+        learning = feedback["learning"]
+        # 화면과 저장 데이터 모두 정답에 필요한 것으로 확인된 누락 용어만 사용한다.
+        feedback["missing_keywords"] = [
+            item["keyword"] for item in learning.get("missing_required_keywords", [])
+        ]
+        if learning["status"] == "ready":
+            # 의미상 오류가 있는 답안을 키워드 점수만으로 정답 처리하지 않는다.
+            statuses = {c["status"] for c in learning["criteria"]}
+            if "unverified" in statuses and learning.get("engine") != "rules":
+                grading_score = None
+                feedback["grading_status"] = "review_required"
+            elif grading_score is not None and ("error" in statuses or learning.get("misconceptions")):
+                grading_score = min(grading_score, 0.59)
+            elif grading_score is not None and statuses & {"partial", "missing"} and learning.get("engine") != "rules":
+                grading_score = min(grading_score, 0.89)
+            feedback["score"] = grading_score
+            predicted_label = predict_answer_label(grading_score)
+        # 키워드 일치만으로 생성하던 칭찬을 실제 답안 근거가 있는 상세 피드백으로 대체한다.
+        feedback["messages"] = [learning["notice"]]
+        feedback["detail_analysis"] = ""
 
-        QuizAnswer.objects.update_or_create(
-            user=user,
-            quiz_question=quiz_question,
-            defaults={
+        # 2. QuizAnswer에 점수, 라벨, 상세 피드백(feedback_json) 저장
+        with transaction.atomic():
+            answer, created = QuizAnswer.objects.select_for_update().get_or_create(
+                user=user, quiz_question=quiz_question,
+            )
+            # 제출 이력 기능이 도입되기 전에 작성된 답안도 이전 이력으로 보관한다.
+            if not created and not answer.attempts.exists():
+                QuizAnswerAttempt.objects.create(
+                    answer=answer, user_answer=answer.user_answer, score=answer.similarity_score,
+                    predicted_label=answer.predicted_label, feedback_json=answer.feedback_json,
+                )
+            last_attempt = answer.attempts.order_by("-created_at", "-pk").first()
+            comparison_attempt = last_attempt
+            if last_attempt and last_attempt.user_answer == value:
+                comparison_attempt = answer.attempts.order_by("-created_at", "-pk")[1:2].first()
+            feedback["comparison"] = compare_attempts(
+                (comparison_attempt.feedback_json or {}).get("learning", {}) if comparison_attempt else {},
+                feedback["learning"],
+            )
+            if not created and answer.user_answer != value:
+                answer.human_score = None
+                answer.human_label = ""
+            updates = {
                 "user_answer": value,
                 "similarity_score": grading_score,
                 "predicted_label": predicted_label,
-            },
-        )
+                "feedback_json": feedback,  # matched_keywords, missing_keywords, messages 포함
+            }
+            for field, field_value in updates.items():
+                setattr(answer, field, field_value)
+            answer.save()
+            if last_attempt and last_attempt.user_answer == value:
+                # 같은 답안을 재평가할 때는 제출 횟수를 늘리지 않는다.
+                last_attempt.score = grading_score
+                last_attempt.predicted_label = predicted_label
+                last_attempt.feedback_json = feedback
+                last_attempt.save(update_fields=["score", "predicted_label", "feedback_json"])
+            else:
+                QuizAnswerAttempt.objects.create(
+                    answer=answer, user_answer=value, score=grading_score,
+                    predicted_label=predicted_label, feedback_json=feedback,
+                )
 
-        print(
-            f"[답안 자동 채점] {quiz.generation_number}차 {quiz_question.number}번 "
-            f"채점점수={grading_score}, 판정={predicted_label}"
-        )
-
-    # 기존 Quiz.answer JSON 구조도 호환용으로 유지
     quiz.answer = json.dumps(legacy_json_data, ensure_ascii=False)
     quiz.save(update_fields=["answer"])
 
-    print(f"[답안 저장] {quiz.generation_number}차 사용자 답안을 QuizAnswer에 저장했습니다.")
     return legacy_json_data
+
 
 def build_quiz_items_for_display(quiz_text, quiz, user=None):
     """퀴즈 화면 출력용 데이터 구성.
@@ -520,10 +587,22 @@ def build_quiz_items_for_display(quiz_text, quiz, user=None):
     ensure_quiz_questions_exist(quiz)
 
     legacy_answer = _user_answers_dict(quiz)
-    db_answer = {}
+    db_answer_map = {}
 
     if user and user.is_authenticated:
-        db_answer = get_quiz_answer_dict_from_db(quiz, user)
+        # QuizAnswer 레코드를 통째로 조회해 답안과 피드백을 가져옴
+        answers = QuizAnswer.objects.filter(
+            user=user,
+            quiz_question__quiz=quiz
+        ).select_related("quiz_question")
+
+        for ans in answers:
+            db_answer_map[str(ans.quiz_question.number)] = {
+                "user_answer": ans.user_answer,
+                "score": ans.similarity_score,
+                "label": ans.predicted_label,
+                "feedback": ans.feedback_json or {},
+            }
 
     items = []
     questions = quiz.questions.order_by("number")
@@ -531,9 +610,9 @@ def build_quiz_items_for_display(quiz_text, quiz, user=None):
     if questions.exists():
         for question in questions:
             num = str(question.number)
+            ans_data = db_answer_map.get(num, {})
 
-            saved_answer = db_answer.get(num)
-
+            saved_answer = ans_data.get("user_answer")
             if saved_answer is None:
                 saved_answer = legacy_answer.get(num, "") or ""
 
@@ -550,36 +629,12 @@ def build_quiz_items_for_display(quiz_text, quiz, user=None):
                 "explanation": question.explanation,
                 "keywords": keywords,
                 "timeline": timelines,
-                "timelines": timelines,
                 "saved_answer": saved_answer,
+                # UI 출력을 위해 피드백 객체 전달
+                "score_percent": int((ans_data.get("score", 0.0) or 0.0) * 100),
+                "predicted_label": ans_data.get("label", ""),
+                "feedback": ans_data.get("feedback", {}),
             })
 
         raw_saved = legacy_answer.get("__raw__", "") or ""
         return items, raw_saved
-
-    parsed_items = parse_quiz_text(quiz_text)
-
-    for item in parsed_items:
-        num = str(item["number"]).strip()
-
-        saved_answer = db_answer.get(num)
-
-        if saved_answer is None:
-            saved_answer = legacy_answer.get(num, "") or ""
-
-        keywords = (item.get("keywords") or "").strip()
-        timelines = (item.get("timeline") or "").strip()
-
-        if not keywords and timelines:
-            keywords, timelines = split_quiz_reference(combined=timelines)
-
-        items.append({
-            **item,
-            "keywords": keywords,
-            "timeline": timelines,
-            "timelines": timelines,
-            "saved_answer": saved_answer,
-        })
-
-    raw_saved = legacy_answer.get("__raw__", "") or ""
-    return items, raw_saved

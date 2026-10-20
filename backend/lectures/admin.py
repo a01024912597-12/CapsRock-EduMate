@@ -73,6 +73,7 @@ class QuizAdmin(admin.ModelAdmin):
 
 @admin.register(QuizQuestion)
 class QuizQuestionAdmin(admin.ModelAdmin):
+    exclude = ("feedback_rubric",)
     list_display = (
         "get_lecture_title",
         "get_generation_number",
