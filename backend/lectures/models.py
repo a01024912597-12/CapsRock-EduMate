@@ -88,6 +88,7 @@ class QuizQuestion(models.Model):
     number = models.PositiveIntegerField(default=1)
     question_text = models.TextField(default="", blank=True)
     model_answer = models.TextField(default="", blank=True)
+    feedback_rubric = models.JSONField(default=list, blank=True)
     explanation = models.TextField(default="", blank=True)
 
     # 타임라인 기능 필드
@@ -98,6 +99,7 @@ class QuizQuestion(models.Model):
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.quiz} - {self.number}번 문제"
@@ -117,10 +119,23 @@ class QuizAnswer(models.Model):
     human_score = models.FloatField(null=True, blank=True)
     human_label = models.CharField(max_length=50, blank=True)
 
+    feedback_json = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.quiz_question}"
+        return f"[{self.user}] Q{self.quiz_question.number} - {self.predicted_label}"
+
+
+class QuizAnswerAttempt(models.Model):
+    answer = models.ForeignKey(QuizAnswer, on_delete=models.CASCADE, related_name="attempts")
+    user_answer = models.TextField(blank=True, default="")
+    score = models.FloatField(null=True, blank=True)
+    predicted_label = models.CharField(max_length=50, blank=True)
+    feedback_json = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "pk"]
 
 
 class UserProfile(models.Model):
