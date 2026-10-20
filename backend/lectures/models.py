@@ -41,12 +41,14 @@ class Lecture(models.Model):
     STATUS_PROCESSING = "processing"  # 현재 분석 중
     STATUS_COMPLETED = "completed"  # 요약 완료
     STATUS_FAILED = "failed"  # 요약 실패
+    STATUS_CANCELED = "canceled"  # 대기 취소됨
 
     STATUS_CHOICES = [
         (STATUS_PENDING, "대기 중"),
         (STATUS_PROCESSING, "분석 중"),
         (STATUS_COMPLETED, "완료"),
         (STATUS_FAILED, "실패"),
+        (STATUS_CANCELED, "취소됨"),
     ]
 
     status = models.CharField(
@@ -55,12 +57,16 @@ class Lecture(models.Model):
         default=STATUS_PENDING,
         db_index=True,
     )
+    queue_order = models.PositiveIntegerField(default=0, db_index=True)
     error_message = models.TextField(blank=True, default="")
 
     # ------------------------------------------------------------
 
-    def __str__(self):
-        return self.title
+    def save(self, *args, **kwargs):
+        if not self.pk and self.queue_order == 0:
+            last = Lecture.objects.order_by("-queue_order", "-id").first()
+            self.queue_order = (last.queue_order + 1) if last else 1
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title
