@@ -154,6 +154,41 @@ body.edumate-app {
     color: var(--accent);
 }
 
+.sidebar-nav {
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.sidebar-section-title {
+    margin: 14px 0 4px;
+    padding: 0 var(--sidebar-link-pad-x);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.sidebar-classroom-icon {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    border-radius: 7px;
+    background: var(--grad-soft);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-classroom-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .sidebar-bottom {
     padding: var(--sidebar-bottom-pad);
     border-top: 1px solid var(--border);
@@ -602,6 +637,12 @@ body.edumate-app {
     background: rgba(239, 68, 68, 0.10);
     border: 1px solid rgba(239, 68, 68, 0.35);
     color: #b91c1c;
+}
+
+.message-container .alert-info {
+    background: rgba(99, 102, 241, 0.10);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    color: var(--accent);
 }
 
 /* Legacy pages (history, quiz, etc.) */

@@ -1,3 +1,5 @@
+import secrets
+
 from django.db import models
 from django.contrib.auth.models import User
 
@@ -11,7 +13,25 @@ class Lecture(models.Model):
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='lectures')
+    classroom = models.ForeignKey(
+        "Classroom",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lectures",
+        verbose_name="강의실",
+    )
+    # 강의실 학생이 강의자의 게시 강의를 요약하면 학생 소유의 사본이 생기고, 원본을 가리킨다.
+    source_lecture = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="member_copies",
+        verbose_name="원본 강의실 강의",
+    )
     title = models.CharField(max_length=200)
+    description = models.TextField(max_length=1000, blank=True, verbose_name="강의 설명")
     source_type = models.CharField(
         max_length=20,
         choices=SOURCE_CHOICES,
@@ -37,12 +57,14 @@ class Lecture(models.Model):
     whisper_model_name = models.CharField(max_length=50, blank=True)
     analyzed_at = models.DateTimeField(null=True, blank=True)
     # ------------------ [대기열] ------------------
+    STATUS_IDLE = "idle"  # 요약 요청 전 (강의실 업로드)
     STATUS_PENDING = "pending"  # 대기 중
     STATUS_PROCESSING = "processing"  # 현재 분석 중
     STATUS_COMPLETED = "completed"  # 요약 완료
     STATUS_FAILED = "failed"  # 요약 실패
 
     STATUS_CHOICES = [
+        (STATUS_IDLE, "요약 전"),
         (STATUS_PENDING, "대기 중"),
         (STATUS_PROCESSING, "분석 중"),
         (STATUS_COMPLETED, "완료"),
@@ -56,11 +78,28 @@ class Lecture(models.Model):
         db_index=True,
     )
     error_message = models.TextField(blank=True, default="")
+    # 업로드와 요약 요청 시점이 다를 수 있어 대기열 정리는 이 값을 기준으로 한다(없으면 created_at).
+    analysis_requested_at = models.DateTimeField(null=True, blank=True)
 
     # ------------------------------------------------------------
 
-    def __str__(self):
-        return self.title
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_lecture", "user"],
+                condition=models.Q(source_lecture__isnull=False),
+                name="unique_member_copy_per_lecture",
+            ),
+        ]
+
+    @property
+    def is_classroom_post(self):
+        """강의자가 강의실 게시판에 올린 원본 강의인지 (학생 사본 제외)."""
+        return (
+            self.classroom_id is not None
+            and self.source_lecture_id is None
+            and self.user_id == self.classroom.owner_id
+        )
 
     def __str__(self):
         return self.title
@@ -145,6 +184,7 @@ class UserProfile(models.Model):
         choices=LANGUAGE_CHOICES,
         default=LANG_KO,
     )
+    is_instructor = models.BooleanField(default=False, verbose_name="강의자")
 
     def __str__(self):
         return f"{self.user.username}의 프로필"
@@ -164,3 +204,44 @@ class StudyCalendarMemo(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.date}"
+
+
+# 헷갈리기 쉬운 0/O, 1/I/L은 제외한다.
+CLASSROOM_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+CLASSROOM_CODE_LENGTH = 6
+
+
+def generate_classroom_code():
+    while True:
+        code = "".join(secrets.choice(CLASSROOM_CODE_ALPHABET) for _ in range(CLASSROOM_CODE_LENGTH))
+        if not Classroom.objects.filter(code=code).exists():
+            return code
+
+
+class Classroom(models.Model):
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="owned_classrooms")
+    name = models.CharField(max_length=100)
+    description = models.TextField(max_length=500, blank=True)
+    code = models.CharField(max_length=CLASSROOM_CODE_LENGTH, unique=True, default=generate_classroom_code)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+
+class ClassroomMembership(models.Model):
+    classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="classroom_memberships")
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["classroom", "user"], name="unique_classroom_member"),
+        ]
+        ordering = ["joined_at"]
+
+    def __str__(self):
+        return f"{self.classroom.name} - {self.user.username}"

@@ -659,6 +659,140 @@
 
     .mng-link-btn:hover { text-decoration: underline; }
 
+    .mng-group-row td { background: rgba(99, 102, 241, 0.04); }
+
+    .mng-group-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--accent);
+        font-size: 14px;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .mng-group-link:hover { text-decoration: underline; }
+    .mng-group-row .mng-lecture-sub { display: block; margin-top: 4px; font-size: 12px; color: var(--text-muted); }
+
+    .mng-group-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        text-decoration: none;
+    }
+
+    .mng-obj-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+
+    .mng-obj-list { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+
+    .mng-obj-item {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--border2);
+        border-radius: 12px;
+        padding: 16px 18px;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .mng-obj-item.is-correct { border-left-color: #16a34a; }
+    .mng-obj-item.is-wrong { border-left-color: #ef4444; }
+
+    .mng-obj-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    .mng-obj-q { font-size: 14.5px; font-weight: 600; color: var(--text-main); line-height: 1.55; }
+    .mng-obj-q .mng-obj-num { color: var(--accent); margin-right: 6px; }
+
+    .mng-obj-choices { list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; margin-bottom: 12px; }
+
+    .mng-obj-choice {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 13px;
+        color: var(--text-sub);
+    }
+
+    .mng-obj-choice.is-answer { border-color: rgba(22, 163, 74, 0.5); background: rgba(22, 163, 74, 0.08); color: #16a34a; font-weight: 600; }
+    .mng-obj-choice.is-picked-wrong { border-color: rgba(239, 68, 68, 0.5); background: rgba(239, 68, 68, 0.08); color: #ef4444; font-weight: 600; }
+    .mng-obj-choice .mng-obj-tag { margin-left: auto; font-size: 11px; white-space: nowrap; }
+
+    .mng-sub-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+
+    .mng-sub-box {
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--bg-inner);
+        min-width: 0;
+    }
+
+    .mng-sub-box--student { background: var(--grad-soft); border-color: rgba(99, 102, 241, 0.3); }
+    .mng-sub-label { font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; }
+
+    .mng-sub-text {
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--text-main);
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+    }
+
+    .mng-obj-explain { font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5; }
+
+    .mng-obj-grade {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding-top: 10px;
+        border-top: 1px dashed var(--border);
+        font-size: 12.5px;
+        color: var(--text-sub);
+    }
+
+    .mng-obj-grade select,
+    .mng-obj-grade input {
+        padding: 6px 8px;
+        border: 1px solid var(--border2);
+        border-radius: 8px;
+        background: var(--bg-item);
+        color: var(--text-main);
+        font-size: 12.5px;
+        font-family: inherit;
+    }
+
+    .mng-obj-grade input { width: 80px; }
+
+    .mng-obj-actions {
+        position: sticky;
+        bottom: 0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 14px 0;
+        margin-top: 8px;
+        background: linear-gradient(to top, var(--bg-main, var(--bg-card)) 70%, transparent);
+    }
+
+    @media (max-width: 700px) {
+        .mng-obj-choices,
+        .mng-sub-grid { grid-template-columns: 1fr; }
+    }
+
     @media (max-width: 900px) {
         .mng-profile-form {
             grid-template-columns: 1fr;

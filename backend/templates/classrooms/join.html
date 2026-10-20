@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "강의실 들어가기" %} — EduMate{% endblock %}
+{% block breadcrumb %}{% trans "강의실 들어가기" %}{% endblock %}
+{% block page_content_class %} page-content--classroom{% endblock %}
+
+{% block extra_head %}
+{% include 'classrooms/_styles.html' %}
+{% endblock %}
+
+{% block content_area %}
+<div class="hero-banner">
+    <div class="hero-text">
+        <h1><i class="fas fa-door-open"></i> {% trans "강의실 들어가기" %}</h1>
+        <p>{% trans "강의자에게 받은 입장 코드를 입력하세요. 한 번 입장하면 사이드바에서 언제든 다시 들어갈 수 있습니다." %}</p>
+    </div>
+    <div class="hero-icon"><i class="fas fa-key"></i></div>
+</div>
+
+<section class="cls-card">
+    <form method="post">
+        {% csrf_token %}
+        <div class="cls-field">
+            <label for="classroomCode">{% trans "입장 코드" %}</label>
+            <input type="text" id="classroomCode" name="code" value="{{ code }}" class="cls-code-input"
+                   maxlength="{{ code_length|add:4 }}" required autofocus autocomplete="off" spellcheck="false"
+                   placeholder="ABC123">
+            <div class="cls-field-hint">{% blocktrans with length=code_length %}영문 대문자와 숫자로 된 {{ length }}자리 코드입니다.{% endblocktrans %}</div>
+        </div>
+        <div class="cls-actions">
+            <a href="{% url 'home' %}" class="btn-secondary">{% trans "취소" %}</a>
+            <button type="submit" class="btn-primary"><i class="fas fa-sign-in-alt"></i> {% trans "입장하기" %}</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

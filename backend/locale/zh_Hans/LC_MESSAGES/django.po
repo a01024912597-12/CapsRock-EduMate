@@ -1161,6 +1161,9 @@ msgstr "用户列表分页"
 msgid "일반 사용자"
 msgstr "普通用户"
 
+msgid "강의자"
+msgstr "讲师"
+
 msgid "운영자"
 msgstr "运营者"
 
@@ -1345,3 +1348,382 @@ msgstr "关键画面"
 msgid "학습 점검"
 msgstr "学习检查"
 
+
+msgid "강의실"
+msgstr "教室"
+
+msgid "강의실 만들기"
+msgstr "创建教室"
+
+msgid "강의실 들어가기"
+msgstr "加入教室"
+
+msgid "강의실을 만들면 입장 코드가 생성되고, 학생들은 그 코드로 강의실에 들어올 수 있습니다."
+msgstr "创建教室后会生成邀请码，学生可以使用该邀请码加入教室。"
+
+msgid "강의실 이름"
+msgstr "教室名称"
+
+msgid "예: 인공지능캡스톤디자인 2"
+msgstr "例如：人工智能毕业设计 2"
+
+msgid "설명 (선택)"
+msgstr "说明（可选）"
+
+msgid "강의실 소개나 안내 사항을 적어 주세요."
+msgstr "请填写教室介绍或注意事项。"
+
+msgid "취소"
+msgstr "取消"
+
+msgid "강의자에게 받은 입장 코드를 입력하세요. 한 번 입장하면 사이드바에서 언제든 다시 들어갈 수 있습니다."
+msgstr "请输入讲师提供的邀请码。加入后，可随时从侧边栏再次进入。"
+
+msgid "입장 코드"
+msgstr "邀请码"
+
+#, python-format
+msgid "영문 대문자와 숫자로 된 %(length)s자리 코드입니다."
+msgstr "由大写英文字母和数字组成的 %(length)s 位代码。"
+
+msgid "입장하기"
+msgstr "加入"
+
+msgid "복사됨"
+msgstr "已复制"
+
+msgid "코드 복사"
+msgstr "复制代码"
+
+msgid "학생에게 이 코드를 공유하면 사이드바의 '강의실 들어가기'에서 입장할 수 있습니다."
+msgstr "将此代码分享给学生，学生即可在侧边栏的“加入教室”中加入。"
+
+msgid "참여 학생"
+msgstr "参与学生"
+
+msgid "나"
+msgstr "我"
+
+msgid "입장일"
+msgstr "加入日期"
+
+#, python-format
+msgid "%(name)s님을 강의실에서 추방할까요?"
+msgstr "要将 %(name)s 移出教室吗？"
+
+msgid "추방"
+msgstr "移出"
+
+msgid "아직 입장한 학생이 없습니다. 위의 입장 코드를 학생들에게 공유해 주세요."
+msgstr "还没有学生加入。请将上方的邀请码分享给学生。"
+
+msgid "아직 입장한 학생이 없습니다."
+msgstr "还没有学生加入。"
+
+msgid "이 강의실에서 나갈까요? 다시 들어오려면 입장 코드가 필요합니다."
+msgstr "要退出此教室吗？再次加入需要邀请码。"
+
+msgid "강의실 나가기"
+msgstr "退出教室"
+
+msgid "강의실은 강의자만 만들 수 있습니다."
+msgstr "只有讲师可以创建教室。"
+
+msgid "강의실 이름을 입력해 주세요."
+msgstr "请输入教室名称。"
+
+#, python-format
+msgid "강의실 이름은 %(max)d자 이하로 입력해 주세요."
+msgstr "教室名称最多 %(max)d 个字符。"
+
+#, python-format
+msgid "강의실 설명은 %(max)d자 이하로 입력해 주세요."
+msgstr "教室说明最多 %(max)d 个字符。"
+
+#, python-format
+msgid "강의실을 만들었습니다. 학생들에게 입장 코드 %(code)s를 공유해 주세요."
+msgstr "教室已创建。请将邀请码 %(code)s 分享给学生。"
+
+msgid "입장 코드를 입력해 주세요."
+msgstr "请输入邀请码。"
+
+msgid "입장 코드와 일치하는 강의실이 없습니다. 코드를 다시 확인해 주세요."
+msgstr "没有与该邀请码匹配的教室。请检查后重试。"
+
+msgid "내가 만든 강의실입니다."
+msgstr "这是你创建的教室。"
+
+#, python-format
+msgid "%(name)s 강의실에 입장했습니다."
+msgstr "已加入教室 %(name)s。"
+
+msgid "이미 참여 중인 강의실입니다."
+msgstr "你已经在这个教室中。"
+
+msgid "참여 중인 강의실이 아닙니다. 입장 코드를 입력해 입장해 주세요."
+msgstr "你不在这个教室中。请输入邀请码加入。"
+
+msgid "이미 강의실에 없는 학생입니다."
+msgstr "该学生已不在教室中。"
+
+#, python-format
+msgid "%(name)s님을 강의실에서 추방했습니다."
+msgstr "已将 %(name)s 移出教室。"
+
+msgid "강의실을 만든 강의자는 나갈 수 없습니다."
+msgstr "创建教室的讲师不能退出教室。"
+
+#, python-format
+msgid "%(name)s 강의실에서 나갔습니다."
+msgstr "已退出教室 %(name)s。"
+
+#, python-format
+msgid "학생 %(counter)s명"
+msgid_plural "학생 %(counter)s명"
+msgstr[0] "%(counter)s 名学生"
+
+msgid "강의 목록"
+msgstr "课程列表"
+
+msgid "강의 올리기"
+msgstr "上传课程"
+
+msgid "영상 파일"
+msgstr "视频文件"
+
+msgid "예: 3주차 - 신경망 기초"
+msgstr "例如：第 3 周 - 神经网络基础"
+
+msgid "mp4, mov, avi, mkv, webm, m4v · 500MB 이하"
+msgstr "mp4、mov、avi、mkv、webm、m4v · 不超过 500MB"
+
+msgid "학생들에게 전할 강의 안내나 과제를 적어 주세요."
+msgstr "请填写要告知学生的课程说明或作业。"
+
+msgid "올린 강의는 AI 요약 대기열에 자동으로 등록됩니다."
+msgstr "上传的课程会自动加入 AI 摘要队列。"
+
+msgid "올리기"
+msgstr "上传"
+
+msgid "분석 실패"
+msgstr "分析失败"
+
+msgid "대기 중"
+msgstr "排队中"
+
+msgid "이 강의를 강의실에서 내릴까요? 내 학습 기록에는 남아 있습니다."
+msgstr "要从教室中移除此课程吗？它仍会保留在你的学习记录中。"
+
+msgid "강의실에서 내리기"
+msgstr "从教室移除"
+
+msgid "아직 올린 강의가 없습니다. '강의 올리기'로 첫 강의를 올려 보세요."
+msgstr "还没有上传课程。请通过“上传课程”发布第一节课。"
+
+msgid "아직 올라온 강의가 없습니다."
+msgstr "还没有发布的课程。"
+
+msgid "강의실로 돌아가기"
+msgstr "返回教室"
+
+msgid "강의 제목을 입력해 주세요."
+msgstr "请输入课程标题。"
+
+#, python-format
+msgid "강의 제목은 %(max)d자 이하로 입력해 주세요."
+msgstr "课程标题最多 %(max)d 个字符。"
+
+#, python-format
+msgid "강의 설명은 %(max)d자 이하로 입력해 주세요."
+msgstr "课程说明最多 %(max)d 个字符。"
+
+msgid "올바른 유튜브 링크를 입력해 주세요."
+msgstr "请输入有效的 YouTube 链接。"
+
+msgid "강의를 올렸습니다. AI 요약이 끝나면 학생들도 요약을 볼 수 있습니다."
+msgstr "课程已上传。AI 摘要完成后，学生也可以查看摘要。"
+
+msgid "강의를 강의실에서 내렸습니다. 내 학습 기록에는 그대로 남아 있습니다."
+msgstr "已从教室移除课程。它仍保留在你的学习记录中。"
+
+msgid "이미 강의실에 없는 강의입니다."
+msgstr "该课程已不在教室中。"
+
+msgid "요약 전"
+msgstr "未摘要"
+
+msgid "요약하기"
+msgstr "开始摘要"
+
+msgid "다시 요약"
+msgstr "重新摘要"
+
+msgid "아직 요약되지 않은 강의입니다."
+msgstr "这节课还没有摘要。"
+
+msgid "분석 설정을 고른 뒤 요약하기를 누르면 AI 요약이 시작됩니다. 요약 결과는 강의실의 모든 참여자가 함께 봅니다."
+msgstr "选择分析设置后点击“开始摘要”即可开始 AI 摘要。摘要结果由教室内所有成员共享。"
+
+msgid "이전 요약에 실패했습니다."
+msgstr "上一次摘要失败。"
+
+msgid "올린 뒤 '요약하기'를 누르면 분석 설정을 골라 AI 요약을 시작할 수 있습니다."
+msgstr "上传后点击“开始摘要”，即可选择分析设置并开始 AI 摘要。"
+
+msgid "강의를 올렸습니다. '요약하기'를 누르면 AI 요약이 시작됩니다."
+msgstr "课程已上传。点击“开始摘要”即可开始 AI 摘要。"
+
+msgid "이미 요약이 진행 중이거나 완료된 강의입니다."
+msgstr "该课程的摘要正在进行或已完成。"
+
+msgid "객관식"
+msgstr "选择题"
+
+msgid "O/X"
+msgstr "判断题"
+
+msgid "피드백"
+msgstr "反馈"
+
+msgid "서술형"
+msgstr "简答题"
+
+msgid "채점 결과를 다시 선택해 주세요."
+msgstr "请重新选择评分结果。"
+
+msgid "점수는 0~100 사이의 숫자로 입력해 주세요."
+msgstr "请输入 0~100 之间的分数。"
+
+msgid "%(name)s님의 답안 채점 결과를 저장했습니다."
+msgstr "已保存 %(name)s 的答案评分。"
+
+msgid "학습 관리 · 채점"
+msgstr "学习管理 · 评分"
+
+msgid "요약은 각자 진행되며 내 학습 기록에 저장됩니다. 요약 후 문제를 풀면 강의자가 답안을 확인하고 채점합니다."
+msgstr "每位学生各自生成摘要，并保存在自己的学习记录中。生成摘要后答题，讲师会查看并评分。"
+
+msgid "내 채점 결과"
+msgstr "我的评分结果"
+
+msgid "아직 채점된 답안이 없습니다."
+msgstr "还没有已评分的答案。"
+
+msgid "학생별 학습 현황을 확인하고, 학생이 푼 문제의 답안을 채점하세요."
+msgstr "查看每位学生的学习情况，并为学生提交的答案评分。"
+
+msgid "채점"
+msgstr "评分"
+
+msgid "학생별 학습 현황"
+msgstr "学生学习情况"
+
+msgid "학생"
+msgstr "学生"
+
+msgid "요약한 강의"
+msgstr "已摘要课程"
+
+msgid "채점 대기"
+msgstr "待评分"
+
+msgid "자동 채점 평균"
+msgstr "自动评分平均"
+
+msgid "강의자 점수 평균"
+msgstr "讲师评分平均"
+
+msgid "답안 보기"
+msgstr "查看答案"
+
+msgid "답안 채점"
+msgstr "答案评分"
+
+msgid "채점 상태"
+msgstr "评分状态"
+
+msgid "채점 완료"
+msgstr "已评分"
+
+msgid "문제 · 모범 답안"
+msgstr "题目 · 参考答案"
+
+msgid "채점 결과"
+msgstr "评分结果"
+
+msgid "미채점"
+msgstr "未评分"
+
+msgid "아직 학생이 제출한 답안이 없습니다. 학생이 강의를 요약하고 문제를 풀면 여기에 표시됩니다."
+msgstr "学生还没有提交答案。学生生成课程摘要并答题后，答案会显示在这里。"
+
+msgid "학생 %(counter)s명 요약"
+msgid_plural "학생 %(counter)s명 요약"
+msgstr[0] "%(counter)s 名学生已摘要"
+
+#, python-format
+msgid "%(gen)s차 객관식 문제"
+msgstr "第 %(gen)s 次选择题"
+
+#, python-format
+msgid "%(total)s문항 중 %(answered)s문항 응답 · 정답 %(correct)s개"
+msgstr "共 %(total)s 题，已答 %(answered)s 题 · 答对 %(correct)s 题"
+
+msgid "문항"
+msgstr "题"
+
+msgid "미응답"
+msgstr "未作答"
+
+msgid "학생 선택"
+msgstr "学生选择"
+
+msgid "자동 채점 결과(정답 100점, 오답 0점)로 모든 문항을 채점할까요? 직접 입력한 값은 덮어씁니다."
+msgstr "要按自动评分结果（正确 100 分，错误 0 分）为所有题目评分吗？手动输入的值将被覆盖。"
+
+msgid "자동 결과로 일괄 채점"
+msgstr "按自动结果批量评分"
+
+msgid "채점 저장"
+msgstr "保存评分"
+
+msgid "이 차수에 문제가 없습니다."
+msgstr "该次没有题目。"
+
+#, python-format
+msgid "자동 채점 결과로 %(count)d문항을 채점했습니다."
+msgstr "已按自动结果为 %(count)d 道题评分。"
+
+#, python-format
+msgid "%(number)d번 문항의 채점 값이 올바르지 않습니다. 점수는 0~100 사이로 입력해 주세요."
+msgstr "第 %(number)d 题的评分无效。请输入 0~100 之间的分数。"
+
+msgid "답안 검수로"
+msgstr "返回答案审核"
+
+#, python-format
+msgid "%(gen)s차 서술형 문제"
+msgstr "第 %(gen)s 次简答题"
+
+#, python-format
+msgid "%(total)s문항 중 %(answered)s문항 응답"
+msgstr "共 %(total)s 题，已答 %(answered)s 题"
+
+msgid "응답"
+msgstr "已答"
+
+msgid "평균 자동 점수"
+msgstr "平均自动评分"
+
+msgid "자동"
+msgstr "自动"
+
+msgid "학생 답안"
+msgstr "学生答案"
+
+msgid "자동 판정과 자동 점수로 모든 문항을 채점할까요? 직접 입력한 값은 덮어씁니다."
+msgstr "要按自动判定和自动评分为所有题目评分吗？手动输入的值将被覆盖。"
+
+msgid "평균"
+msgstr "平均"

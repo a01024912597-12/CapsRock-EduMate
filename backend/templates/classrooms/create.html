@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "강의실 만들기" %} — EduMate{% endblock %}
+{% block breadcrumb %}{% trans "강의실 만들기" %}{% endblock %}
+{% block page_content_class %} page-content--classroom{% endblock %}
+
+{% block extra_head %}
+{% include 'classrooms/_styles.html' %}
+{% endblock %}
+
+{% block content_area %}
+<div class="hero-banner">
+    <div class="hero-text">
+        <h1><i class="fas fa-chalkboard-teacher"></i> {% trans "강의실 만들기" %}</h1>
+        <p>{% trans "강의실을 만들면 입장 코드가 생성되고, 학생들은 그 코드로 강의실에 들어올 수 있습니다." %}</p>
+    </div>
+    <div class="hero-icon"><i class="fas fa-plus"></i></div>
+</div>
+
+<section class="cls-card">
+    <form method="post">
+        {% csrf_token %}
+        <div class="cls-field">
+            <label for="classroomName">{% trans "강의실 이름" %}</label>
+            <input type="text" id="classroomName" name="name" value="{{ form.name }}"
+                   maxlength="{{ name_max_length }}" required autofocus
+                   placeholder="{% trans '예: 인공지능캡스톤디자인 2' %}">
+        </div>
+        <div class="cls-field">
+            <label for="classroomDescription">{% trans "설명 (선택)" %}</label>
+            <textarea id="classroomDescription" name="description" rows="4"
+                      maxlength="{{ description_max_length }}"
+                      placeholder="{% trans '강의실 소개나 안내 사항을 적어 주세요.' %}">{{ form.description }}</textarea>
+        </div>
+        <div class="cls-actions">
+            <a href="{% url 'home' %}" class="btn-secondary">{% trans "취소" %}</a>
+            <button type="submit" class="btn-primary"><i class="fas fa-plus"></i> {% trans "강의실 만들기" %}</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

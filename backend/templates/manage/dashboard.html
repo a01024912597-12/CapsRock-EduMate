@@ -98,7 +98,25 @@
                 </tr>
             </thead>
             <tbody>
-                {% for answer in recent_answers %}
+                {% for row in recent_answers %}
+                {% if row.kind != "single" %}
+                <tr class="mng-group-row">
+                    <td>{{ row.user.username }}</td>
+                    <td class="mng-truncate" title="{{ row.lecture.title }}">
+                        <a class="mng-group-link" href="{% url 'manage_quiz_answers' row.quiz.id row.user.id %}">
+                            <i class="fas {% if row.kind == 'objective' %}fa-list-ol{% else %}fa-pen-fancy{% endif %}"></i> {% include 'manage/_quiz_group_title.html' with kind=row.kind gen=row.quiz.generation_number %}
+                        </a>
+                        · {{ row.lecture.title }}
+                    </td>
+                    <td>{{ row.score }}%</td>
+                    <td><span class="mng-pill muted">{% if row.kind == 'objective' %}{% trans "정답" %} {{ row.correct }}/{{ row.question_count }}{% else %}{% trans "응답" %} {{ row.answered }}/{{ row.question_count }}{% endif %}</span></td>
+                    <td>
+                        <span class="mng-pill {% if row.is_reviewed %}good{% else %}muted{% endif %}">{% trans "검수" %} {{ row.reviewed }}/{{ row.answered }}</span>
+                    </td>
+                    <td style="color:var(--text-sub);white-space:nowrap;">{{ row.created_at|date:"Y-m-d H:i" }}</td>
+                </tr>
+                {% else %}
+                {% with answer=row.obj %}
                 <tr>
                     <td>{{ answer.user.username }}</td>
                     <td class="mng-truncate" title="{{ answer.quiz_question.quiz.lecture.title }}">
@@ -130,6 +148,8 @@
                     </td>
                     <td style="color:var(--text-sub);white-space:nowrap;">{{ answer.created_at|date:"Y-m-d H:i" }}</td>
                 </tr>
+                {% endwith %}
+                {% endif %}
                 {% endfor %}
             </tbody>
         </table>

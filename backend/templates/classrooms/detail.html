@@ -1,0 +1,335 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}EduMate — {{ classroom.name }}{% endblock %}
+{% block breadcrumb %}{{ classroom.name }}{% endblock %}
+{% block page_content_class %} page-content--classroom page-content--classroom-wide{% endblock %}
+
+{% block extra_head %}
+{% include 'classrooms/_styles.html' %}
+{% endblock %}
+
+{% block content_area %}
+<div class="hero-banner">
+    <div class="hero-text">
+        <h1><i class="fas fa-chalkboard"></i> {{ classroom.name }}</h1>
+        {% if classroom.description %}
+        <p>{{ classroom.description|linebreaksbr }}</p>
+        {% endif %}
+        <div class="hero-badges">
+            <span class="hero-badge"><i class="fas fa-chalkboard-teacher"></i> {% trans "강의자" %} {{ owner_name }}</span>
+            <span class="hero-badge"><i class="fas fa-user-graduate"></i> {% blocktrans count counter=member_count %}학생 {{ counter }}명{% plural %}학생 {{ counter }}명{% endblocktrans %}</span>
+            <span class="hero-badge"><i class="fas fa-calendar-alt"></i> {{ classroom.created_at|date:"Y-m-d" }}</span>
+        </div>
+        {% if is_owner %}
+        <a class="cls-hero-action" href="{% url 'classroom_manage' classroom.pk %}">
+            <i class="fas fa-clipboard-check"></i> {% trans "학습 관리 · 채점" %}
+        </a>
+        {% endif %}
+    </div>
+    <div class="hero-icon">{{ classroom.name|slice:":1"|upper }}</div>
+</div>
+
+<div class="cls-layout">
+    <div class="cls-main">
+        {% if is_owner %}
+        <section class="cls-card">
+            <div class="cls-card-title"><i class="fas fa-key"></i> {% trans "입장 코드" %}</div>
+            <div class="cls-code-box">
+                <span class="cls-code-value" id="classroomCodeValue">{{ classroom.code }}</span>
+                <button type="button" class="cls-copy-btn" id="classroomCodeCopy"
+                        data-label-done="{% trans '복사됨' %}">
+                    <i class="fas fa-copy"></i> <span>{% trans "코드 복사" %}</span>
+                </button>
+            </div>
+            <div class="cls-field-hint">{% trans "학생에게 이 코드를 공유하면 사이드바의 '강의실 들어가기'에서 입장할 수 있습니다." %}</div>
+        </section>
+        {% endif %}
+
+        <section class="cls-card">
+            <div class="cls-card-head">
+                <div class="cls-card-title"><i class="fas fa-play-circle"></i> {% trans "강의 목록" %} ({{ lectures|length }})</div>
+                {% if is_owner %}
+                <button type="button" class="cls-copy-btn" id="lectureUploadToggle" aria-expanded="false" aria-controls="lectureUploadForm">
+                    <i class="fas fa-upload"></i> <span>{% trans "강의 올리기" %}</span>
+                </button>
+                {% endif %}
+            </div>
+
+            {% if is_owner %}
+            <form method="post" enctype="multipart/form-data" class="cls-upload-form" id="lectureUploadForm"
+                  action="{% url 'classroom_lecture_upload' classroom.pk %}" hidden>
+                {% csrf_token %}
+                <input type="hidden" name="upload_mode" id="lectureUploadMode" value="youtube">
+
+                <div class="cls-tabs" role="tablist">
+                    <button type="button" class="cls-tab is-active" data-mode="youtube" role="tab" aria-selected="true">
+                        <i class="fab fa-youtube"></i> {% trans "유튜브 링크" %}
+                    </button>
+                    <button type="button" class="cls-tab" data-mode="file" role="tab" aria-selected="false">
+                        <i class="fas fa-file-video"></i> {% trans "영상 파일" %}
+                    </button>
+                </div>
+
+                <div class="cls-field">
+                    <label for="lectureTitle">{% trans "강의 제목" %}</label>
+                    <input type="text" id="lectureTitle" name="title" maxlength="{{ lecture_title_max_length }}" required
+                           placeholder="{% trans '예: 3주차 - 신경망 기초' %}">
+                </div>
+
+                <div class="cls-field" data-mode-panel="youtube">
+                    <label for="lectureYoutube">{% trans "유튜브 링크" %}</label>
+                    <input type="url" id="lectureYoutube" name="youtube_link" placeholder="https://www.youtube.com/watch?v=...">
+                </div>
+
+                <div class="cls-field" data-mode-panel="file" hidden>
+                    <label for="lectureFile">{% trans "영상 파일" %}</label>
+                    <input type="file" id="lectureFile" name="lecture_file" accept=".mp4,.mov,.avi,.mkv,.webm,.m4v,video/*">
+                    <div class="cls-field-hint">{% trans "mp4, mov, avi, mkv, webm, m4v · 500MB 이하" %}</div>
+                </div>
+
+                <div class="cls-field">
+                    <label for="lectureDescription">{% trans "설명 (선택)" %}</label>
+                    <textarea id="lectureDescription" name="description" rows="3" maxlength="{{ lecture_description_max_length }}"
+                              placeholder="{% trans '학생들에게 전할 강의 안내나 과제를 적어 주세요.' %}"></textarea>
+                    <div class="cls-field-hint">{% trans "올린 뒤 '요약하기'를 누르면 분석 설정을 골라 AI 요약을 시작할 수 있습니다." %}</div>
+                </div>
+
+                <div class="cls-actions">
+                    <button type="button" class="btn-secondary" id="lectureUploadCancel">{% trans "취소" %}</button>
+                    <button type="submit" class="btn-primary"><i class="fas fa-upload"></i> {% trans "올리기" %}</button>
+                </div>
+            </form>
+            {% endif %}
+
+            {% if lectures %}
+            <ul class="cls-lecture-list">
+                {% for lec in lectures %}
+                <li class="cls-lecture">
+                    <a class="cls-lecture-link" href="{% url 'summary' %}?lecture_id={{ lec.open_id }}">
+                        <div class="cls-lecture-thumb">
+                            {% if lec.thumbnail %}
+                            <img src="{{ lec.thumbnail }}" alt="" loading="lazy">
+                            {% else %}
+                            <i class="fas {% if lec.source_type == 'file' %}fa-file-video{% else %}fa-play{% endif %}"></i>
+                            {% endif %}
+                        </div>
+                        <div class="cls-lecture-body">
+                            <div class="cls-lecture-title">{{ lec.title }}</div>
+                            {% if lec.description %}
+                            <div class="cls-lecture-desc">{{ lec.description|linebreaksbr }}</div>
+                            {% endif %}
+                            <div class="cls-lecture-meta">
+                                <span><i class="{% if lec.source_type == 'file' %}fas fa-file-video{% else %}fab fa-youtube{% endif %}"></i>
+                                    {% if lec.source_type == 'file' %}{% trans "영상 파일" %}{% else %}YouTube{% endif %}</span>
+                                <span>{{ lec.created_at|date:"Y-m-d H:i" }}</span>
+                                {% if lec.status == "completed" %}
+                                <span class="cls-status cls-status--done">{% trans "요약 완료" %}</span>
+                                {% elif lec.status == "failed" %}
+                                <span class="cls-status cls-status--failed">{% trans "분석 실패" %}</span>
+                                {% elif lec.status == "processing" %}
+                                <span class="cls-status cls-status--busy">{% trans "분석 중" %}</span>
+                                {% elif lec.status == "idle" %}
+                                <span class="cls-status cls-status--idle">{% trans "요약 전" %}</span>
+                                {% else %}
+                                <span class="cls-status cls-status--busy">{% trans "대기 중" %}</span>
+                                {% endif %}
+                                {% if lec.summarized_count is not None %}
+                                <span><i class="fas fa-user-graduate"></i> {% blocktrans count counter=lec.summarized_count %}학생 {{ counter }}명 요약{% plural %}학생 {{ counter }}명 요약{% endblocktrans %}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </a>
+                    {% if lec.status == "idle" or lec.status == "failed" %}
+                    <a class="cls-summarize-btn" href="{% url 'summary' %}?lecture_id={{ lec.open_id }}#summaryRequestForm">
+                        <i class="fas fa-magic"></i> {% if lec.status == "failed" %}{% trans "다시 요약" %}{% else %}{% trans "요약하기" %}{% endif %}
+                    </a>
+                    {% elif lec.can_quiz %}
+                    <a class="cls-summarize-btn" href="{% url 'quiz' %}?lecture_id={{ lec.open_id }}">
+                        <i class="fas fa-pen"></i> {% trans "예상 문제 풀기" %}
+                    </a>
+                    {% endif %}
+                    {% if is_owner %}
+                    <form method="post" action="{% url 'classroom_lecture_remove' classroom.pk lec.id %}"
+                          data-confirm="{% trans '이 강의를 강의실에서 내릴까요? 내 학습 기록에는 남아 있습니다.' %}"
+                          onsubmit="return confirm(this.dataset.confirm);">
+                        {% csrf_token %}
+                        <button type="submit" class="cls-icon-btn" title="{% trans '강의실에서 내리기' %}" aria-label="{% trans '강의실에서 내리기' %}">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="cls-empty">
+                {% if is_owner %}{% trans "아직 올린 강의가 없습니다. '강의 올리기'로 첫 강의를 올려 보세요." %}{% else %}{% trans "아직 올라온 강의가 없습니다." %}{% endif %}
+            </div>
+            {% endif %}
+            {% if lectures and not is_owner %}
+            <div class="cls-field-hint">{% trans "요약은 각자 진행되며 내 학습 기록에 저장됩니다. 요약 후 문제를 풀면 강의자가 답안을 확인하고 채점합니다." %}</div>
+            {% endif %}
+        </section>
+
+        {% if is_member and not is_owner %}
+        <section class="cls-card">
+            <div class="cls-card-title"><i class="fas fa-clipboard-check"></i> {% trans "내 채점 결과" %}</div>
+            {% if my_graded_answers %}
+            <ul class="cls-graded-list">
+                {% for row in my_graded_answers %}
+                {% if row.kind != "single" %}
+                <li class="cls-graded">
+                    <a class="cls-graded-body cls-graded-link" href="{{ row.my_url }}">
+                        <div class="cls-graded-lecture">{{ row.lecture_title }}</div>
+                        <div class="cls-graded-question"><i class="fas {% if row.kind == 'objective' %}fa-list-ol{% else %}fa-pen-fancy{% endif %}"></i> {% include 'manage/_quiz_group_title.html' with kind=row.kind gen=row.quiz.generation_number %}</div>
+                    </a>
+                    <div class="cls-graded-result">
+                        <span class="cls-status cls-status--done">{% trans "채점" %} {{ row.reviewed }}{% trans "문항" %}</span>
+                        {% if row.kind == 'objective' %}
+                        <strong>{% trans "정답" %} {{ row.correct }}/{{ row.question_count }}</strong>
+                        {% elif row.human_avg is not None %}
+                        <strong>{% trans "평균" %} {{ row.human_avg }}{% trans "점" %}</strong>
+                        {% endif %}
+                    </div>
+                </li>
+                {% else %}
+                {% with answer=row.obj %}
+                <li class="cls-graded">
+                    <div class="cls-graded-body">
+                        <div class="cls-graded-lecture">{{ row.lecture_title }} · {{ answer.quiz_question.quiz.generation_number }}{% trans "차" %} {{ answer.quiz_question.number }}{% trans "번" %}</div>
+                        <div class="cls-graded-question">{{ answer.quiz_question.question_text }}</div>
+                    </div>
+                    <div class="cls-graded-result">
+                        <span class="cls-status {% if answer.human_label == '정답' %}cls-status--done{% elif answer.human_label == '오답' %}cls-status--failed{% else %}cls-status--busy{% endif %}">{% trans answer.human_label %}</span>
+                        {% if answer.human_score is not None %}<strong>{{ answer.human_score|floatformat:"-1" }}{% trans "점" %}</strong>{% endif %}
+                    </div>
+                </li>
+                {% endwith %}
+                {% endif %}
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="cls-empty">{% trans "아직 채점된 답안이 없습니다." %}</div>
+            {% endif %}
+        </section>
+        {% endif %}
+    </div>
+
+    <aside class="cls-aside">
+        <section class="cls-card cls-members-card">
+            <div class="cls-card-title"><i class="fas fa-users"></i> {% trans "참여 학생" %} ({{ member_count }})</div>
+            {% if members %}
+            <ul class="cls-member-list">
+                {% for m in members %}
+                <li class="cls-member">
+                    <div class="cls-member-avatar">{{ m.display_name|slice:":1"|upper }}</div>
+                    <div class="cls-member-info">
+                        <div class="cls-member-name">{{ m.display_name }}{% if m.is_self %} ({% trans "나" %}){% endif %}</div>
+                        <div class="cls-member-meta">@{{ m.username }} · {{ m.joined_at|date:"Y-m-d" }}</div>
+                    </div>
+                    {% if is_owner %}
+                    <form method="post" action="{% url 'classroom_kick' classroom.pk m.user_id %}"
+                          data-confirm="{% blocktrans with name=m.display_name %}{{ name }}님을 강의실에서 추방할까요?{% endblocktrans %}"
+                          onsubmit="return confirm(this.dataset.confirm);">
+                        {% csrf_token %}
+                        <button type="submit" class="cls-icon-btn" title="{% trans '추방' %}" aria-label="{% trans '추방' %}">
+                            <i class="fas fa-user-slash"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="cls-empty">
+                {% if is_owner %}{% trans "아직 입장한 학생이 없습니다. 위의 입장 코드를 학생들에게 공유해 주세요." %}{% else %}{% trans "아직 입장한 학생이 없습니다." %}{% endif %}
+            </div>
+            {% endif %}
+
+            {% if is_member and not is_owner %}
+            <form method="post" action="{% url 'classroom_leave' classroom.pk %}" class="cls-leave-form"
+                  data-confirm="{% trans '이 강의실에서 나갈까요? 다시 들어오려면 입장 코드가 필요합니다.' %}"
+                  onsubmit="return confirm(this.dataset.confirm);">
+                {% csrf_token %}
+                <button type="submit" class="cls-danger-btn"><i class="fas fa-sign-out-alt"></i> {% trans "강의실 나가기" %}</button>
+            </form>
+            {% endif %}
+        </section>
+    </aside>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if is_owner %}
+<script>
+    (function () {
+        const btn = document.getElementById('classroomCodeCopy');
+        const code = document.getElementById('classroomCodeValue');
+        if (!btn || !code) return;
+        const label = btn.querySelector('span');
+        const original = label.textContent;
+
+        function done() {
+            label.textContent = btn.dataset.labelDone;
+            setTimeout(function () { label.textContent = original; }, 1500);
+        }
+
+        btn.addEventListener('click', function () {
+            const text = code.textContent.trim();
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(done);
+                return;
+            }
+            const range = document.createRange();
+            range.selectNodeContents(code);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            try { document.execCommand('copy'); done(); } catch (e) {}
+            sel.removeAllRanges();
+        });
+    })();
+
+    (function () {
+        const form = document.getElementById('lectureUploadForm');
+        const toggle = document.getElementById('lectureUploadToggle');
+        const cancel = document.getElementById('lectureUploadCancel');
+        const modeInput = document.getElementById('lectureUploadMode');
+        const youtubeInput = document.getElementById('lectureYoutube');
+        const fileInput = document.getElementById('lectureFile');
+        if (!form || !toggle) return;
+
+        function setOpen(open) {
+            form.hidden = !open;
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open) document.getElementById('lectureTitle').focus();
+        }
+
+        function setMode(mode) {
+            modeInput.value = mode;
+            form.querySelectorAll('.cls-tab').forEach(function (tab) {
+                const active = tab.dataset.mode === mode;
+                tab.classList.toggle('is-active', active);
+                tab.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            form.querySelectorAll('[data-mode-panel]').forEach(function (panel) {
+                panel.hidden = panel.dataset.modePanel !== mode;
+            });
+            youtubeInput.required = mode === 'youtube';
+            fileInput.required = mode === 'file';
+        }
+
+        toggle.addEventListener('click', function () { setOpen(form.hidden); });
+        cancel.addEventListener('click', function () { form.reset(); setMode('youtube'); setOpen(false); });
+        form.querySelectorAll('.cls-tab').forEach(function (tab) {
+            tab.addEventListener('click', function () { setMode(tab.dataset.mode); });
+        });
+        form.addEventListener('submit', function () {
+            form.querySelector('button[type="submit"]').disabled = true;
+        });
+        setMode('youtube');
+    })();
+</script>
+{% endif %}
+{% endblock %}

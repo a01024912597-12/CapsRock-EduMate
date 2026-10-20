@@ -1,5 +1,14 @@
 from django.contrib import admin
-from .models import Lecture, UserProfile, Quiz, QuizQuestion, QuizAnswer, StudyCalendarMemo
+from .models import (
+    Classroom,
+    ClassroomMembership,
+    Lecture,
+    UserProfile,
+    Quiz,
+    QuizQuestion,
+    QuizAnswer,
+    StudyCalendarMemo,
+)
 
 
 class QuizQuestionInline(admin.TabularInline):
@@ -177,8 +186,8 @@ class QuizAnswerAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "name", "age", "phone", "certification", "preferred_language")
-    list_filter = ("preferred_language",)
+    list_display = ("user", "name", "is_instructor", "age", "phone", "certification", "preferred_language")
+    list_filter = ("is_instructor", "preferred_language")
     search_fields = ("user__username", "name", "phone", "certification")
 
 
@@ -195,3 +204,25 @@ class StudyCalendarMemoAdmin(admin.ModelAdmin):
         return obj.memo
 
     short_memo.short_description = "메모"
+
+
+class ClassroomMembershipInline(admin.TabularInline):
+    model = ClassroomMembership
+    extra = 0
+    fields = ("user", "joined_at")
+    readonly_fields = ("joined_at",)
+
+
+@admin.register(Classroom)
+class ClassroomAdmin(admin.ModelAdmin):
+    list_display = ("name", "owner", "code", "created_at")
+    search_fields = ("name", "code", "owner__username")
+    readonly_fields = ("created_at",)
+    inlines = [ClassroomMembershipInline]
+
+
+@admin.register(ClassroomMembership)
+class ClassroomMembershipAdmin(admin.ModelAdmin):
+    list_display = ("classroom", "user", "joined_at")
+    search_fields = ("classroom__name", "classroom__code", "user__username")
+    readonly_fields = ("joined_at",)

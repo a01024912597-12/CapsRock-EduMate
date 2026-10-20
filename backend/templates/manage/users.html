@@ -74,9 +74,11 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if u.is_staff %}
+                        {% if item.role == "staff" %}
                         <span class="mng-pill good">{% trans "관리자" %}</span>
-                        {% elif u.is_active %}
+                        {% elif item.role == "instructor" %}
+                        <span class="mng-pill review">{% trans "강의자" %}</span>
+                        {% elif item.role == "active" %}
                         <span class="mng-pill muted">{% trans "일반" %}</span>
                         {% else %}
                         <span class="mng-pill bad">{% trans "비활성" %}</span>

@@ -1,0 +1,301 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}EduMate — {{ classroom.name }} · {% trans "학습 관리" %}{% endblock %}
+{% block breadcrumb %}{{ classroom.name }} · {% trans "학습 관리" %}{% endblock %}
+{% block page_content_class %} page-content--manage{% endblock %}
+
+{% block extra_head %}
+{% include 'manage/_styles.html' %}
+<style>
+    .clsm-section-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 12px;
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-main);
+    }
+
+    .clsm-section-title i { color: var(--accent); }
+    .clsm-students { margin-bottom: 28px; }
+    .clsm-students .mng-table td,
+    .clsm-students .mng-table th { vertical-align: middle; }
+    .clsm-num { text-align: center !important; white-space: nowrap; }
+    .clsm-student-name { font-weight: 600; }
+    .clsm-student-id { display: block; font-size: 11.5px; color: var(--text-muted); }
+    .clsm-filter-link { color: var(--accent); font-size: 12.5px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+    .clsm-filter-link:hover { text-decoration: underline; }
+
+    .clsm-q {
+        font-size: 13px;
+        line-height: 1.55;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+    }
+
+    .clsm-model {
+        margin-top: 6px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        background: var(--bg-inner);
+        font-size: 12px;
+        color: var(--text-sub);
+        line-height: 1.5;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+    }
+
+    .clsm-model strong { color: var(--text-main); }
+    .clsm-type { margin-left: 4px; font-size: 10.5px !important; padding: 2px 6px !important; }
+</style>
+{% endblock %}
+
+{% block content_area %}
+<div class="history-page">
+    <a href="{% url 'classroom_detail' classroom.pk %}" style="display:inline-flex;align-items:center;gap:6px;color:var(--text-sub);text-decoration:none;font-size:13px;margin-bottom:16px;">
+        <i class="fas fa-arrow-left"></i> {% trans "강의실로 돌아가기" %}
+    </a>
+    <div class="hero-banner">
+        <div class="hero-text">
+            <h1><i class="fas fa-clipboard-check"></i> {% trans "학습 관리" %}</h1>
+            <p>{% trans "학생별 학습 현황을 확인하고, 학생이 푼 문제의 답안을 채점하세요." %}</p>
+            <div class="hero-badges">
+                <span class="hero-badge"><i class="fas fa-chalkboard"></i> {{ classroom.name }}</span>
+                <span class="hero-badge"><i class="fas fa-user-graduate"></i> {% blocktrans count counter=students|length %}학생 {{ counter }}명{% plural %}학생 {{ counter }}명{% endblocktrans %}</span>
+                <span class="hero-badge"><i class="fas fa-clipboard-check"></i> {% trans "채점" %} {{ reviewed_total }} / {{ answer_total }}</span>
+            </div>
+        </div>
+        <div class="hero-icon"><i class="fas fa-clipboard-check"></i></div>
+    </div>
+
+    <section class="clsm-students">
+        <h2 class="clsm-section-title"><i class="fas fa-users"></i> {% trans "학생별 학습 현황" %}</h2>
+        <div class="mng-table-wrap mng-table-wrap--scroll">
+            {% if students %}
+            <table class="mng-table">
+                <thead>
+                    <tr>
+                        <th>{% trans "학생" %}</th>
+                        <th class="clsm-num">{% trans "요약한 강의" %}</th>
+                        <th class="clsm-num">{% trans "제출 답안" %}</th>
+                        <th class="clsm-num">{% trans "채점 대기" %}</th>
+                        <th class="clsm-num">{% trans "자동 채점 평균" %}</th>
+                        <th class="clsm-num">{% trans "강의자 점수 평균" %}</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in students %}
+                    <tr>
+                        <td>
+                            <span class="clsm-student-name">{{ s.display_name }}</span>
+                            <span class="clsm-student-id">@{{ s.username }}</span>
+                        </td>
+                        <td class="clsm-num">{{ s.completed }}{% if s.started != s.completed %} <span class="mng-muted">/ {{ s.started }}</span>{% endif %}</td>
+                        <td class="clsm-num">{{ s.answered }}</td>
+                        <td class="clsm-num">{% if s.pending %}<span class="mng-pill review">{{ s.pending }}</span>{% else %}<span class="mng-muted">0</span>{% endif %}</td>
+                        <td class="clsm-num">{% if s.auto_avg is not None %}{{ s.auto_avg }}%{% else %}<span class="mng-muted">-</span>{% endif %}</td>
+                        <td class="clsm-num">{% if s.human_avg is not None %}{{ s.human_avg }}{% else %}<span class="mng-muted">-</span>{% endif %}</td>
+                        <td class="clsm-num">
+                            {% if s.answered %}
+                            <a class="clsm-filter-link" href="?student={{ s.user_id }}#grading">{% trans "답안 보기" %} <i class="fas fa-angle-right"></i></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="mng-empty">{% trans "아직 입장한 학생이 없습니다." %}</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <h2 class="clsm-section-title" id="grading"><i class="fas fa-pen-to-square"></i> {% trans "답안 채점" %}</h2>
+    <form class="mng-filter" method="get" action="{% url 'classroom_manage' classroom.pk %}#grading">
+        <div class="mng-field">
+            <label for="student">{% trans "학생" %}</label>
+            <select id="student" name="student">
+                <option value="">{% trans "전체" %}</option>
+                {% for s in students %}
+                <option value="{{ s.user_id }}" {% if student_id == s.user_id|stringformat:"s" %}selected{% endif %}>{{ s.display_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mng-field mng-field--grow">
+            <label for="lecture">{% trans "강의" %}</label>
+            <select id="lecture" name="lecture">
+                <option value="">{% trans "전체" %}</option>
+                {% for post in posts %}
+                <option value="{{ post.id }}" {% if post_id == post.id|stringformat:"s" %}selected{% endif %}>{{ post.title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mng-field">
+            <label for="review">{% trans "채점 상태" %}</label>
+            <select id="review" name="review">
+                <option value="">{% trans "전체" %}</option>
+                <option value="pending" {% if review_state == 'pending' %}selected{% endif %}>{% trans "채점 대기" %}</option>
+                <option value="reviewed" {% if review_state == 'reviewed' %}selected{% endif %}>{% trans "채점 완료" %}</option>
+            </select>
+        </div>
+
+        <div class="mng-filter-actions">
+            <button type="submit" class="btn-app btn-app--primary"><i class="fas fa-search"></i> {% trans "검색" %}</button>
+            <a href="{% url 'classroom_manage' classroom.pk %}#grading" class="btn-app btn-app--orange" style="text-decoration:none;">{% trans "초기화" %}</a>
+        </div>
+    </form>
+
+    <div class="mng-result-bar">
+        <span>
+            {% trans "검색 결과" %} <strong style="color:var(--text-main);">{{ page_obj.paginator.count }}</strong>{% trans "건" %}
+            {% if page_obj.paginator.count %}
+            ({{ page_obj.start_index }}–{{ page_obj.end_index }} {% trans "표시" %})
+            {% endif %}
+        </span>
+        <span>{% trans "채점 대기" %} <strong style="color:var(--text-main);">{{ pending_total }}</strong>{% trans "건" %}</span>
+    </div>
+
+    <div class="mng-table-wrap">
+        {% if items %}
+        <table class="mng-table mng-table--answers">
+            <colgroup>
+                <col class="mng-col-user">
+                <col class="mng-col-lecture">
+                <col class="mng-col-question">
+                <col class="mng-col-answer">
+                <col class="mng-col-score">
+                <col class="mng-col-review">
+                <col class="mng-col-time">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th class="mng-th-user">{% trans "학생" %}</th>
+                    <th class="mng-th-lecture">{% trans "강의" %}</th>
+                    <th class="mng-th-question">{% trans "문제 · 모범 답안" %}</th>
+                    <th class="mng-th-answer">{% trans "제출 답안" %}</th>
+                    <th class="mng-th-score">{% trans "자동 점수" %}</th>
+                    <th>{% trans "채점" %}</th>
+                    <th class="mng-th-time">{% trans "제출 시각" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                {% if item.kind != "single" %}
+                {% url 'classroom_quiz_answers' classroom.pk item.quiz.id item.user.id as group_url %}
+                <tr class="mng-group-row">
+                    <td class="mng-cell-user" title="@{{ item.user.username }}">{{ item.student_name }}</td>
+                    <td class="mng-cell-lecture" title="{{ item.lecture_title }}">
+                        <span class="mng-lecture-title">{{ item.lecture_title }}</span>
+                    </td>
+                    <td colspan="2">
+                        <a class="mng-group-link" href="{{ group_url }}">
+                            <i class="fas {% if item.kind == 'objective' %}fa-list-ol{% else %}fa-pen-fancy{% endif %}"></i> {% include 'manage/_quiz_group_title.html' with kind=item.kind gen=item.quiz.generation_number %}
+                        </a>
+                        <span class="mng-lecture-sub">{% include 'manage/_quiz_group_sub.html' with row=item %}</span>
+                    </td>
+                    <td class="mng-cell-score"><strong>{{ item.score }}%</strong></td>
+                    <td class="mng-cell-review">
+                        <span class="mng-pill {% if item.is_reviewed %}good{% else %}review{% endif %}">{% trans "채점" %} {{ item.reviewed }}/{{ item.answered }}</span>
+                        <a class="mng-save-btn mng-group-btn" style="margin-top:6px;" href="{{ group_url }}">{% trans "전체 보기" %} <i class="fas fa-angle-right"></i></a>
+                    </td>
+                    <td class="mng-cell-time">
+                        <span class="mng-time-date">{{ item.created_at|date:"Y-m-d" }}</span>
+                        <span class="mng-time-hour">{{ item.created_at|date:"H:i" }}</span>
+                    </td>
+                </tr>
+                {% else %}
+                {% with answer=item.obj %}
+                <tr>
+                    <td class="mng-cell-user" title="@{{ answer.user.username }}">{{ item.student_name }}</td>
+                    <td class="mng-cell-lecture" title="{{ item.lecture_title }}">
+                        <span class="mng-lecture-title">{{ item.lecture_title }}</span>
+                        <span class="mng-lecture-sub">{{ answer.quiz_question.quiz.generation_number }}{% trans "차" %} · {{ answer.quiz_question.number }}{% trans "번" %}<span class="mng-pill muted clsm-type">{{ item.quiz_type }}</span></span>
+                    </td>
+                    <td>
+                        <div class="clsm-q">{{ answer.quiz_question.question_text|linebreaksbr }}</div>
+                        {% if answer.quiz_question.model_answer %}
+                        <div class="clsm-model"><strong>{% trans "모범 답안" %}</strong> {{ answer.quiz_question.model_answer|linebreaksbr }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="mng-answer-cell" title="{{ answer.user_answer }}">
+                        {% if answer.user_answer %}{{ answer.user_answer }}{% else %}<span class="mng-muted">{% trans "(빈 답안)" %}</span>{% endif %}
+                    </td>
+                    <td class="mng-cell-score">
+                        <strong>{{ item.percent }}%</strong>
+                        {% if answer.predicted_label %}<span class="mng-lecture-sub">{% trans answer.predicted_label %}</span>{% endif %}
+                    </td>
+                    <td class="mng-cell-review">
+                        <form class="mng-review-form mng-review-form--stack" method="post" action="{% url 'classroom_manage' classroom.pk %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="answer_id" value="{{ answer.id }}">
+                            <input type="hidden" name="querystring" value="{{ current_query }}">
+                            <select name="human_label" aria-label="{% trans '채점 결과' %}">
+                                <option value="">{% trans "미채점" %}</option>
+                                {% for hl in human_labels %}{% if hl %}
+                                <option value="{{ hl }}" {% if answer.human_label == hl %}selected{% endif %}>{% trans hl %}</option>
+                                {% endif %}{% endfor %}
+                            </select>
+                            <div class="mng-review-row">
+                                <input class="mng-score" type="text" inputmode="decimal" name="human_score"
+                                       value="{{ answer.human_score|default_if_none:'' }}"
+                                       placeholder="0~100" aria-label="{% trans '점수' %}">
+                                <button type="submit" class="mng-save-btn">{% trans "저장" %}</button>
+                            </div>
+                        </form>
+                    </td>
+                    <td class="mng-cell-time">
+                        <span class="mng-time-date">{{ answer.created_at|date:"Y-m-d" }}</span>
+                        <span class="mng-time-hour">{{ answer.created_at|date:"H:i" }}</span>
+                    </td>
+                </tr>
+                {% endwith %}
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="mng-empty">
+            <i class="fas fa-inbox" style="font-size:28px;display:block;margin-bottom:12px;"></i>
+            {% trans "아직 학생이 제출한 답안이 없습니다. 학생이 강의를 요약하고 문제를 풀면 여기에 표시됩니다." %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-wrap">
+        <nav class="history-pagination" aria-label="{% trans '답안 목록 페이지' %}">
+            <div class="pagination-group pagination-group--nav">
+                {% if page_obj.has_previous %}
+                <a href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ page_obj.previous_page_number }}#grading" class="pg-btn nav"><i class="fas fa-angle-left"></i> {% trans "이전" %}</a>
+                {% else %}
+                <span class="pg-btn nav disabled"><i class="fas fa-angle-left"></i> {% trans "이전" %}</span>
+                {% endif %}
+            </div>
+            <div class="pg-divider" aria-hidden="true"></div>
+            <div class="pagination-group pagination-pages">
+                {% for num in page_obj.paginator.page_range %}
+                    {% if num == page_obj.number %}
+                    <span class="pg-btn active">{{ num }}</span>
+                    {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                    <a href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ num }}#grading" class="pg-btn">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <div class="pg-divider" aria-hidden="true"></div>
+            <div class="pagination-group pagination-group--nav">
+                {% if page_obj.has_next %}
+                <a href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ page_obj.next_page_number }}#grading" class="pg-btn nav">{% trans "다음" %} <i class="fas fa-angle-right"></i></a>
+                {% else %}
+                <span class="pg-btn nav disabled">{% trans "다음" %} <i class="fas fa-angle-right"></i></span>
+                {% endif %}
+            </div>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

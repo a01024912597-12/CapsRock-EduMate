@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}EduMate — {% include 'manage/_quiz_group_title.html' with kind=kind gen=quiz.generation_number %}{% endblock %}
+{% block breadcrumb %}{% include 'manage/_quiz_group_title.html' with kind=kind gen=quiz.generation_number %}{% endblock %}
+{% block page_content_class %} page-content--manage{% endblock %}
+
+{% block extra_head %}
+{% include 'manage/_styles.html' %}
+{% endblock %}
+
+{% block content_area %}
+<div class="history-page">
+    <a href="{{ back_url }}" style="display:inline-flex;align-items:center;gap:6px;color:var(--text-sub);text-decoration:none;font-size:13px;margin-bottom:16px;">
+        <i class="fas fa-arrow-left"></i> {{ back_label }}
+    </a>
+    <div class="hero-banner">
+        <div class="hero-text">
+            <h1><i class="fas {% if kind == 'objective' %}fa-list-ol{% else %}fa-pen-fancy{% endif %}"></i> {% include 'manage/_quiz_group_title.html' with kind=kind gen=quiz.generation_number %}</h1>
+            <p>{{ lecture_title }}</p>
+            <div class="hero-badges">
+                <span class="hero-badge"><i class="fas fa-user-graduate"></i> {{ student_name }}</span>
+                {% if kind == 'objective' %}
+                <span class="hero-badge"><i class="fas fa-check-circle"></i> {% trans "정답" %} {{ correct_count }} / {{ total_count }}</span>
+                <span class="hero-badge"><i class="fas fa-percent"></i> {% trans "자동 점수" %} {{ score }}%</span>
+                {% else %}
+                <span class="hero-badge"><i class="fas fa-pen"></i> {% trans "응답" %} {{ answered_count }} / {{ total_count }}</span>
+                <span class="hero-badge"><i class="fas fa-percent"></i> {% trans "평균 자동 점수" %} {{ score }}%</span>
+                {% endif %}
+                <span class="hero-badge"><i class="fas fa-clipboard-check"></i> {% trans "채점" %} {{ reviewed_count }} / {{ answered_count }}</span>
+            </div>
+        </div>
+        <div class="hero-icon"><i class="fas {% if kind == 'objective' %}fa-list-ol{% else %}fa-pen-fancy{% endif %}"></i></div>
+    </div>
+
+    {% if items %}
+    <form method="post">
+        {% csrf_token %}
+        <ul class="mng-obj-list">
+            {% for item in items %}
+            {% if kind == 'objective' %}
+            <li class="mng-obj-item {% if item.answer %}{% if item.is_correct %}is-correct{% else %}is-wrong{% endif %}{% endif %}">
+                <div class="mng-obj-head">
+                    <div class="mng-obj-q"><span class="mng-obj-num">{{ item.question.number }}.</span>{{ item.question.question_text|linebreaksbr }}</div>
+                    {% if not item.answer %}
+                    <span class="mng-pill muted">{% trans "미응답" %}</span>
+                    {% elif item.is_correct %}
+                    <span class="mng-pill good">{% trans "정답" %}</span>
+                    {% else %}
+                    <span class="mng-pill bad">{% trans "오답" %}</span>
+                    {% endif %}
+                </div>
+
+                {% if item.choices %}
+                <ul class="mng-obj-choices">
+                    {% for choice in item.choices %}
+                    <li class="mng-obj-choice {% if choice.is_correct %}is-answer{% elif choice.is_selected %}is-picked-wrong{% endif %}">
+                        <strong>{{ choice.num }}</strong> {{ choice.text }}
+                        {% if choice.is_selected %}<span class="mng-obj-tag">{% trans "학생 선택" %}</span>{% elif choice.is_correct %}<span class="mng-obj-tag">{% trans "정답" %}</span>{% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="mng-obj-explain">{% trans "정답" %} {{ item.correct_choice }} · {% trans "학생 선택" %} {{ item.user_choice|default:"-" }}</div>
+                {% endif %}
+
+                {% if item.explanation %}
+                <div class="mng-obj-explain"><i class="fas fa-lightbulb"></i> {{ item.explanation }}</div>
+                {% endif %}
+            {% else %}
+            <li class="mng-obj-item {% if item.answer %}{% if item.auto_label == '정답' %}is-correct{% elif item.auto_label == '오답' %}is-wrong{% endif %}{% endif %}">
+                <div class="mng-obj-head">
+                    <div class="mng-obj-q"><span class="mng-obj-num">{{ item.question.number }}.</span>{{ item.question.question_text|linebreaksbr }}</div>
+                    {% if not item.answer %}
+                    <span class="mng-pill muted">{% trans "미응답" %}</span>
+                    {% else %}
+                    <span class="mng-pill {% if item.auto_label == '정답' %}good{% elif item.auto_label == '오답' %}bad{% else %}review{% endif %}">
+                        {% trans "자동" %} {% if item.auto_label %}{% trans item.auto_label %}{% else %}{% trans "미판정" %}{% endif %}{% if item.percent is not None %} · {{ item.percent }}%{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <div class="mng-sub-grid">
+                    <div class="mng-sub-box">
+                        <div class="mng-sub-label">{% trans "모범 답안" %}</div>
+                        <div class="mng-sub-text">{{ item.question.model_answer|default:"-"|linebreaksbr }}</div>
+                    </div>
+                    <div class="mng-sub-box mng-sub-box--student">
+                        <div class="mng-sub-label">{% trans "학생 답안" %}</div>
+                        <div class="mng-sub-text">{% if item.answer and item.answer.user_answer %}{{ item.answer.user_answer|linebreaksbr }}{% else %}<span class="mng-muted">{% trans "(빈 답안)" %}</span>{% endif %}</div>
+                    </div>
+                </div>
+
+                {% if item.keywords %}
+                <div class="mng-obj-explain"><i class="fas fa-key"></i> {{ item.keywords }}</div>
+                {% endif %}
+            {% endif %}
+
+                {% if item.answer %}
+                <div class="mng-obj-grade">
+                    <span>{% trans "채점" %}</span>
+                    <select name="label_{{ item.answer.id }}" aria-label="{% trans '채점 결과' %}">
+                        <option value="">{% trans "미채점" %}</option>
+                        {% for hl in human_labels %}
+                        <option value="{{ hl }}" {% if item.answer.human_label == hl %}selected{% endif %}>{% trans hl %}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" inputmode="decimal" name="score_{{ item.answer.id }}" placeholder="0~100"
+                           value="{{ item.answer.human_score|default_if_none:'' }}" aria-label="{% trans '점수' %}">
+                </div>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+
+        {% if answered_count %}
+        <div class="mng-obj-actions">
+            <button type="submit" name="action" value="auto" class="btn-app btn-app--orange"
+                    {% if kind == 'objective' %}
+                    data-confirm="{% trans '자동 채점 결과(정답 100점, 오답 0점)로 모든 문항을 채점할까요? 직접 입력한 값은 덮어씁니다.' %}"
+                    {% else %}
+                    data-confirm="{% trans '자동 판정과 자동 점수로 모든 문항을 채점할까요? 직접 입력한 값은 덮어씁니다.' %}"
+                    {% endif %}
+                    onclick="return confirm(this.dataset.confirm);">
+                <i class="fas fa-magic"></i> {% trans "자동 결과로 일괄 채점" %}
+            </button>
+            <button type="submit" name="action" value="save" class="btn-app btn-app--primary">
+                <i class="fas fa-save"></i> {% trans "채점 저장" %}
+            </button>
+        </div>
+        {% endif %}
+    </form>
+    {% else %}
+    <div class="mng-empty">{% trans "이 차수에 문제가 없습니다." %}</div>
+    {% endif %}
+</div>
+{% endblock %}
