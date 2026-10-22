@@ -14,6 +14,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db import transaction
 from django.db.models import Exists, OuterRef, Count, Q, Max, Avg, Value, Subquery
 from django.db.models.functions import Coalesce
 from django.utils import timezone, translation
@@ -747,78 +748,95 @@ def stream_lecture_video(request, lecture_id):
     response["Accept-Ranges"] = "bytes"
     return response
 
-
 @login_required(login_url="home")
 def analyze_video_api(request):
-    """강의 대기열 순번, 요약 상태 및 최근 내 작업 목록 조회 API (완벽한 FIFO 순서 보장)"""
+    """강의 대기열 순번, 요약 상태 및 최근 내 작업 목록 조회 API."""
     lecture_id = request.GET.get("lecture_id")
     if not lecture_id:
-        return JsonResponse({"status": "error", "message": "lecture_id가 전달되지 않았습니다."}, status=400)
+        return JsonResponse(
+            {"status": "error", "message": "lecture_id가 전달되지 않았습니다."},
+            status=400,
+        )
 
     lecture = get_viewable_lecture_or_404(request, lecture_id)
 
-    # 1. 20분 이상 멈춰있는 과거 유령 데이터 정리
+    # 1. 오래 멈춰 있는 분석 작업 정리.
     stale_threshold = timezone.now() - timedelta(minutes=20)
     Lecture.objects.filter(
         _requested_before(stale_threshold),
         user=request.user,
         status__in=[Lecture.STATUS_PENDING, Lecture.STATUS_PROCESSING],
-    ).update(status=Lecture.STATUS_FAILED)
+    ).update(
+        status=Lecture.STATUS_FAILED,
+        error_message="시간 초과로 자동 종료되었습니다.",
+    )
 
-    # 요약 요청 전(강의실 업로드), 또는 다른 사람의 요약
+    # 위 update가 현재 강의에 적용됐을 수도 있으므로 최신 상태를 다시 읽는다.
+    lecture.refresh_from_db(fields=["status", "error_message"])
+
+    # 강의실에 게시만 된 강의이거나 현재 사용자에게 요약 열람 권한이 없으면 분석 전 상태로 응답한다.
     if lecture.status == Lecture.STATUS_IDLE or not can_view_summary(request.user, lecture):
         return JsonResponse({"status": "idle", "state": "idle", "recent_tasks": []})
 
-    # 2. 이미 요약이 완료된 경우
-    if lecture.status == Lecture.STATUS_COMPLETED:
-        return JsonResponse({
-            "status": "success",
-            "state": "completed",
-            "result": lecture.summary_text,
-            "summary_timeline": getattr(lecture, "summary_timeline", ""),
-            "recent_tasks": [],
-        })
-
-    # 3. 분석 실패
-    if lecture.status == Lecture.STATUS_FAILED:
-        return JsonResponse({
-            "status": "failed",
-            "state": "failed",
-            "message": lecture.error_message or "분석 중 오류가 발생했습니다.",
-            "recent_tasks": [],
-        })
-
-    # 4. 활성 작업 전체 조회 (생성시간 기준 오름차순: 먼저 등록한 게 무조건 앞)
-    active_lectures = list(
-        Lecture.objects.filter(
+    # 현재 강의 소유자의 활성 분석 작업을 조회한다.
+    active_qs = (
+        Lecture.objects
+        .filter(
             user_id=lecture.user_id,
             status__in=[Lecture.STATUS_PROCESSING, Lecture.STATUS_PENDING],
         )
         .exclude(_requested_before(stale_threshold))
-        .order_by(Coalesce("analysis_requested_at", "created_at"))
     )
 
-    # 내 강의의 실제 순번 계산 (시간순 인덱스 + 1)
-    my_order = 1
-    for idx, item in enumerate(active_lectures):
-        if item.id == lecture.id:
-            my_order = idx + 1
-            break
+    processing_list = list(
+        active_qs
+        .filter(status=Lecture.STATUS_PROCESSING)
+        .order_by(Coalesce("analysis_requested_at", "created_at"), "id")
+    )
 
-    # 1번 강의(가장 먼저 등록된 작업)만 processing, 2번부터는 무조건 pending
-    if my_order == 1:
-        current_state = Lecture.STATUS_PROCESSING
-    else:
-        current_state = Lecture.STATUS_PENDING
+    pending_list = list(
+        active_qs
+        .filter(status=Lecture.STATUS_PENDING)
+        .order_by("queue_order", Coalesce("analysis_requested_at", "created_at"), "id")
+    )
 
-    # 우측 대시보드용 목록 구성: 현재 진행 작업 -> 대기 1번 -> 대기 2번...
+    # 예전 데이터처럼 queue_order가 0인 대기 작업에는 전역 대기열 뒤쪽 순번을 부여한다.
+    if pending_list and any(item.queue_order <= 0 for item in pending_list):
+        next_order = (
+            Lecture.objects.aggregate(max_order=Max("queue_order"))["max_order"] or 0
+        ) + 1
+        for item in pending_list:
+            if item.queue_order <= 0:
+                item.queue_order = next_order
+                item.save(update_fields=["queue_order"])
+                next_order += 1
+        pending_list.sort(
+            key=lambda item: (
+                item.queue_order,
+                item.analysis_requested_at or item.created_at,
+                item.id,
+            )
+        )
+
+    active_lectures = processing_list + pending_list
+
+    # 우측 대시보드용 목록 구성.
     my_tasks = []
     for idx, item in enumerate(active_lectures):
-        is_first = (idx == 0)
-        # 1위, 2위 대신 직관적인 진행 상태 및 대기 순번으로 표기
-        status_label = "분석 진행 중" if is_first else f"대기 {idx}번"
-        status_color = "processing" if is_first else "waiting"
-        clean_title = re.sub(r"\s*\[\s*SUB\s*:\s*(?:auto|[1-4])\s*\]", "", item.title or "제목 없음").strip()
+        is_processing = item.status == Lecture.STATUS_PROCESSING
+        pending_idx = pending_list.index(item) if item in pending_list else -1
+
+        status_label = "분석 진행 중" if is_processing else f"대기 {pending_idx + 1}번"
+        status_color = "processing" if is_processing else "waiting"
+        clean_title = re.sub(
+            r"\s*\[\s*SUB\s*:\s*(?:auto|[1-4])\s*\]",
+            "",
+            item.title or "제목 없음",
+        ).strip()
+
+        can_control = item.user_id == request.user.id and item.status == Lecture.STATUS_PENDING
+        can_move_up = can_control and pending_idx > 0
+        can_move_down = can_control and 0 <= pending_idx < len(pending_list) - 1
 
         my_tasks.append({
             "id": item.id,
@@ -826,12 +844,49 @@ def analyze_video_api(request):
             "order_num": idx + 1,
             "status_label": status_label,
             "status_color": status_color,
-            "is_current": (item.id == lecture.id)
+            "is_current": item.id == lecture.id,
+            "can_cancel": can_control,
+            "can_move_up": can_move_up,
+            "can_move_down": can_move_down,
         })
 
     # 강의실 학생에게는 강의자의 다른 작업 목록을 노출하지 않는다.
     if lecture.user_id != request.user.id:
-        my_tasks = [t for t in my_tasks if t["is_current"]]
+        my_tasks = [task for task in my_tasks if task["is_current"]]
+
+    # 2. 이미 요약이 완료된 경우.
+    if lecture.status == Lecture.STATUS_COMPLETED:
+        return JsonResponse({
+            "status": "success",
+            "state": "completed",
+            "result": lecture.summary_text,
+            "summary_timeline": getattr(lecture, "summary_timeline", ""),
+            "recent_tasks": my_tasks,
+        })
+
+    # 3. 분석 실패 또는 사용자가 대기열에서 취소한 경우.
+    if lecture.status in [Lecture.STATUS_FAILED, Lecture.STATUS_CANCELED]:
+        return JsonResponse({
+            "status": "failed",
+            "state": lecture.status,
+            "message": lecture.error_message or (
+                "사용자에 의해 대기열에서 취소되었습니다."
+                if lecture.status == Lecture.STATUS_CANCELED
+                else "분석 중 오류가 발생했습니다."
+            ),
+            "recent_tasks": my_tasks,
+        })
+
+    # 4. 현재 강의의 대기열 위치 계산.
+    my_order = 1
+    for idx, item in enumerate(active_lectures):
+        if item.id == lecture.id:
+            my_order = idx + 1
+            break
+
+    current_state = lecture.status
+    if current_state not in [Lecture.STATUS_PROCESSING, Lecture.STATUS_PENDING]:
+        current_state = Lecture.STATUS_PENDING
 
     return JsonResponse({
         "status": "waiting",
@@ -841,13 +896,121 @@ def analyze_video_api(request):
         "recent_tasks": my_tasks,
     })
 
-    return JsonResponse({
-        "status": "waiting",
-        "state": current_state,
-        "queue_order": my_order,
-        "ahead_count": max(0, my_order - 1),
-        "recent_tasks": my_tasks,
-    })
+
+@login_required(login_url="home")
+@require_POST
+def cancel_queue_task_api(request):
+    """현재 분석 중이 아닌 대기 작업을 취소한다."""
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+        target_id = data.get("lecture_id")
+    except Exception:
+        target_id = request.POST.get("lecture_id")
+
+    if not target_id:
+        return JsonResponse({"ok": False, "message": "lecture_id가 필요합니다."}, status=400)
+
+    with transaction.atomic():
+        lecture = get_object_or_404(
+            Lecture.objects.select_for_update(),
+            id=target_id,
+            user=request.user,
+        )
+
+        if lecture.status == Lecture.STATUS_PROCESSING:
+            return JsonResponse(
+                {"ok": False, "message": "현재 분석이 진행 중인 강의는 취소할 수 없습니다."},
+                status=400,
+            )
+
+        if lecture.status != Lecture.STATUS_PENDING:
+            return JsonResponse(
+                {"ok": False, "message": "대기 중인 강의만 취소할 수 있습니다."},
+                status=400,
+            )
+
+        lecture.status = Lecture.STATUS_CANCELED
+        lecture.error_message = "사용자에 의해 대기열에서 취소되었습니다."
+        lecture.save(update_fields=["status", "error_message"])
+
+    # 메모리 대기열에서도 제거한다. 이미 워커가 가져갔더라도 워커가 DB 상태를 다시 확인해 취소 작업을 건너뛴다.
+    from .queue_worker import remove_lecture_from_queue
+    remove_lecture_from_queue(lecture.id)
+
+    return JsonResponse({"ok": True, "message": "대기열에서 취소되었습니다."})
+
+
+@login_required(login_url="home")
+@require_POST
+def move_queue_order_api(request):
+    """현재 사용자의 대기 중인 강의 순서를 위/아래로 변경한다."""
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+        target_id = data.get("lecture_id")
+        direction = data.get("direction")
+    except Exception:
+        target_id = request.POST.get("lecture_id")
+        direction = request.POST.get("direction")
+
+    if direction not in ["up", "down"]:
+        return JsonResponse({"ok": False, "message": "잘못된 이동 방향입니다."}, status=400)
+
+    stale_threshold = timezone.now() - timedelta(minutes=20)
+
+    with transaction.atomic():
+        pending_lectures = list(
+            Lecture.objects
+            .select_for_update()
+            .filter(
+                user=request.user,
+                status=Lecture.STATUS_PENDING,
+            )
+            .exclude(_requested_before(stale_threshold))
+            .order_by("queue_order", Coalesce("analysis_requested_at", "created_at"), "id")
+        )
+
+        # 예전 데이터처럼 순번이 없는 작업은 전역 대기열의 맨 뒤로 보낸다.
+        if any(item.queue_order <= 0 for item in pending_lectures):
+            next_order = (
+                Lecture.objects.aggregate(max_order=Max("queue_order"))["max_order"] or 0
+            ) + 1
+            for item in pending_lectures:
+                if item.queue_order <= 0:
+                    item.queue_order = next_order
+                    item.save(update_fields=["queue_order"])
+                    next_order += 1
+            pending_lectures.sort(
+                key=lambda item: (
+                    item.queue_order,
+                    item.analysis_requested_at or item.created_at,
+                    item.id,
+                )
+            )
+
+        target_idx = next(
+            (idx for idx, item in enumerate(pending_lectures) if str(item.id) == str(target_id)),
+            None,
+        )
+        if target_idx is None:
+            return JsonResponse(
+                {"ok": False, "message": "순서를 변경할 수 없는 상태입니다."},
+                status=400,
+            )
+
+        swap_idx = target_idx - 1 if direction == "up" else target_idx + 1
+        if swap_idx < 0 or swap_idx >= len(pending_lectures):
+            return JsonResponse(
+                {"ok": False, "message": "더 이상 이동할 수 없습니다."},
+                status=400,
+            )
+
+        task_a = pending_lectures[target_idx]
+        task_b = pending_lectures[swap_idx]
+        task_a.queue_order, task_b.queue_order = task_b.queue_order, task_a.queue_order
+        task_a.save(update_fields=["queue_order"])
+        task_b.save(update_fields=["queue_order"])
+
+    return JsonResponse({"ok": True})
 
 
 @login_required(login_url="home")

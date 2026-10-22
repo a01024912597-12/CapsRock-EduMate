@@ -515,6 +515,41 @@
             width: 100%;
         }
     }
+    /* 대기열 순서 변경 및 취소 컨트롤 버튼 */
+    .queue-ctrl-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .btn-queue-ctrl {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #cbd5e1;
+        border-radius: 6px;
+        width: 24px;
+        height: 24px;
+        font-size: 11px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        padding: 0;
+    }
+    .btn-queue-ctrl:hover:not(:disabled) {
+        background: #6366f1;
+        border-color: #6366f1;
+        color: #ffffff;
+    }
+    .btn-queue-ctrl:disabled {
+        opacity: 0.25;
+        cursor: not-allowed;
+    }
+    .btn-queue-ctrl.btn-cancel:hover:not(:disabled) {
+        background: #ef4444;
+        border-color: #ef4444;
+        color: #ffffff;
+    }
 </style>
 
 <script>
@@ -635,6 +670,48 @@ function renderSummaryHtml(text) {
             const lineFill = document.getElementById('stepLineFill');
 
             // 우측 대시보드에 실시간 진행 카드 렌더링
+            // CSRF 토큰 가져오기 헬퍼
+            function getCsrfToken() {
+                const match = document.cookie.match(/csrftoken=([^;]+)/);
+                return match ? match[1] : '';
+            }
+
+            // 순서 변경 요청
+            window.moveQueueTask = function (targetId, direction) {
+                fetch('/analyze-api/move/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({ lecture_id: targetId, direction: direction })
+                })
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    if (!data.ok && data.message) alert(data.message);
+                    checkQueueStatus();
+                });
+            };
+
+            // 대기 취소 요청
+            window.cancelQueueTask = function (targetId) {
+                if (!confirm('이 강의의 요약 대기열을 취소하시겠습니까?')) return;
+                fetch('/analyze-api/cancel/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({ lecture_id: targetId })
+                })
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    if (!data.ok && data.message) alert(data.message);
+                    checkQueueStatus();
+                });
+            };
+
+            // 우측 대시보드에 실시간 진행 카드 렌더링 (버튼 포함)
             function renderRecentTasks(tasks) {
                 const taskListEl = document.getElementById('sideTaskList');
                 if (!taskListEl) return;
@@ -650,13 +727,26 @@ function renderSummaryHtml(text) {
                     const progressWidth = isProc ? '65%' : '15%';
                     const currentBadge = t.is_current ? '<span style="font-size:10px; color:#818cf8; margin-left:6px; font-weight:700;">[현재 페이지]</span>' : '';
 
+                    // 대기 중인 작업에만 위/아래/취소 버튼 표시
+                    let ctrlHtml = '';
+                    if (t.can_cancel) {
+                        ctrlHtml += '<div class="queue-ctrl-group">';
+                        ctrlHtml += '  <button type="button" class="btn-queue-ctrl" title="순서 위로" ' + (!t.can_move_up ? 'disabled' : '') + ' onclick="moveQueueTask(' + t.id + ', \'up\')">▲</button>';
+                        ctrlHtml += '  <button type="button" class="btn-queue-ctrl" title="순서 아래로" ' + (!t.can_move_down ? 'disabled' : '') + ' onclick="moveQueueTask(' + t.id + ', \'down\')">▼</button>';
+                        ctrlHtml += '  <button type="button" class="btn-queue-ctrl btn-cancel" title="대기 취소" onclick="cancelQueueTask(' + t.id + ')">✕</button>';
+                        ctrlHtml += '</div>';
+                    }
+
                     html += '<div class="monitor-task-item ' + (t.is_current ? 'current' : '') + '">';
                     html += '  <div class="monitor-task-header">';
                     html += '    <a href="/summary/?lecture_id=' + t.id + '" class="monitor-task-title" title="' + escapeHtml(t.title) + '" style="text-decoration:none;">';
                     html += '      <span style="display:inline-block; width:18px; height:18px; line-height:18px; text-align:center; border-radius:4px; background:rgba(255,255,255,0.08); font-size:11px; margin-right:6px; color:#94a3b8;">' + t.order_num + '</span>';
                     html +=        escapeHtml(t.title);
                     html += '    </a>';
-                    html += '    <span class="monitor-task-pill pill-' + t.status_color + '">' + t.status_label + '</span>';
+                    html += '    <div style="display:flex; align-items:center; gap:6px;">';
+                    html +=        ctrlHtml;
+                    html += '      <span class="monitor-task-pill pill-' + t.status_color + '">' + t.status_label + '</span>';
+                    html += '    </div>';
                     html += '  </div>';
                     html += '  <div class="monitor-progress-bar-wrap">';
                     html += '    <div class="monitor-progress-bar-fill" style="width: ' + progressWidth + ';"></div>';

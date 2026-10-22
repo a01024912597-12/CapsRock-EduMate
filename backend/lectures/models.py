@@ -56,12 +56,14 @@ class Lecture(models.Model):
     summary_duration_seconds = models.FloatField(null=True, blank=True)
     whisper_model_name = models.CharField(max_length=50, blank=True)
     analyzed_at = models.DateTimeField(null=True, blank=True)
+
     # ------------------ [대기열] ------------------
     STATUS_IDLE = "idle"  # 요약 요청 전 (강의실 업로드)
     STATUS_PENDING = "pending"  # 대기 중
     STATUS_PROCESSING = "processing"  # 현재 분석 중
     STATUS_COMPLETED = "completed"  # 요약 완료
     STATUS_FAILED = "failed"  # 요약 실패
+    STATUS_CANCELED = "canceled"  # 대기 취소됨
 
     STATUS_CHOICES = [
         (STATUS_IDLE, "요약 전"),
@@ -69,6 +71,7 @@ class Lecture(models.Model):
         (STATUS_PROCESSING, "분석 중"),
         (STATUS_COMPLETED, "완료"),
         (STATUS_FAILED, "실패"),
+        (STATUS_CANCELED, "취소됨"),
     ]
 
     status = models.CharField(
@@ -77,6 +80,7 @@ class Lecture(models.Model):
         default=STATUS_PENDING,
         db_index=True,
     )
+    queue_order = models.PositiveIntegerField(default=0, db_index=True)
     error_message = models.TextField(blank=True, default="")
     # 업로드와 요약 요청 시점이 다를 수 있어 대기열 정리는 이 값을 기준으로 한다(없으면 created_at).
     analysis_requested_at = models.DateTimeField(null=True, blank=True)
@@ -170,7 +174,7 @@ class QuizAnswerAttempt(models.Model):
     user_answer = models.TextField(blank=True, default="")
     score = models.FloatField(null=True, blank=True)
     predicted_label = models.CharField(max_length=50, blank=True)
-    feedback_json = models.JSONField(default=dict, blank=True)
+    feedback_json = models.JSONField(blank=True, default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
