@@ -67,6 +67,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'lectures.context_processors.edumate_ui',
+                'lectures.context_processors.classroom_sidebar',
             ],
         },
     },

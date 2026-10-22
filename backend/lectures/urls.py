@@ -17,9 +17,22 @@ from .views import (
     test_api,
     manage_dashboard,
     manage_answers,
+    manage_quiz_answers,
     manage_users,
     save_calendar_memo,
     set_preferred_language,
+)
+from .classroom_views import (
+    classroom_create,
+    classroom_join,
+    classroom_detail,
+    classroom_kick,
+    classroom_leave,
+    classroom_lecture_upload,
+    classroom_lecture_remove,
+    classroom_manage,
+    classroom_quiz_answers,
+    lecture_summarize,
 )
 
 urlpatterns = [
@@ -30,6 +43,7 @@ urlpatterns = [
     path('upload/', upload_page, name='upload'),
     path('summary/', summary_page, name='summary'),
     path('summary/<int:lecture_id>/pdf/', download_summary_pdf, name='download_summary_pdf'),
+    path('summary/<int:lecture_id>/start/', lecture_summarize, name='lecture_summarize'),
     path('lecture-video/<int:lecture_id>/stream/', stream_lecture_video, name='stream_lecture_video'),
     path('analyze-api/', analyze_video_api, name='analyze_api'),
     path('history/', history_page, name='history'),
@@ -42,5 +56,17 @@ urlpatterns = [
     path('i18n/setlang/', set_preferred_language, name='set_language'),
     path('manage/', manage_dashboard, name='manage_dashboard'),
     path('manage/answers/', manage_answers, name='manage_answers'),
+    path('manage/answers/quiz/<int:quiz_id>/<int:user_id>/', manage_quiz_answers,
+         name='manage_quiz_answers'),
     path('manage/users/', manage_users, name='manage_users'),
+    path('classrooms/create/', classroom_create, name='classroom_create'),
+    path('classrooms/join/', classroom_join, name='classroom_join'),
+    path('classrooms/<int:pk>/', classroom_detail, name='classroom_detail'),
+    path('classrooms/<int:pk>/kick/<int:user_id>/', classroom_kick, name='classroom_kick'),
+    path('classrooms/<int:pk>/leave/', classroom_leave, name='classroom_leave'),
+    path('classrooms/<int:pk>/manage/', classroom_manage, name='classroom_manage'),
+    path('classrooms/<int:pk>/manage/quiz/<int:quiz_id>/<int:user_id>/', classroom_quiz_answers,
+         name='classroom_quiz_answers'),
+    path('classrooms/<int:pk>/lectures/upload/', classroom_lecture_upload, name='classroom_lecture_upload'),
+    path('classrooms/<int:pk>/lectures/<int:lecture_id>/remove/', classroom_lecture_remove, name='classroom_lecture_remove'),
 ]

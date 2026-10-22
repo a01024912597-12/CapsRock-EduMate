@@ -21,6 +21,8 @@ from django.urls import reverse, NoReverseMatch
 from django.core.paginator import Paginator
 
 from .models import Lecture, UserProfile, Quiz, QuizQuestion, QuizAnswer, StudyCalendarMemo
+from .answer_groups import SUBJECTIVE_QUIZ_TYPES, group_answer_rows, quiz_review
+from .permissions import can_view_lecture, can_view_summary, is_classroom_member, is_instructor
 from .lecture_thumbnail import capture_lecture_video_thumbnail
 from .utils.youtube_utils import extract_youtube_video_id
 from .utils.option_utils import (
@@ -56,12 +58,15 @@ from .services.answer_feedback_generator import recurring_misconceptions, polite
 # 페이지네이션/관리자 화면 설정
 HISTORY_PAGE_SIZE = 5
 MANAGE_ANSWER_PAGE_SIZE = 10
+DASHBOARD_RECENT_ROW_COUNT = 8
+DASHBOARD_RECENT_ANSWER_SCAN = 200
 MANAGE_USER_PAGE_SIZE = 10
 HUMAN_LABEL_CHOICES = ["", "정답", "부분 정답", "오답"]
 PREDICTED_LABEL_CHOICES = ["", "정답", "부분 정답", "오답"]
 _REVIEWED_Q = Q(human_label__isnull=False) & ~Q(human_label="")
 USER_ROLE_CHOICES = [
     ("active", _lazy("일반 사용자")),
+    ("instructor", _lazy("강의자")),
     ("staff", _lazy("운영자")),
     ("inactive", _lazy("비활성화")),
 ]
@@ -421,6 +426,23 @@ def validate_lecture_video_file(uploaded_file):
 
     return None
 
+def _requested_before(threshold):
+    """요약 요청 시각(없으면 업로드 시각)이 threshold보다 이전인 강의."""
+    return (
+        Q(analysis_requested_at__lt=threshold)
+        | Q(analysis_requested_at__isnull=True, created_at__lt=threshold)
+    )
+
+
+def get_viewable_lecture_or_404(request, lecture_id):
+    """내 강의 또는 내가 속한 강의실에 올라온 강의만 반환한다."""
+    lecture = get_object_or_404(
+        Lecture.objects.select_related("classroom"),
+        id=lecture_id,
+    )
+    if not can_view_lecture(request.user, lecture):
+        raise Http404("강의를 찾을 수 없습니다.")
+    return lecture
 
 @login_required(login_url="home")
 def upload_page(request):
@@ -519,9 +541,9 @@ def upload_page(request):
         # 1시간 이상 지난 '진짜 옛날 찌꺼기'만 정리하고, 방금 전 돌려둔 1번째 강의는 절대 건드리지 않음
         stale_threshold = timezone.now() - timedelta(hours=1)
         Lecture.objects.filter(
+            _requested_before(stale_threshold),
             user=request.user,
             status__in=[Lecture.STATUS_PENDING, Lecture.STATUS_PROCESSING],
-            created_at__lt=stale_threshold
         ).update(status=Lecture.STATUS_FAILED)
 
         # 대기열 등록 (세션 옵션 함께 전달)
@@ -577,7 +599,28 @@ def summary_page(request):
     if not lecture_id:
         return redirect("upload")
 
-    lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
+    lecture = get_viewable_lecture_or_404(request, lecture_id)
+
+    is_member_on_post = (
+        lecture.user_id != request.user.id
+        and lecture.is_classroom_post
+        and is_classroom_member(request.user, lecture.classroom)
+    )
+    summary_not_started = False
+    if can_view_summary(request.user, lecture) and not is_member_on_post:
+        is_owner = lecture.user_id == request.user.id
+        needs_summary_request = (
+            lecture.classroom_id is not None
+            and is_owner
+            and lecture.status in (Lecture.STATUS_IDLE, Lecture.STATUS_FAILED)
+        )
+        summary_not_started = not is_owner and lecture.status == Lecture.STATUS_IDLE
+    else:
+        # 강의실 학생: 강의자의 요약 대신 내 사본으로 보내고, 없으면 요약 시작 폼을 보여 준다.
+        my_copy = Lecture.objects.filter(source_lecture=lecture, user=request.user).only("id").first()
+        if my_copy:
+            return redirect(f"{reverse('summary')}?lecture_id={my_copy.id}")
+        needs_summary_request = True
 
     video_id = ""
 
@@ -609,6 +652,15 @@ def summary_page(request):
         "thumbnail_url": lecture.thumbnail_url,
         "video_file_name": video_file_name,
         "video_file_url": video_file_url,
+        "is_lecture_owner": lecture.user_id == request.user.id,
+        "lecture_classroom": lecture.classroom,
+        "needs_summary_request": needs_summary_request,
+        "summary_not_started": summary_not_started,
+        "summary_failed_message": (
+            lecture.error_message
+            if needs_summary_request and lecture.user_id == request.user.id and lecture.status == Lecture.STATUS_FAILED
+            else ""
+        ),
     }
 
     return render(request, "summary.html", context)
@@ -619,7 +671,9 @@ def download_summary_pdf(request, lecture_id):
     """강의 요약 PDF 다운로드."""
     from .summary_pdf import build_summary_pdf_filename, generate_summary_pdf_bytes
 
-    lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
+    lecture = get_viewable_lecture_or_404(request, lecture_id)
+    if not can_view_summary(request.user, lecture):
+        raise Http404("요약을 찾을 수 없습니다.")
 
     if not (lecture.summary_text or "").strip():
         return HttpResponse(
@@ -647,7 +701,7 @@ def download_summary_pdf(request, lecture_id):
 @login_required(login_url="home")
 def stream_lecture_video(request, lecture_id):
     """업로드 영상을 HTTP Range(206)로 스트리밍해 재생·탐색이 즉시 가능하도록 한다."""
-    lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
+    lecture = get_viewable_lecture_or_404(request, lecture_id)
 
     if lecture.source_type != Lecture.SOURCE_FILE or not lecture.video_file:
         raise Http404("영상 파일이 없습니다.")
@@ -701,15 +755,19 @@ def analyze_video_api(request):
     if not lecture_id:
         return JsonResponse({"status": "error", "message": "lecture_id가 전달되지 않았습니다."}, status=400)
 
-    lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
+    lecture = get_viewable_lecture_or_404(request, lecture_id)
 
     # 1. 20분 이상 멈춰있는 과거 유령 데이터 정리
     stale_threshold = timezone.now() - timedelta(minutes=20)
     Lecture.objects.filter(
+        _requested_before(stale_threshold),
         user=request.user,
         status__in=[Lecture.STATUS_PENDING, Lecture.STATUS_PROCESSING],
-        created_at__lt=stale_threshold
     ).update(status=Lecture.STATUS_FAILED)
+
+    # 요약 요청 전(강의실 업로드), 또는 다른 사람의 요약
+    if lecture.status == Lecture.STATUS_IDLE or not can_view_summary(request.user, lecture):
+        return JsonResponse({"status": "idle", "state": "idle", "recent_tasks": []})
 
     # 2. 이미 요약이 완료된 경우
     if lecture.status == Lecture.STATUS_COMPLETED:
@@ -731,11 +789,14 @@ def analyze_video_api(request):
         })
 
     # 4. 활성 작업 전체 조회 (생성시간 기준 오름차순: 먼저 등록한 게 무조건 앞)
-    active_lectures = list(Lecture.objects.filter(
-        user=request.user,
-        status__in=[Lecture.STATUS_PROCESSING, Lecture.STATUS_PENDING],
-        created_at__gte=stale_threshold
-    ).order_by("created_at"))
+    active_lectures = list(
+        Lecture.objects.filter(
+            user_id=lecture.user_id,
+            status__in=[Lecture.STATUS_PROCESSING, Lecture.STATUS_PENDING],
+        )
+        .exclude(_requested_before(stale_threshold))
+        .order_by(Coalesce("analysis_requested_at", "created_at"))
+    )
 
     # 내 강의의 실제 순번 계산 (시간순 인덱스 + 1)
     my_order = 1
@@ -767,6 +828,10 @@ def analyze_video_api(request):
             "status_color": status_color,
             "is_current": (item.id == lecture.id)
         })
+
+    # 강의실 학생에게는 강의자의 다른 작업 목록을 노출하지 않는다.
+    if lecture.user_id != request.user.id:
+        my_tasks = [t for t in my_tasks if t["is_current"]]
 
     return JsonResponse({
         "status": "waiting",
@@ -1650,24 +1715,25 @@ def test_api(request):
         {"message": "백엔드 연결 성공"},
         json_dumps_params={"ensure_ascii": False},
     )
-
-
-def _user_role_value(user):
+def _user_role_value(user, profile=None):
     if not user.is_active:
         return "inactive"
     if user.is_staff:
         return "staff"
+    if is_instructor(user, profile):
+        return "instructor"
     return "active"
 
-
 def _apply_user_role(user, role, actor):
-    """사용자 권한(is_staff / is_active)을 적용한다."""
+    """사용자 권한(is_staff / is_active / UserProfile.is_instructor)을 적용한다."""
     if role == "staff":
-        is_staff, is_active = True, True
+        is_staff, is_active, instructor = True, True, False
+    elif role == "instructor":
+        is_staff, is_active, instructor = False, True, True
     elif role == "inactive":
-        is_staff, is_active = False, False
+        is_staff, is_active, instructor = False, False, False
     elif role == "active":
-        is_staff, is_active = False, True
+        is_staff, is_active, instructor = False, True, False
     else:
         return False, "올바르지 않은 권한 값입니다."
 
@@ -1680,6 +1746,10 @@ def _apply_user_role(user, role, actor):
     user.is_staff = is_staff
     user.is_active = is_active
     user.save(update_fields=["is_staff", "is_active"])
+
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    profile.is_instructor = instructor
+    profile.save(update_fields=["is_instructor"])
     return True, ""
 
 
@@ -1697,7 +1767,7 @@ def manage_dashboard(request):
     answer_count = QuizAnswer.objects.count()
     reviewed_count = QuizAnswer.objects.filter(_REVIEWED_Q).count()
 
-    recent_answers = (
+    recent_answers = group_answer_rows(
         QuizAnswer.objects
         .select_related(
             "user",
@@ -1705,8 +1775,8 @@ def manage_dashboard(request):
             "quiz_question__quiz",
             "quiz_question__quiz__lecture",
         )
-        .order_by("-created_at")[:8]
-    )
+        .order_by("-created_at")[:DASHBOARD_RECENT_ANSWER_SCAN]
+    )[:DASHBOARD_RECENT_ROW_COUNT]
 
     context = {
         "lecture_count": Lecture.objects.count(),
@@ -1795,19 +1865,18 @@ def manage_answers(request):
     elif review_state == "pending":
         answers = answers.exclude(_REVIEWED_Q)
 
-    answers = answers.order_by("-created_at")
-
-    paginator = Paginator(answers, MANAGE_ANSWER_PAGE_SIZE)
+    rows = group_answer_rows(answers.order_by("-created_at"))
+    paginator = Paginator(rows, MANAGE_ANSWER_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
 
     items = []
-    for answer in page_obj:
-        raw_score = answer.similarity_score if answer.similarity_score is not None else 0.0
-        items.append({
-            "obj": answer,
-            "percent": round(max(0.0, min(raw_score, 1.0)) * 100, 1),
-            "is_reviewed": bool(answer.human_label) or answer.human_score is not None,
-        })
+    for row in page_obj:
+        if row["kind"] == "single":
+            answer = row["obj"]
+            raw_score = answer.similarity_score if answer.similarity_score is not None else 0.0
+            row["percent"] = round(max(0.0, min(raw_score, 1.0)) * 100, 1)
+            row["is_reviewed"] = bool(answer.human_label) or answer.human_score is not None
+        items.append(row)
 
     # 페이지 이동 시 필터를 유지하기 위한 쿼리스트링 (page 제외)
     params = request.GET.copy()
@@ -1838,6 +1907,25 @@ def manage_answers(request):
     }
     return render(request, "manage/answers.html", context)
 
+
+@staff_required
+def manage_quiz_answers(request, quiz_id, user_id):
+    """한 학생이 푼 객관식/서술형 한 차수의 전체 문항을 보고 채점한다."""
+    quiz = get_object_or_404(
+        Quiz.objects.select_related("lecture"),
+        id=quiz_id,
+        explanation__in=(OBJECTIVE_QUIZ_TYPE, *SUBJECTIVE_QUIZ_TYPES),
+    )
+    student = get_object_or_404(User, id=user_id)
+    return quiz_review(
+        request,
+        quiz,
+        student,
+        back_url=reverse("manage_answers"),
+        back_label=_("답안 검수로"),
+        student_name=student.username,
+        lecture_title=quiz.lecture.title,
+    )
 
 @staff_required
 def manage_users(request):
@@ -1915,7 +2003,7 @@ def manage_users(request):
             "user": user,
             "profile": profile,
             "display_name": user.display_name,
-            "role": _user_role_value(user),
+            "role": _user_role_value(user, profile),
             "is_self": user.pk == request.user.pk,
         })
 

@@ -1165,6 +1165,9 @@ msgstr "User list pages"
 msgid "일반 사용자"
 msgstr "Regular user"
 
+msgid "강의자"
+msgstr "Instructor"
+
 msgid "운영자"
 msgstr "Staff"
 
@@ -1351,3 +1354,400 @@ msgstr "Key scenes"
 msgid "학습 점검"
 msgstr "Learning check"
 
+
+msgid "강의실"
+msgstr "Classrooms"
+
+msgid "강의실 만들기"
+msgstr "Create classroom"
+
+msgid "강의실 들어가기"
+msgstr "Join classroom"
+
+msgid "강의실을 만들면 입장 코드가 생성되고, 학생들은 그 코드로 강의실에 들어올 수 있습니다."
+msgstr "Creating a classroom generates an invite code that students can use to join."
+
+msgid "강의실 이름"
+msgstr "Classroom name"
+
+msgid "예: 인공지능캡스톤디자인 2"
+msgstr "e.g. AI Capstone Design 2"
+
+msgid "설명 (선택)"
+msgstr "Description (optional)"
+
+msgid "강의실 소개나 안내 사항을 적어 주세요."
+msgstr "Add an introduction or notes for your classroom."
+
+msgid "취소"
+msgstr "Cancel"
+
+msgid "강의자에게 받은 입장 코드를 입력하세요. 한 번 입장하면 사이드바에서 언제든 다시 들어갈 수 있습니다."
+msgstr "Enter the invite code from your instructor. Once you join, you can return anytime from the sidebar."
+
+msgid "입장 코드"
+msgstr "Invite code"
+
+#, python-format
+msgid "영문 대문자와 숫자로 된 %(length)s자리 코드입니다."
+msgstr "A %(length)s-character code of uppercase letters and numbers."
+
+msgid "입장하기"
+msgstr "Join"
+
+msgid "복사됨"
+msgstr "Copied"
+
+msgid "코드 복사"
+msgstr "Copy code"
+
+msgid "학생에게 이 코드를 공유하면 사이드바의 '강의실 들어가기'에서 입장할 수 있습니다."
+msgstr "Share this code with students so they can join via 'Join classroom' in the sidebar."
+
+msgid "참여 학생"
+msgstr "Students"
+
+msgid "나"
+msgstr "me"
+
+msgid "입장일"
+msgstr "Joined"
+
+#, python-format
+msgid "%(name)s님을 강의실에서 추방할까요?"
+msgstr "Remove %(name)s from this classroom?"
+
+msgid "추방"
+msgstr "Remove"
+
+msgid "아직 입장한 학생이 없습니다. 위의 입장 코드를 학생들에게 공유해 주세요."
+msgstr "No students have joined yet. Share the invite code above with your students."
+
+msgid "아직 입장한 학생이 없습니다."
+msgstr "No students have joined yet."
+
+msgid "이 강의실에서 나갈까요? 다시 들어오려면 입장 코드가 필요합니다."
+msgstr "Leave this classroom? You will need the invite code to join again."
+
+msgid "강의실 나가기"
+msgstr "Leave classroom"
+
+msgid "강의실은 강의자만 만들 수 있습니다."
+msgstr "Only instructors can create classrooms."
+
+msgid "강의실 이름을 입력해 주세요."
+msgstr "Please enter a classroom name."
+
+#, python-format
+msgid "강의실 이름은 %(max)d자 이하로 입력해 주세요."
+msgstr "Classroom names can be up to %(max)d characters."
+
+#, python-format
+msgid "강의실 설명은 %(max)d자 이하로 입력해 주세요."
+msgstr "Descriptions can be up to %(max)d characters."
+
+#, python-format
+msgid "강의실을 만들었습니다. 학생들에게 입장 코드 %(code)s를 공유해 주세요."
+msgstr "Classroom created. Share invite code %(code)s with your students."
+
+msgid "입장 코드를 입력해 주세요."
+msgstr "Please enter an invite code."
+
+msgid "입장 코드와 일치하는 강의실이 없습니다. 코드를 다시 확인해 주세요."
+msgstr "No classroom matches that invite code. Please check the code and try again."
+
+msgid "내가 만든 강의실입니다."
+msgstr "This is a classroom you created."
+
+#, python-format
+msgid "%(name)s 강의실에 입장했습니다."
+msgstr "You joined %(name)s."
+
+msgid "이미 참여 중인 강의실입니다."
+msgstr "You are already in this classroom."
+
+msgid "참여 중인 강의실이 아닙니다. 입장 코드를 입력해 입장해 주세요."
+msgstr "You are not in this classroom. Enter its invite code to join."
+
+msgid "이미 강의실에 없는 학생입니다."
+msgstr "This student is no longer in the classroom."
+
+#, python-format
+msgid "%(name)s님을 강의실에서 추방했습니다."
+msgstr "%(name)s was removed from the classroom."
+
+msgid "강의실을 만든 강의자는 나갈 수 없습니다."
+msgstr "The instructor who created the classroom cannot leave it."
+
+#, python-format
+msgid "%(name)s 강의실에서 나갔습니다."
+msgstr "You left %(name)s."
+
+#, python-format
+msgid "학생 %(counter)s명"
+msgid_plural "학생 %(counter)s명"
+msgstr[0] "%(counter)s student"
+msgstr[1] "%(counter)s students"
+
+msgid "강의 목록"
+msgstr "Lectures"
+
+msgid "강의 올리기"
+msgstr "Post lecture"
+
+msgid "영상 파일"
+msgstr "Video file"
+
+msgid "예: 3주차 - 신경망 기초"
+msgstr "e.g. Week 3 - Neural network basics"
+
+msgid "mp4, mov, avi, mkv, webm, m4v · 500MB 이하"
+msgstr "mp4, mov, avi, mkv, webm, m4v · up to 500MB"
+
+msgid "학생들에게 전할 강의 안내나 과제를 적어 주세요."
+msgstr "Add notes or assignments for your students."
+
+msgid "올린 강의는 AI 요약 대기열에 자동으로 등록됩니다."
+msgstr "Posted lectures are added to the AI summary queue automatically."
+
+msgid "올리기"
+msgstr "Post"
+
+msgid "분석 실패"
+msgstr "Analysis failed"
+
+msgid "대기 중"
+msgstr "Queued"
+
+msgid "이 강의를 강의실에서 내릴까요? 내 학습 기록에는 남아 있습니다."
+msgstr ""
+"Remove this lecture from the classroom? It stays in your learning history."
+
+msgid "강의실에서 내리기"
+msgstr "Remove from classroom"
+
+msgid "아직 올린 강의가 없습니다. '강의 올리기'로 첫 강의를 올려 보세요."
+msgstr "No lectures yet. Use 'Post lecture' to add your first one."
+
+msgid "아직 올라온 강의가 없습니다."
+msgstr "No lectures have been posted yet."
+
+msgid "강의실로 돌아가기"
+msgstr "Back to classroom"
+
+msgid "강의 제목을 입력해 주세요."
+msgstr "Please enter a lecture title."
+
+#, python-format
+msgid "강의 제목은 %(max)d자 이하로 입력해 주세요."
+msgstr "Lecture titles can be up to %(max)d characters."
+
+#, python-format
+msgid "강의 설명은 %(max)d자 이하로 입력해 주세요."
+msgstr "Lecture descriptions can be up to %(max)d characters."
+
+msgid "올바른 유튜브 링크를 입력해 주세요."
+msgstr "Please enter a valid YouTube link."
+
+msgid "강의를 올렸습니다. AI 요약이 끝나면 학생들도 요약을 볼 수 있습니다."
+msgstr "Lecture posted. Students can view the summary once the AI finishes."
+
+msgid "강의를 강의실에서 내렸습니다. 내 학습 기록에는 그대로 남아 있습니다."
+msgstr ""
+"Lecture removed from the classroom. It is still in your learning history."
+
+msgid "이미 강의실에 없는 강의입니다."
+msgstr "This lecture is no longer in the classroom."
+
+msgid "요약 전"
+msgstr "Not summarized"
+
+msgid "요약하기"
+msgstr "Summarize"
+
+msgid "다시 요약"
+msgstr "Summarize again"
+
+msgid "아직 요약되지 않은 강의입니다."
+msgstr "This lecture hasn't been summarized yet."
+
+msgid "분석 설정을 고른 뒤 요약하기를 누르면 AI 요약이 시작됩니다. 요약 결과는 강의실의 모든 참여자가 함께 봅니다."
+msgstr ""
+"Choose the analysis settings and press Summarize to start the AI summary. "
+"Everyone in the classroom will see the result."
+
+msgid "이전 요약에 실패했습니다."
+msgstr "The previous summary failed."
+
+msgid "올린 뒤 '요약하기'를 누르면 분석 설정을 골라 AI 요약을 시작할 수 있습니다."
+msgstr ""
+"After posting, press 'Summarize' to pick analysis settings and start the AI "
+"summary."
+
+msgid "강의를 올렸습니다. '요약하기'를 누르면 AI 요약이 시작됩니다."
+msgstr "Lecture posted. Press 'Summarize' to start the AI summary."
+
+msgid "이미 요약이 진행 중이거나 완료된 강의입니다."
+msgstr "This lecture is already being summarized or has been summarized."
+
+msgid "객관식"
+msgstr "Multiple choice"
+
+msgid "O/X"
+msgstr "True/False"
+
+msgid "피드백"
+msgstr "Feedback"
+
+msgid "서술형"
+msgstr "Short answer"
+
+msgid "채점 결과를 다시 선택해 주세요."
+msgstr "Please choose a grading result again."
+
+msgid "점수는 0~100 사이의 숫자로 입력해 주세요."
+msgstr "Enter a score between 0 and 100."
+
+msgid "%(name)s님의 답안 채점 결과를 저장했습니다."
+msgstr "Saved the grade for %(name)s's answer."
+
+msgid "학습 관리 · 채점"
+msgstr "Learning management · Grading"
+
+msgid "요약은 각자 진행되며 내 학습 기록에 저장됩니다. 요약 후 문제를 풀면 강의자가 답안을 확인하고 채점합니다."
+msgstr ""
+"Each student creates their own summary, which is saved to their learning "
+"history. After summarizing, solve the questions and the instructor will "
+"review and grade your answers."
+
+msgid "내 채점 결과"
+msgstr "My grades"
+
+msgid "아직 채점된 답안이 없습니다."
+msgstr "No graded answers yet."
+
+msgid "학생별 학습 현황을 확인하고, 학생이 푼 문제의 답안을 채점하세요."
+msgstr "Check each student's progress and grade the answers they submitted."
+
+msgid "채점"
+msgstr "Grading"
+
+msgid "학생별 학습 현황"
+msgstr "Progress by student"
+
+msgid "학생"
+msgstr "Student"
+
+msgid "요약한 강의"
+msgstr "Summarized lectures"
+
+msgid "채점 대기"
+msgstr "Awaiting grading"
+
+msgid "자동 채점 평균"
+msgstr "Avg. auto score"
+
+msgid "강의자 점수 평균"
+msgstr "Avg. instructor score"
+
+msgid "답안 보기"
+msgstr "View answers"
+
+msgid "답안 채점"
+msgstr "Grade answers"
+
+msgid "채점 상태"
+msgstr "Grading status"
+
+msgid "채점 완료"
+msgstr "Graded"
+
+msgid "문제 · 모범 답안"
+msgstr "Question · Model answer"
+
+msgid "채점 결과"
+msgstr "Grading result"
+
+msgid "미채점"
+msgstr "Not graded"
+
+msgid "아직 학생이 제출한 답안이 없습니다. 학생이 강의를 요약하고 문제를 풀면 여기에 표시됩니다."
+msgstr ""
+"No answers submitted yet. They will appear here once students summarize a "
+"lecture and solve its questions."
+
+msgid "학생 %(counter)s명 요약"
+msgid_plural "학생 %(counter)s명 요약"
+msgstr[0] "%(counter)s student summarized"
+msgstr[1] "%(counter)s students summarized"
+
+#, python-format
+msgid "%(gen)s차 객관식 문제"
+msgstr "Round %(gen)s multiple-choice quiz"
+
+#, python-format
+msgid "%(total)s문항 중 %(answered)s문항 응답 · 정답 %(correct)s개"
+msgstr "%(answered)s of %(total)s answered · %(correct)s correct"
+
+msgid "문항"
+msgstr " questions"
+
+msgid "미응답"
+msgstr "Not answered"
+
+msgid "학생 선택"
+msgstr "Student's choice"
+
+msgid "자동 채점 결과(정답 100점, 오답 0점)로 모든 문항을 채점할까요? 직접 입력한 값은 덮어씁니다."
+msgstr ""
+"Grade every question with the auto result (correct 100, wrong 0)? Values you"
+" entered will be overwritten."
+
+msgid "자동 결과로 일괄 채점"
+msgstr "Grade all with auto result"
+
+msgid "채점 저장"
+msgstr "Save grades"
+
+msgid "이 차수에 문제가 없습니다."
+msgstr "This round has no questions."
+
+#, python-format
+msgid "자동 채점 결과로 %(count)d문항을 채점했습니다."
+msgstr "Graded %(count)d questions with the auto result."
+
+#, python-format
+msgid "%(number)d번 문항의 채점 값이 올바르지 않습니다. 점수는 0~100 사이로 입력해 주세요."
+msgstr ""
+"Question %(number)d has an invalid grade. Enter a score between 0 and 100."
+
+msgid "답안 검수로"
+msgstr "Back to answer review"
+
+#, python-format
+msgid "%(gen)s차 서술형 문제"
+msgstr "Round %(gen)s short-answer quiz"
+
+#, python-format
+msgid "%(total)s문항 중 %(answered)s문항 응답"
+msgstr "%(answered)s of %(total)s answered"
+
+msgid "응답"
+msgstr "Answered"
+
+msgid "평균 자동 점수"
+msgstr "Avg. auto score"
+
+msgid "자동"
+msgstr "Auto"
+
+msgid "학생 답안"
+msgstr "Student answer"
+
+msgid "자동 판정과 자동 점수로 모든 문항을 채점할까요? 직접 입력한 값은 덮어씁니다."
+msgstr ""
+"Grade every question with the auto verdict and auto score? Values you "
+"entered will be overwritten."
+
+msgid "평균"
+msgstr "Avg."

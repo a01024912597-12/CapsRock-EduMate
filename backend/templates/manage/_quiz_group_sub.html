@@ -1,0 +1,1 @@
+{% load i18n %}{% if row.kind == 'objective' %}{% blocktrans with answered=row.answered total=row.question_count correct=row.correct %}{{ total }}문항 중 {{ answered }}문항 응답 · 정답 {{ correct }}개{% endblocktrans %}{% else %}{% blocktrans with answered=row.answered total=row.question_count %}{{ total }}문항 중 {{ answered }}문항 응답{% endblocktrans %}{% endif %}

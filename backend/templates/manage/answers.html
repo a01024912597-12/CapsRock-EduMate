@@ -118,6 +118,32 @@
             </thead>
             <tbody>
                 {% for item in items %}
+                {% if item.kind != "single" %}
+                {% url 'manage_quiz_answers' item.quiz.id item.user.id as group_url %}
+                <tr class="mng-group-row">
+                    <td class="mng-cell-user">{{ item.user.username }}</td>
+                    <td class="mng-cell-lecture" title="{{ item.lecture.title }}">
+                        <span class="mng-lecture-title">{{ item.lecture.title }}</span>
+                    </td>
+                    <td colspan="2">
+                        <a class="mng-group-link" href="{{ group_url }}">
+                            <i class="fas {% if item.kind == 'objective' %}fa-list-ol{% else %}fa-pen-fancy{% endif %}"></i> {% include 'manage/_quiz_group_title.html' with kind=item.kind gen=item.quiz.generation_number %}
+                        </a>
+                        <span class="mng-lecture-sub">{% include 'manage/_quiz_group_sub.html' with row=item %}</span>
+                    </td>
+                    <td class="mng-cell-score"><strong>{{ item.score }}%</strong></td>
+                    <td class="mng-cell-label">
+                        <span class="mng-pill {% if item.is_reviewed %}good{% else %}review{% endif %}">{% trans "검수" %} {{ item.reviewed }}/{{ item.answered }}</span>
+                    </td>
+                    <td class="mng-cell-review">
+                        <a class="mng-save-btn mng-group-btn" href="{{ group_url }}">{% trans "전체 보기" %} <i class="fas fa-angle-right"></i></a>
+                    </td>
+                    <td class="mng-cell-time">
+                        <span class="mng-time-date">{{ item.created_at|date:"Y-m-d" }}</span>
+                        <span class="mng-time-hour">{{ item.created_at|date:"H:i" }}</span>
+                    </td>
+                </tr>
+                {% else %}
                 {% with answer=item.obj %}
                 <tr>
                     <td class="mng-cell-user">{{ answer.user.username }}</td>
@@ -167,6 +193,7 @@
                     </td>
                 </tr>
                 {% endwith %}
+                {% endif %}
                 {% endfor %}
             </tbody>
         </table>

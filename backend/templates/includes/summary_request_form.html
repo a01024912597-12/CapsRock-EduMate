@@ -1,0 +1,141 @@
+{% load i18n %}
+<style>
+    .sum-req-card {
+        padding: 22px 24px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--bg-card);
+    }
+
+    .sum-req-head h4 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 17px;
+        color: var(--text-main);
+    }
+
+    .sum-req-head h4 i { color: var(--accent); }
+
+    .sum-req-head p {
+        margin-top: 6px;
+        font-size: 14px;
+        color: var(--text-sub);
+    }
+
+    .sum-req-error {
+        margin-top: 14px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.08);
+        color: #ef4444;
+        font-size: 13px;
+    }
+
+    .sum-req-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin: 18px 0;
+    }
+
+    .sum-req-field label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-sub);
+    }
+
+    .sum-req-field label i { color: var(--accent); }
+
+    .sum-req-field select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border2);
+        border-radius: 10px;
+        background: var(--bg-inner);
+        color: var(--text-main);
+        font-size: 14px;
+        font-family: inherit;
+    }
+
+    .sum-req-hint {
+        margin-top: 4px;
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .sum-req-actions { display: flex; justify-content: flex-end; }
+    .sum-req-actions .btn-primary { flex: 0 0 auto; padding: 12px 22px; }
+
+    @media (max-width: 700px) {
+        .sum-req-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+</style>
+
+<form method="post" action="{% url 'lecture_summarize' lecture_id %}" class="sum-req-card" id="summaryRequestForm">
+    {% csrf_token %}
+    <div class="sum-req-head">
+        <h4><i class="fas fa-magic"></i> {% trans "아직 요약되지 않은 강의입니다." %}</h4>
+        <p>{% trans "분석 설정을 고른 뒤 요약하기를 누르면 AI 요약이 시작됩니다. 요약 결과는 강의실의 모든 참여자가 함께 봅니다." %}</p>
+    </div>
+
+    {% if summary_failed_message %}
+    <div class="sum-req-error"><i class="fas fa-exclamation-circle"></i> {% trans "이전 요약에 실패했습니다." %} {{ summary_failed_message }}</div>
+    {% endif %}
+
+    <div class="sum-req-grid">
+        <div class="sum-req-field">
+            <label for="sumReqWhisper"><i class="fas fa-brain"></i> {% trans "분석 정확도" %}</label>
+            <select name="whisper_model" id="sumReqWhisper">
+                <option value="base" selected>{% trans "base-빠른 분석" %}</option>
+                <option value="small">{% trans "small-균형 분석" %}</option>
+                <option value="medium">{% trans "medium-정확한 분석" %}</option>
+                <option value="large">{% trans "large-고정밀 분석" %}</option>
+            </select>
+        </div>
+        <div class="sum-req-field">
+            <label for="sumReqWorkers"><i class="fas fa-users-cog"></i> {% trans "처리 속도" %}</label>
+            <select name="workers" id="sumReqWorkers">
+                <option value="1">{% trans "안정 모드 — 낮은 사양 권장" %}</option>
+                <option value="2" selected>{% trans "기본 모드 — 권장" %}</option>
+                <option value="3">{% trans "빠른 모드 — 높은 성능 필요" %}</option>
+                <option value="4">{% trans "최대 속도 — 고성능 환경" %}</option>
+            </select>
+        </div>
+        <div class="sum-req-field">
+            <label for="sumReqSubject"><i class="fas fa-book-open"></i> {% trans "강의 유형" %}</label>
+            <select name="subject_code" id="sumReqSubject">
+                <option value="auto" selected>{% trans "자동 선택 — 강의 내용에 맞게 분석" %}</option>
+                <option value="4">{% trans "일반 강의 — 범용 요약" %}</option>
+                <option value="1">{% trans "역사/인문학 — 사건 흐름과 인과관계 중심" %}</option>
+                <option value="2">{% trans "프로그래밍/IT — 코드 흐름과 실습 중심" %}</option>
+                <option value="3">{% trans "수학/과학 — 개념, 공식, 풀이 과정 중심" %}</option>
+            </select>
+        </div>
+        <div class="sum-req-field">
+            <label for="sumReqApi"><i class="fas fa-microchip"></i> {% trans "요약 방식" %}</label>
+            <select name="summary_api" id="sumReqApi">
+                <option value="gemini" selected>{% trans "기본 요약 — Gemini 활용" %}</option>
+                <option value="gpt">{% trans "정밀 요약 — GPT 활용" %}</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="sum-req-actions">
+        <button type="submit" class="btn-primary"><i class="fas fa-magic"></i> {% trans "요약하기" %}</button>
+    </div>
+</form>
+<script>
+    (function () {
+        const form = document.getElementById('summaryRequestForm');
+        if (!form) return;
+        form.addEventListener('submit', function () {
+            form.querySelector('button[type="submit"]').disabled = true;
+        });
+    })();
+</script>

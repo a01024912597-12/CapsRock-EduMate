@@ -64,6 +64,11 @@
         <div class="summary-analysis-wrap" style="margin-top: 20px;">
             <h3 class="summary-analysis-title">📋 {% trans "AI 요약" %}</h3>
 
+            {% if needs_summary_request %}
+            {% include 'includes/summary_request_form.html' %}
+            {% elif summary_not_started %}
+            <p class="app-meta-line">{% trans "아직 요약되지 않은 강의입니다." %}</p>
+            {% else %}
             <div id="analysis-container">
                 <div id="loading-area" class="queue-progress-card">
                     <div class="queue-badge" id="queueBadge">대기열 확인 중...</div>
@@ -100,6 +105,7 @@
 
                 <div id="result-text" style="display: none;"></div>
             </div>
+            {% endif %}
         </div>
 
         <div class="page-actions" style="margin-top: 24px;">
@@ -111,12 +117,19 @@
                 download>
                 <i class="fas fa-file-pdf"></i> {% trans "PDF 다운로드" %}
             </a>
+            {% if lecture_classroom %}
+            <a href="{% url 'classroom_detail' lecture_classroom.pk %}" class="btn-action btn-action--muted">
+                <i class="fas fa-chalkboard"></i> {% trans "강의실로 돌아가기" %}
+            </a>
+            {% endif %}
+            {% if is_lecture_owner %}
             <button type="button" class="btn-action btn-action--muted" onclick="location.href='{% url 'upload' %}'">
                 {% trans "새로운 강의 분석" %}
             </button>
             <button type="button" class="btn-action btn-action--primary" onclick="location.href='{% url 'quiz' %}?lecture_id={{ lecture_id }}'">
                 {% trans "예상 문제 풀기" %}
             </button>
+            {% endif %}
         </div>
     </div>
 
@@ -751,6 +764,7 @@ function renderSummaryHtml(text) {
             const lectureId = "{{ lecture_id }}";
             const loadingArea = document.getElementById('loading-area');
             const resultArea = document.getElementById('result-text');
+            if (!loadingArea || !resultArea) return;
             runAnalysis(lectureId, loadingArea, resultArea);
 
             resultArea.addEventListener('click', function (e) {

@@ -7,7 +7,7 @@
     <title>{% block title %}EduMate{% endblock %}</title>
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="{% static 'css/edumate-gradient.css' %}?v=20260909">
+    <link rel="stylesheet" href="{% static 'css/edumate-gradient.css' %}?v=20261012">
     <script>
         (function () {
             try {
@@ -45,6 +45,23 @@
                 <i class="fas fa-tasks"></i> {% trans "학습 관리" %}
             </a>
             {% endif %}
+
+            <div class="sidebar-section-title">{% trans "강의실" %}</div>
+            {% if sidebar_is_instructor %}
+            <a href="{% url 'classroom_create' %}" class="{% if request.resolver_match.url_name == 'classroom_create' %}active{% endif %}">
+                <i class="fas fa-plus"></i> {% trans "강의실 만들기" %}
+            </a>
+            {% else %}
+            <a href="{% url 'classroom_join' %}" class="{% if request.resolver_match.url_name == 'classroom_join' %}active{% endif %}">
+                <i class="fas fa-door-open"></i> {% trans "강의실 들어가기" %}
+            </a>
+            {% endif %}
+            {% for room in sidebar_classrooms %}
+            <a href="{% url 'classroom_detail' room.pk %}" class="{% if room.pk == sidebar_current_classroom_id %}active{% endif %}" title="{{ room.name }}">
+                <span class="sidebar-classroom-icon">{{ room.name|slice:":1"|upper }}</span>
+                <span class="sidebar-classroom-name">{{ room.name }}</span>
+            </a>
+            {% endfor %}
         </nav>
         <div class="sidebar-bottom">
             {% get_current_language as CURRENT_LANG %}
