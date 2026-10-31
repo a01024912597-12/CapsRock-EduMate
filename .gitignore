@@ -10,3 +10,9 @@ staticfiles/
 .DS_Store
 .idea/
 .vscode/
+# EduMate STT temporary files
+backend/chunk_*.mp3
+backend/temp_full_audio.mp3
+
+# Local backup files
+edumate_backup/
