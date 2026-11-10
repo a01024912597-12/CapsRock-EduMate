@@ -2,7 +2,8 @@
 
 WHISPER_MODEL_NAME = "base"
 PARALLEL_MAX_WORKERS = 2
-SUMMARY_API_NAME = "gemini"
+SUMMARY_API_NAME = "gpt"
+SUMMARY_LANGUAGE_NAME = "ko"
 SUBJECT_CODE_NAME = "auto"
 
 
@@ -69,6 +70,32 @@ def normalize_summary_api(value):
     return value
 
 
+
+def normalize_summary_language(value):
+    """UI 언어 코드를 AI 요약 출력 언어로 안전하게 정리한다.
+
+    ko      : 한국어
+    en      : English
+    zh-hans : 简体中文
+    """
+    value = str(value or SUMMARY_LANGUAGE_NAME).strip().lower().replace("_", "-")
+
+    aliases = {
+        "ko-kr": "ko",
+        "en-us": "en",
+        "en-gb": "en",
+        "zh": "zh-hans",
+        "zh-cn": "zh-hans",
+        "zh-sg": "zh-hans",
+    }
+    value = aliases.get(value, value)
+
+    allowed_values = ["ko", "en", "zh-hans"]
+    if value not in allowed_values:
+        return SUMMARY_LANGUAGE_NAME
+
+    return value
+
 def get_lecture_analysis_options(request, lecture_id):
     """강의별 분석 옵션을 세션에서 가져온다."""
     session_key = f"lecture_analysis_options_{lecture_id}"
@@ -87,5 +114,8 @@ def get_lecture_analysis_options(request, lecture_id):
         ),
         "summary_api": normalize_summary_api(
             options.get("summary_api", SUMMARY_API_NAME)
+        ),
+        "summary_language": normalize_summary_language(
+            options.get("summary_language", SUMMARY_LANGUAGE_NAME)
         ),
     }

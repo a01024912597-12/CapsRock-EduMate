@@ -8,7 +8,7 @@ import PIL.Image
 from google import genai
 from django.conf import settings
 
-from ..utils.option_utils import normalize_subject_code, normalize_summary_api
+from ..utils.option_utils import normalize_subject_code, normalize_summary_api, normalize_summary_language
 from ..utils.text_utils import clean_summary_text
 from .media_service import format_seconds_to_mmss
 
@@ -135,7 +135,7 @@ def gemini_generate_text(contents, max_retries=5, base_delay=10):
 # 요약 API 선택 공통 처리
 # =========================
 
-def get_summary_model_label(summary_api="gemini"):
+def get_summary_model_label(summary_api="gpt"):
     """로그 및 DB 기록용 요약 API/모델명을 반환한다."""
     summary_api = normalize_summary_api(summary_api)
 
@@ -536,7 +536,7 @@ def openai_generate_multimodal_text(
     raise last_error
 
 
-def generate_text_by_selected_api(prompt, summary_api="gemini"):
+def generate_text_by_selected_api(prompt, summary_api="gpt"):
     """선택된 요약 API에 따라 Gemini 또는 GPT를 호출한다."""
     summary_api = normalize_summary_api(summary_api)
 
@@ -547,10 +547,111 @@ def generate_text_by_selected_api(prompt, summary_api="gemini"):
 
 
 # =========================
+# 요약 출력 언어
+# =========================
+
+_SUMMARY_LANGUAGE_META = {
+    "ko": {
+        "label": "한국어",
+        "header": "[AI가 분석한 강의 요약]",
+        "section3": "3. 꼭 알아야 할 필수 개념",
+        "section4": "4. 핵심",
+        "no_evidence": "근거 없음",
+        "image_alt": "강의 화면",
+        "image_reference": "시점 판서 및 자료 참조",
+        "core_image": "시점 핵심 화면",
+        "lecture_image": "시점 강의 화면",
+    },
+    "en": {
+        "label": "English",
+        "header": "[AI Lecture Summary]",
+        "section3": "3. Essential Concepts",
+        "section4": "4. Key",
+        "no_evidence": "No evidence",
+        "image_alt": "lecture frame",
+        "image_reference": "lecture slide / board reference",
+        "core_image": "key lecture frame",
+        "lecture_image": "lecture frame",
+    },
+    "zh-hans": {
+        "label": "简体中文",
+        "header": "[AI 分析的课程摘要]",
+        "section3": "3. 必须掌握的核心概念",
+        "section4": "4. 核心",
+        "no_evidence": "无依据",
+        "image_alt": "课程画面",
+        "image_reference": "板书及资料参考",
+        "core_image": "核心画面",
+        "lecture_image": "课程画面",
+    },
+}
+
+
+def _get_summary_language_meta(summary_language="ko"):
+    language = normalize_summary_language(summary_language)
+    return language, _SUMMARY_LANGUAGE_META[language]
+
+
+def get_summary_result_header(summary_language="ko"):
+    """요약 결과 맨 앞에 붙이는 언어별 안내 헤더를 반환한다."""
+    _language, meta = _get_summary_language_meta(summary_language)
+    return meta["header"]
+
+
+def _get_summary_language_instruction(summary_language="ko", final=False):
+    """UI 언어와 동일한 언어로 AI가 출력하도록 강제하는 프롬프트 지시문."""
+    language, meta = _get_summary_language_meta(summary_language)
+
+    if language == "en":
+        instruction = f"""
+[Output language - English]
+- Write the entire response in natural English, including section headings, explanations, bullets, and labels.
+- Preserve code identifiers, API names, library names, formulas, commands, proper nouns, and standard technical terms when translating them would reduce accuracy.
+- Do not translate or alter timeline values such as (05:10) or image markers such as [IMG: 05:10].
+- Use a neutral academic style suitable for university lecture notes.
+- Even if Korean wording appears in the instructions below, the final response itself must be written in English.
+"""
+    elif language == "zh-hans":
+        instruction = f"""
+[输出语言 - 简体中文]
+- 整个回答必须使用自然、清晰的简体中文，包括章节标题、说明、项目符号和标签。
+- 代码标识符、API 名称、库名称、公式、命令、专有名词及通用技术术语在翻译会降低准确性时保留原文。
+- 不要翻译或修改 (05:10) 等时间信息以及 [IMG: 05:10] 等图片标记。
+- 使用适合大学课程笔记的客观、清晰表达。
+- 即使下方说明中出现韩文，最终回答本身也必须使用简体中文。
+"""
+    else:
+        instruction = f"""
+[출력 언어 - 한국어]
+- 전체 응답을 자연스러운 한국어로 작성한다.
+- 코드 식별자, API·라이브러리 이름, 공식, 명령어, 고유명사는 정확성을 위해 필요한 경우 원문 표기를 유지한다.
+- (05:10) 같은 타임라인과 [IMG: 05:10] 같은 이미지 마커는 변경하지 않는다.
+- 대학 강의 노트에 적합한 객관적이고 명확한 문체를 사용한다.
+"""
+
+    if final:
+        instruction += f"""
+[Required localized section markers]
+- Section 3 heading must start exactly with: {meta['section3']}
+- Section 4 heading must start exactly with: {meta['section4']}
+"""
+
+    return instruction.strip()
+
+
+def _strip_summary_result_header(text):
+    """한국어/영어/중국어 요약 안내 헤더를 제거한다."""
+    cleaned = (text or "").strip()
+    for meta in _SUMMARY_LANGUAGE_META.values():
+        cleaned = cleaned.replace(meta["header"], "").strip()
+    return cleaned
+
+
+# =========================
 # 이미지 마커 처리
 # =========================
 
-def replace_image_markers_with_html(ai_summary_text, lecture_id):
+def replace_image_markers_with_html(ai_summary_text, lecture_id, summary_language="ko"):
     """AI 요약문에 남겨진 [IMG: MM:SS] 마커를 실제 이미지 HTML로 치환한다.
 
     - **[IMG: 02:12]** 처럼 마크다운 bold로 감싼 경우도 처리한다.
@@ -558,6 +659,7 @@ def replace_image_markers_with_html(ai_summary_text, lecture_id):
     - 이미지 HTML 앞뒤에 줄바꿈을 넣어 summary.html이 별도 블록으로 인식하게 한다.
     """
     text = ai_summary_text or ""
+    _language, language_meta = _get_summary_language_meta(summary_language)
 
     pattern = r"\*{0,2}\[IMG:\s*(\d{1,3}:\d{2})\s*\]\*{0,2}"
 
@@ -588,11 +690,11 @@ def replace_image_markers_with_html(ai_summary_text, lecture_id):
             f'\n\n<div class="timeline-image-wrapper" '
             f'style="text-align:center; margin: 25px 0; padding: 15px; '
             f'background-color:#f8f9fa; border-radius:12px;">'
-            f'<img src="{image_url}" alt="{time_str} 강의화면" '
+            f'<img src="{image_url}" alt="{time_str} {language_meta["image_alt"]}" '
             f'style="max-width:90%; border-radius:8px; '
             f'box-shadow:0 4px 6px rgba(0,0,0,0.1);">'
             f'<p style="color:#6c757d; font-size:0.9em; '
-            f'margin-top:10px; font-weight:bold;">▶ {time_str} 시점 판서 및 자료 참조</p>'
+            f'margin-top:10px; font-weight:bold;">▶ {time_str} {language_meta["image_reference"]}</p>'
             f'</div>\n\n'
         )
 
@@ -619,15 +721,19 @@ def replace_image_markers_with_html(ai_summary_text, lecture_id):
 # 청크 요약 프롬프트
 # =========================
 
-def get_subject_chunk_prompt(subject_code, chunk_text):
+def get_subject_chunk_prompt(subject_code, chunk_text, summary_language="ko"):
     """과목별 특성에 맞게 청크 요약 프롬프트를 생성한다."""
     subject_code = normalize_subject_code(subject_code)
+    summary_language = normalize_summary_language(summary_language)
+    language_instruction = _get_summary_language_instruction(summary_language, final=False)
 
-    base_instructions = """
+    base_instructions = f"""
 [공통 요구사항]
 - 모든 문장은 '~했다', '~이다', '~하다' 형식의 객관적인 평어체로 작성할 것.
 - 입력 텍스트 맨 앞에 [분:초 ~ 분:초] 형태의 구간 헤더가 있다면, 해당 구간 정보를 출력 맨 앞에 그대로 포함할 것.
 - 본문 중간에 임의의 타임라인을 추가하지 말 것.
+
+{language_instruction}
 """
 
     if subject_code == "auto":
@@ -755,10 +861,10 @@ def get_subject_chunk_prompt(subject_code, chunk_text):
 """
 
 
-def summarize_chunk(chunk_text, subject_code="auto", summary_api="gemini"):
+def summarize_chunk(chunk_text, subject_code="auto", summary_api="gpt", summary_language="ko"):
     """단일 청크를 과목별 프롬프트로 선택된 API를 사용해 요약한다."""
     try:
-        prompt = get_subject_chunk_prompt(subject_code, chunk_text)
+        prompt = get_subject_chunk_prompt(subject_code, chunk_text, summary_language=summary_language)
         result = generate_text_by_selected_api(prompt, summary_api=summary_api)
 
         if not result:
@@ -789,8 +895,20 @@ def _dedup_summary(text):
     return text.strip()
 
 
-_SECTION_3_START = "3. 꼭 알아야 할"
-_SECTION_4_START = "4. 핵심"
+_SECTION_3_STARTS = (
+    "3. 꼭 알아야 할",
+    "3. Essential Concepts",
+    "3. Must-Know Essential Concepts",
+    "3. 必须掌握的核心概念",
+    "3. 必须了解的核心概念",
+)
+_SECTION_4_STARTS = (
+    "4. 핵심",
+    "4. Key",
+    "4. Core",
+    "4. 核心",
+    "4. 重点",
+)
 _TS = r"(\d{1,3}\s*:\s*\d{1,2}(?:\s*:\s*\d{1,2})?)"
 _KEYWORD_TIMELINE_LINE_PATTERNS = (
     re.compile(rf"(?m)^\s*\*\s*\*\*(.+?)\s*\(\s*{_TS}\s*\)\s*\*\*\s*$"),
@@ -810,30 +928,35 @@ def _normalize_summary_keyword(raw):
     return s
 
 
+def _find_first_marker(text, markers):
+    """여러 다국어 섹션 마커 중 가장 먼저 등장하는 위치를 찾는다."""
+    positions = []
+    for marker in markers:
+        idx = text.find(marker)
+        if idx >= 0:
+            positions.append((idx, marker))
+    if not positions:
+        return -1, ""
+    return min(positions, key=lambda item: item[0])
+
+
 def _extract_section_3(summary_text):
-    """최종 요약문에서 '3. 꼭 알아야 할...' 섹션 본문만 추출한다."""
-    text = (summary_text or "").strip()
+    """최종 요약문에서 언어별 3번 핵심 개념 섹션 본문만 추출한다."""
+    text = _strip_summary_result_header(summary_text)
 
     if not text:
         return ""
 
-    if "[AI가 분석한 강의 요약]" in text:
-        _, _, text = text.partition("[AI가 분석한 강의 요약]")
-        text = text.strip().lstrip("\n").strip()
-
-    start_idx = text.find(_SECTION_3_START)
-
+    start_idx, _start_marker = _find_first_marker(text, _SECTION_3_STARTS)
     if start_idx < 0:
         return ""
 
     section = text[start_idx:]
-    end_idx = section.find(_SECTION_4_START)
-
+    end_idx, _end_marker = _find_first_marker(section, _SECTION_4_STARTS)
     if end_idx > 0:
         section = section[:end_idx]
 
     return section.strip()
-
 
 def extract_summary_timeline(summary_text):
     """요약문 3번 섹션에서 '키워드 (분:초)' 형식의 타임라인만 추출한다."""
@@ -881,7 +1004,8 @@ def timestamp_to_seconds(timestamp):
     raw = raw.strip("()[]")
     raw = re.sub(r"\s+", "", raw)
 
-    if not raw or raw == "근거없음":
+    no_evidence_values = {"근거없음", "근거 없음", "noevidence", "no evidence", "无依据", "无证据"}
+    if not raw or raw.lower() in no_evidence_values:
         return None
 
     parts = raw.split(":")
@@ -993,7 +1117,7 @@ def select_best_frame_for_timeline(target_seconds, timeline_frames=None, max_dis
     return best_frame
 
 
-def _timeline_image_html(lecture_id, frame, keyword="", display_time=""):
+def _timeline_image_html(lecture_id, frame, keyword="", display_time="", summary_language="ko"):
     """선택된 프레임을 요약문에 삽입할 HTML로 변환한다."""
     if not lecture_id or not frame:
         return ""
@@ -1005,19 +1129,20 @@ def _timeline_image_html(lecture_id, frame, keyword="", display_time=""):
 
     filename = os.path.basename(filepath)
     image_url = f"/media/lecture_frames/{lecture_id}/{filename}"
+    _language, language_meta = _get_summary_language_meta(summary_language)
     time_str = display_time or frame.get("time_str") or ""
     caption_keyword = (keyword or frame.get("keyword") or "").strip()
 
     if caption_keyword:
-        caption = f"▶ {time_str} 시점 핵심 화면: {caption_keyword}"
+        caption = f"▶ {time_str} {language_meta['core_image']}: {caption_keyword}"
     else:
-        caption = f"▶ {time_str} 시점 강의 화면"
+        caption = f"▶ {time_str} {language_meta['lecture_image']}"
 
     return (
         f'\n\n<div class="timeline-image-wrapper" '
         f'style="text-align:center; margin: 25px 0; padding: 15px; '
         f'background-color:#f8f9fa; border-radius:12px;">'
-        f'<img src="{image_url}" alt="{caption_keyword or time_str} 강의화면" '
+        f'<img src="{image_url}" alt="{caption_keyword or time_str} {language_meta["image_alt"]}" '
         f'style="max-width:90%; border-radius:8px; '
         f'box-shadow:0 4px 6px rgba(0,0,0,0.1);">'
         f'<p style="color:#6c757d; font-size:0.9em; '
@@ -1037,7 +1162,7 @@ def _line_has_timeline_seconds(line, target_seconds):
     return False
 
 
-def inject_core_timeline_images(summary_text, timeline_frames=None, lecture_id=None, max_images=4):
+def inject_core_timeline_images(summary_text, timeline_frames=None, lecture_id=None, max_images=4, summary_language="ko"):
     """요약의 핵심 개념 타임라인에 맞춰 영상 프레임 이미지를 자동 삽입한다.
 
     기존 Gemini가 [IMG: MM:SS] 마커를 넣은 경우에는 이미 이미지 HTML이 생성되므로
@@ -1103,6 +1228,7 @@ def inject_core_timeline_images(summary_text, timeline_frames=None, lecture_id=N
                 frame=best_frame,
                 keyword=keyword,
                 display_time=time_str,
+                summary_language=summary_language,
             )
 
             if not html:
@@ -1120,8 +1246,9 @@ def make_final_summary(
     chunk_summaries_text,
     timeline_frames=None,
     subject_code="auto",
-    summary_api="gemini",
+    summary_api="gpt",
     source_char_count=None,
+    summary_language="ko",
 ):
     """여러 부분 요약을 결합해 과목 맞춤형 최종 요약을 수행한다.
 
@@ -1130,6 +1257,9 @@ def make_final_summary(
     """
     try:
         subject_code = normalize_subject_code(subject_code)
+        summary_language = normalize_summary_language(summary_language)
+        _language, language_meta = _get_summary_language_meta(summary_language)
+        language_instruction = _get_summary_language_instruction(summary_language, final=True)
 
         if not source_char_count:
             source_char_count = len(chunk_summaries_text or "")
@@ -1187,16 +1317,18 @@ def make_final_summary(
 - 마커를 굵게 표시하지 마세요. 즉, **[IMG: 02:12]** 처럼 쓰지 말고 [IMG: 02:12] 형식만 사용하세요.
 
 [공통 출력 규칙]
-- 세 번째 섹션의 제목은 반드시 "3. 꼭 알아야 할 필수 개념"으로 시작해야 합니다.
-- 세 번째 섹션 안의 각 항목은 반드시 "- 키워드명 (분:초)" 형식이어야 합니다.
-- 네 번째 섹션의 제목은 반드시 "4. 핵심"으로 시작해야 합니다.
+- 세 번째 섹션의 제목은 반드시 "{language_meta['section3']}"으로 시작해야 합니다.
+- 세 번째 섹션 안의 각 항목은 반드시 "- 키워드명 (분:초)" 구조를 유지하되, 키워드명과 설명은 선택된 출력 언어로 작성해야 합니다.
+- 네 번째 섹션의 제목은 반드시 "{language_meta['section4']}"으로 시작해야 합니다.
 - 같은 섹션 헤더를 두 번 이상 반복하지 말 것.
 - 최종 완성본을 한 번만 출력할 것.
 - HTML 태그를 직접 출력하지 말 것.
-- 모든 문장의 끝맺음은 '~했다', '~이다', '~하다' 형식의 객관적인 평어체로 통일할 것.
+- 문체는 선택된 출력 언어의 자연스러운 대학 강의 노트 문체를 따를 것.
 - (분:초) 형식의 일반 타임라인은 오직 3번 섹션의 키워드 옆에만 표기할 것.
 
 {adaptive_length_instruction}
+
+{language_instruction}
 """
 
         if subject_code == "auto":
@@ -1449,16 +1581,7 @@ def extract_concept_entries_from_summary(summary_text):
     if not text:
         return []
 
-    section_match = re.search(
-        r"3\.\s*꼭\s*알아야\s*할\s*필수\s*개념.*?(?=\n\s*4\.\s*핵심|\Z)",
-        text,
-        re.DOTALL,
-    )
-
-    if section_match:
-        concept_section = section_match.group(0)
-    else:
-        concept_section = text
+    concept_section = _extract_section_3(text) or text
 
     lines = concept_section.splitlines()
 
@@ -1481,12 +1604,12 @@ def extract_concept_entries_from_summary(summary_text):
             keyword = match.group(1).strip()
             timeline = (match.group(2) or "").strip()
 
-            if (
-                keyword.startswith("구체적")
-                or keyword.startswith("역사적")
-                or keyword.startswith("의미")
-                or keyword.startswith("결과")
-            ):
+            description_prefixes = (
+                "구체적", "역사적", "의미", "결과", "맥락", "시험 포인트", "정의", "작동", "실무",
+                "meaning", "context", "exam point", "definition", "how it works", "practical", "result", "impact",
+                "含义", "意义", "背景", "语境", "考点", "定义", "原理", "作用", "结果", "影响", "应用",
+            )
+            if keyword.lower().startswith(description_prefixes):
                 if current:
                     current["description_parts"].append(keyword)
                 continue

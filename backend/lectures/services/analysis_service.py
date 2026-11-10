@@ -32,6 +32,7 @@ from .summary_service import (
     extract_summary_timeline,
     parse_summary_timeline_items,
     inject_core_timeline_images,
+    get_summary_result_header,
 )
 
 
@@ -98,7 +99,8 @@ def analyze_video_request(request):
     selected_whisper_model = analysis_options["whisper_model"]
     selected_workers = analysis_options["workers"]
     selected_subject_code = analysis_options["subject_code"]
-    selected_summary_api = analysis_options.get("summary_api", "gemini")
+    selected_summary_api = analysis_options.get("summary_api", "gpt")
+    selected_summary_language = analysis_options.get("summary_language", "ko")
     summary_model_label = get_summary_model_label(selected_summary_api)
 
     # get_whisper_model()이 참조하는 stt_service의 모델명을 현재 강의 설정값으로 변경
@@ -127,6 +129,7 @@ def analyze_video_request(request):
             "selected_whisper_model": selected_whisper_model,
             "selected_workers": selected_workers,
             "selected_summary_api": selected_summary_api,
+            "selected_summary_language": selected_summary_language,
         })
 
     print("\n" + "=" * 60)
@@ -136,6 +139,7 @@ def analyze_video_request(request):
         f"workers={selected_workers}, "
         f"subject_code={selected_subject_code}, "
         f"summary_api={selected_summary_api}, "
+        f"summary_language={selected_summary_language}, "
         f"segment={AUDIO_SEGMENT_SECONDS}초, "
         f"summary_model={summary_model_label}"
     )
@@ -387,6 +391,7 @@ def analyze_video_request(request):
                     chunk,
                     subject_code=selected_subject_code,
                     summary_api=selected_summary_api,
+                    summary_language=selected_summary_language,
                 )
 
             chunk_summary_tasks = list(enumerate(timeline_chunks, start=1))
@@ -437,6 +442,7 @@ def analyze_video_request(request):
             subject_code=selected_subject_code,
             summary_api=selected_summary_api,
             source_char_count=len(full_transcript),
+            summary_language=selected_summary_language,
         )
 
         final_summary_api_duration = time.time() - final_summary_api_start_time
@@ -455,6 +461,7 @@ def analyze_video_request(request):
         final_summary = replace_image_markers_with_html(
             ai_summary_text=final_summary,
             lecture_id=lecture.id,
+            summary_language=selected_summary_language,
         )
 
         summary_text_postprocess_duration = time.time() - postprocess_start_time
@@ -517,6 +524,7 @@ def analyze_video_request(request):
             timeline_frames=timeline_frames,
             lecture_id=lecture.id,
             max_images=4,
+            summary_language=selected_summary_language,
         )
 
         if should_remove_temp_video:
@@ -529,7 +537,7 @@ def analyze_video_request(request):
         image_processing_duration = time.time() - image_processing_start_time
         summary_duration = time.time() - summary_start_time
 
-        result_text = "[AI가 분석한 강의 요약]\n\n" + final_summary
+        result_text = get_summary_result_header(selected_summary_language) + "\n\n" + final_summary
         summary_timeline = extract_summary_timeline(result_text)
 
         analysis_duration = time.time() - analysis_start_time
@@ -580,6 +588,7 @@ def analyze_video_request(request):
         print(f"whisper_model: {selected_whisper_model}")
         print(f"workers: {selected_workers}")
         print(f"summary_api: {selected_summary_api}")
+        print(f"summary_language: {selected_summary_language}")
         print("=" * 60 + "\n")
 
         return JsonResponse({
@@ -593,6 +602,7 @@ def analyze_video_request(request):
             "selected_whisper_model": selected_whisper_model,
             "selected_workers": selected_workers,
             "selected_summary_api": selected_summary_api,
+            "selected_summary_language": selected_summary_language,
             "timing_breakdown": {
                 "stt_wall_seconds": stt_wall_duration,
                 "stt_segment_sum_seconds": total_stt_duration,

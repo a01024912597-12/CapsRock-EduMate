@@ -31,6 +31,7 @@ from .utils.option_utils import (
     normalize_subject_code,
     normalize_worker_count,
     normalize_summary_api,
+    normalize_summary_language,
 )
 from .services.analysis_service import analyze_video_request
 from .services.tf_quiz_service import TF_QUIZ_TYPE, generate_tf_quiz_items, save_tf_questions
@@ -383,7 +384,10 @@ def signup_page(request):
         form = UserCreationForm(request.POST)
 
         if form.is_valid():
-            user = form.save()
+            user = form.save(commit=False)
+            # 신규 가입자는 관리자 승인 전까지 로그인할 수 없음
+            user.is_active = False
+            user.save()
 
             user_name = request.POST.get("name", "")
             user_age = request.POST.get("age", "")
@@ -402,8 +406,8 @@ def signup_page(request):
                 interest=interest,
             )
 
-            messages.success(request, "회원가입이 완료되었습니다. 로그인해주세요.")
-            return redirect("home")
+            messages.success(request, "회원가입이 완료되었습니다. 관리자 승인 후 로그인할 수 있습니다.")
+            return redirect("login")
 
         messages.error(request, "회원가입에 실패했습니다. 입력값을 다시 확인해주세요.")
         return render(request, "signup.html", {"form": form})
@@ -462,7 +466,10 @@ def upload_page(request):
             request.POST.get("subject_code", "auto")
         )
         summary_api = normalize_summary_api(
-            request.POST.get("summary_api", "gemini")
+            request.POST.get("summary_api", "gpt")
+        )
+        summary_language = normalize_summary_language(
+            getattr(request, "LANGUAGE_CODE", settings.LANGUAGE_CODE)
         )
 
         clean_title = re.sub(
@@ -528,6 +535,7 @@ def upload_page(request):
             "workers": workers,
             "subject_code": subject_code,
             "summary_api": summary_api,
+            "summary_language": summary_language,
         }
         request.session.modified = True
 
@@ -537,7 +545,8 @@ def upload_page(request):
             f"whisper_model={whisper_model}, "
             f"workers={workers}, "
             f"subject_code={subject_code}, "
-            f"summary_api={summary_api}"
+            f"summary_api={summary_api}, "
+            f"summary_language={summary_language}"
         )
         # 1시간 이상 지난 '진짜 옛날 찌꺼기'만 정리하고, 방금 전 돌려둔 1번째 강의는 절대 건드리지 않음
         stale_threshold = timezone.now() - timedelta(hours=1)
@@ -895,6 +904,87 @@ def analyze_video_api(request):
         "ahead_count": max(0, my_order - 1),
         "recent_tasks": my_tasks,
     })
+
+
+@login_required(login_url="home")
+def queue_status_api(request):
+    """로그인 사용자의 활성 분석 작업을 모든 페이지의 공통 사이드바에 제공한다."""
+    stale_threshold = timezone.now() - timedelta(minutes=20)
+
+    Lecture.objects.filter(
+        _requested_before(stale_threshold),
+        user=request.user,
+        status__in=[Lecture.STATUS_PENDING, Lecture.STATUS_PROCESSING],
+    ).update(
+        status=Lecture.STATUS_FAILED,
+        error_message="시간 초과로 자동 종료되었습니다.",
+    )
+
+    active_qs = (
+        Lecture.objects
+        .filter(
+            user=request.user,
+            status__in=[Lecture.STATUS_PROCESSING, Lecture.STATUS_PENDING],
+        )
+        .exclude(_requested_before(stale_threshold))
+    )
+
+    processing_list = list(
+        active_qs
+        .filter(status=Lecture.STATUS_PROCESSING)
+        .order_by(Coalesce("analysis_requested_at", "created_at"), "id")
+    )
+
+    pending_list = list(
+        active_qs
+        .filter(status=Lecture.STATUS_PENDING)
+        .order_by("queue_order", Coalesce("analysis_requested_at", "created_at"), "id")
+    )
+
+    if pending_list and any(item.queue_order <= 0 for item in pending_list):
+        next_order = (
+            Lecture.objects.aggregate(max_order=Max("queue_order"))["max_order"] or 0
+        ) + 1
+        for item in pending_list:
+            if item.queue_order <= 0:
+                item.queue_order = next_order
+                item.save(update_fields=["queue_order"])
+                next_order += 1
+        pending_list.sort(
+            key=lambda item: (
+                item.queue_order,
+                item.analysis_requested_at or item.created_at,
+                item.id,
+            )
+        )
+
+    active_lectures = processing_list + pending_list
+    tasks = []
+
+    for idx, item in enumerate(active_lectures):
+        is_processing = item.status == Lecture.STATUS_PROCESSING
+        pending_idx = pending_list.index(item) if item in pending_list else -1
+        status_label = "분석 진행 중" if is_processing else f"대기 {pending_idx + 1}번"
+        status_color = "processing" if is_processing else "waiting"
+        clean_title = re.sub(
+            r"\s*\[\s*SUB\s*:\s*(?:auto|[1-4])\s*\]",
+            "",
+            item.title or "제목 없음",
+        ).strip()
+
+        can_control = item.status == Lecture.STATUS_PENDING
+        tasks.append({
+            "id": item.id,
+            "title": clean_title,
+            "order_num": idx + 1,
+            "status_label": status_label,
+            "status_color": status_color,
+            "can_cancel": can_control,
+            "can_move_up": can_control and pending_idx > 0,
+            "can_move_down": can_control and 0 <= pending_idx < len(pending_list) - 1,
+        })
+
+    return JsonResponse({"ok": True, "tasks": tasks})
 
 
 @login_required(login_url="home")

@@ -150,7 +150,8 @@ def _worker_loop():
                 f"whisper_model={session_data.get('whisper_model')}, "
                 f"workers={session_data.get('workers')}, "
                 f"subject_code={session_data.get('subject_code')}, "
-                f"summary_api={session_data.get('summary_api')}"
+                f"summary_api={session_data.get('summary_api')}, "
+                f"summary_language={session_data.get('summary_language')}"
             )
 
             req = DummyRequest(

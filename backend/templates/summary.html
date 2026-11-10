@@ -3,6 +3,8 @@
 
 {% block title %}{% trans "강의 요약" %} — EduMate{% endblock %}
 {% block breadcrumb %}{% trans "강의 요약" %}{% endblock %}
+{% block page_content_class %} page-content--summary-wide{% endblock %}
+
 
 {% block content %}
 <!-- 부모 레이아웃의 max-width 제한을 풀고 화면 전체를 2분할하는 래퍼 -->
@@ -133,25 +135,6 @@
         </div>
     </div>
 
-   <!-- [우측 영역] 동그라미 친 텅 빈 화면에 들어가는 실시간 분석 모니터링 대시보드 -->
-    <div class="summary-right-monitor">
-        <div class="monitor-sticky-panel">
-            <div class="monitor-header">
-                <div>
-                    <h3 class="monitor-title">
-                        <i class="fas fa-layer-group" style="color: #6366f1; margin-right: 8px;"></i>강의 분석 대기열
-                    </h3>
-                    <p class="monitor-subtitle">등록된 순서대로 차례차례 분석이 진행됩니다.</p>
-                </div>
-            </div>
-
-            <div class="monitor-card-list" id="sideTaskList">
-                <div class="monitor-empty-state">
-                    <i class="fas fa-check-circle" style="font-size: 28px; color: #cbd5e1; margin-bottom: 8px;"></i>
-                    <p>현재 진행 중인 다른 작업이 없습니다.</p>
-                </div>
-            </div>
-        </div>
     </div>
 
 <style>
@@ -550,6 +533,44 @@
         border-color: #ef4444;
         color: #ffffff;
     }
+
+
+    /* 2026-11-03: 대기열을 사이드바로 이동하고 요약 본문을 넓게 사용 */
+    .page-content--summary-wide {
+        max-width: none !important;
+        width: 100%;
+        padding: 36px 40px;
+    }
+
+    .page-content--summary-wide .legacy-content {
+        width: 100%;
+        max-width: none;
+    }
+
+    .summary-outer-viewport {
+        display: block;
+        width: 100%;
+        max-width: 1280px;
+        margin: 0;
+    }
+
+    .summary-left-workspace {
+        width: 100%;
+        max-width: 1280px;
+        flex: none;
+    }
+
+    @media (max-width: 1100px) {
+        .page-content--summary-wide {
+            padding: 24px 18px;
+        }
+
+        .summary-outer-viewport,
+        .summary-left-workspace {
+            width: 100%;
+            max-width: 100%;
+        }
+    }
 </style>
 
 <script>
@@ -669,97 +690,6 @@ function renderSummaryHtml(text) {
             const queueDesc = document.getElementById('queueDesc');
             const lineFill = document.getElementById('stepLineFill');
 
-            // 우측 대시보드에 실시간 진행 카드 렌더링
-            // CSRF 토큰 가져오기 헬퍼
-            function getCsrfToken() {
-                const match = document.cookie.match(/csrftoken=([^;]+)/);
-                return match ? match[1] : '';
-            }
-
-            // 순서 변경 요청
-            window.moveQueueTask = function (targetId, direction) {
-                fetch('/analyze-api/move/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCsrfToken()
-                    },
-                    body: JSON.stringify({ lecture_id: targetId, direction: direction })
-                })
-                .then(function (res) { return res.json(); })
-                .then(function (data) {
-                    if (!data.ok && data.message) alert(data.message);
-                    checkQueueStatus();
-                });
-            };
-
-            // 대기 취소 요청
-            window.cancelQueueTask = function (targetId) {
-                if (!confirm('이 강의의 요약 대기열을 취소하시겠습니까?')) return;
-                fetch('/analyze-api/cancel/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCsrfToken()
-                    },
-                    body: JSON.stringify({ lecture_id: targetId })
-                })
-                .then(function (res) { return res.json(); })
-                .then(function (data) {
-                    if (!data.ok && data.message) alert(data.message);
-                    checkQueueStatus();
-                });
-            };
-
-            // 우측 대시보드에 실시간 진행 카드 렌더링 (버튼 포함)
-            function renderRecentTasks(tasks) {
-                const taskListEl = document.getElementById('sideTaskList');
-                if (!taskListEl) return;
-
-                if (!tasks || tasks.length === 0) {
-                    taskListEl.innerHTML = '<div class="monitor-empty-state"><i class="fas fa-check-circle" style="font-size:28px; color:#475569; margin-bottom:8px;"></i><p>현재 진행 중인 다른 작업이 없습니다.</p></div>';
-                    return;
-                }
-
-                let html = '';
-                tasks.forEach(function (t) {
-                    const isProc = t.status_color === 'processing';
-                    const progressWidth = isProc ? '65%' : '15%';
-                    const currentBadge = t.is_current ? '<span style="font-size:10px; color:#818cf8; margin-left:6px; font-weight:700;">[현재 페이지]</span>' : '';
-
-                    // 대기 중인 작업에만 위/아래/취소 버튼 표시
-                    let ctrlHtml = '';
-                    if (t.can_cancel) {
-                        ctrlHtml += '<div class="queue-ctrl-group">';
-                        ctrlHtml += '  <button type="button" class="btn-queue-ctrl" title="순서 위로" ' + (!t.can_move_up ? 'disabled' : '') + ' onclick="moveQueueTask(' + t.id + ', \'up\')">▲</button>';
-                        ctrlHtml += '  <button type="button" class="btn-queue-ctrl" title="순서 아래로" ' + (!t.can_move_down ? 'disabled' : '') + ' onclick="moveQueueTask(' + t.id + ', \'down\')">▼</button>';
-                        ctrlHtml += '  <button type="button" class="btn-queue-ctrl btn-cancel" title="대기 취소" onclick="cancelQueueTask(' + t.id + ')">✕</button>';
-                        ctrlHtml += '</div>';
-                    }
-
-                    html += '<div class="monitor-task-item ' + (t.is_current ? 'current' : '') + '">';
-                    html += '  <div class="monitor-task-header">';
-                    html += '    <a href="/summary/?lecture_id=' + t.id + '" class="monitor-task-title" title="' + escapeHtml(t.title) + '" style="text-decoration:none;">';
-                    html += '      <span style="display:inline-block; width:18px; height:18px; line-height:18px; text-align:center; border-radius:4px; background:rgba(255,255,255,0.08); font-size:11px; margin-right:6px; color:#94a3b8;">' + t.order_num + '</span>';
-                    html +=        escapeHtml(t.title);
-                    html += '    </a>';
-                    html += '    <div style="display:flex; align-items:center; gap:6px;">';
-                    html +=        ctrlHtml;
-                    html += '      <span class="monitor-task-pill pill-' + t.status_color + '">' + t.status_label + '</span>';
-                    html += '    </div>';
-                    html += '  </div>';
-                    html += '  <div class="monitor-progress-bar-wrap">';
-                    html += '    <div class="monitor-progress-bar-fill" style="width: ' + progressWidth + ';"></div>';
-                    html += '  </div>';
-                    html += '  <div class="monitor-task-footer">';
-                    html += '    <span>' + (isProc ? 'AI 모델 분석 수행 중...' : '앞선 작업 완료 후 시작됩니다') + '</span>';
-                    html += '    <span><a href="/summary/?lecture_id=' + t.id + '" style="color:#818cf8; text-decoration:none;">결과 보기 →</a>' + currentBadge + '</span>';
-                    html += '  </div>';
-                    html += '</div>';
-                });
-                taskListEl.innerHTML = html;
-            }
-
             function updateStepUI(stepIndex) {
                 const percentages = ['0%', '33%', '66%', '100%'];
                 if (lineFill) lineFill.style.width = percentages[stepIndex - 1] || '0%';
@@ -776,11 +706,7 @@ function renderSummaryHtml(text) {
                 fetch('/analyze-api/?lecture_id=' + encodeURIComponent(lectureId))
                     .then(function (response) { return response.json(); })
                     .then(function (data) {
-                        if (data.recent_tasks) {
-                            renderRecentTasks(data.recent_tasks);
-                        }
-
-                        if (data.status === 'success' || data.state === 'completed') {
+if (data.status === 'success' || data.state === 'completed') {
                             updateStepUI(4);
                             setTimeout(function () {
                                 loadingArea.style.display = 'none';

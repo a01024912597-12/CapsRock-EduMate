@@ -52,7 +52,13 @@ def clean_summary_text(summary_text):
     """요약문 앞의 안내 문구를 제거하고 실제 요약 본문만 정리한다."""
     text = (summary_text or "").strip()
 
-    text = text.replace("[AI가 분석한 강의 요약]", "").strip()
+    summary_headers = (
+        "[AI가 분석한 강의 요약]",
+        "[AI Lecture Summary]",
+        "[AI 分析的课程摘要]",
+    )
+    for header in summary_headers:
+        text = text.replace(header, "").strip()
 
     return text
 

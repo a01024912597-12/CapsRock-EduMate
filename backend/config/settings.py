@@ -147,3 +147,20 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # 업로드 영상 최대 500MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 500 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 500 * 1024 * 1024
+
+# --- EduMate Cloudflare Tunnel ---
+# 로컬 개발 + Cloudflare Quick Tunnel 허용
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    ".trycloudflare.com",
+]
+
+# Cloudflare Quick Tunnel HTTPS 주소에서 오는 POST 요청 허용
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.trycloudflare.com",
+]
+
+# Cloudflare 프록시를 통해 들어온 HTTPS 요청을 Django가 HTTPS로 인식
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
