@@ -1,0 +1,22 @@
+﻿from .settings import *
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+MIDDLEWARE = list(MIDDLEWARE)
+
+whitenoise_middleware = "whitenoise.middleware.WhiteNoiseMiddleware"
+
+if whitenoise_middleware not in MIDDLEWARE:
+    security_index = MIDDLEWARE.index(
+        "django.middleware.security.SecurityMiddleware"
+    )
+    MIDDLEWARE.insert(security_index + 1, whitenoise_middleware)
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}

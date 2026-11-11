@@ -1177,7 +1177,7 @@ def inject_core_timeline_images(summary_text, timeline_frames=None, lecture_id=N
     if text.count('class="timeline-image-wrapper"') >= max_images:
         return text
 
-    items = parse_summary_timeline_items(text, max_items=max_images * 2)
+    items = parse_summary_timeline_items(text, max_items=0)
 
     if not items:
         return text
@@ -1209,10 +1209,16 @@ def inject_core_timeline_images(summary_text, timeline_frames=None, lecture_id=N
             if not _line_has_timeline_seconds(stripped, seconds):
                 continue
 
-            best_frame = select_best_frame_for_timeline(
-                target_seconds=seconds,
-                timeline_frames=timeline_frames,
-                max_distance_seconds=45,
+            # 같은 개념에 대해 AI가 직접 승인한 프레임만 허용한다.
+            # 가까운 시간의 다른 개념 사진이 대신 들어가는 것을 방지한다.
+            best_frame = next(
+                (
+                    frame for frame in timeline_frames
+                    if frame.get("validated") is True
+                    and frame.get("target_seconds") == seconds
+                    and frame.get("keyword") == keyword
+                ),
+                None,
             )
 
             if not best_frame:
@@ -1227,7 +1233,7 @@ def inject_core_timeline_images(summary_text, timeline_frames=None, lecture_id=N
                 lecture_id=lecture_id,
                 frame=best_frame,
                 keyword=keyword,
-                display_time=time_str,
+                display_time=best_frame.get("time_str") or time_str,
                 summary_language=summary_language,
             )
 

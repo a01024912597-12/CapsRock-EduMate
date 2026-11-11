@@ -64,21 +64,39 @@
 
         <!-- AI 요약 및 스텝바 영역 -->
         <div class="summary-analysis-wrap" style="margin-top: 20px;">
-            <h3 class="summary-analysis-title">📋 {% trans "AI 요약" %}</h3>
+            <div class="summary-analysis-header">
+                <h3 class="summary-analysis-title">📋 {% trans "AI 요약" %}</h3>
+                <div class="summary-font-controls" role="group" aria-label="Summary text size">
+                    <button type="button" class="summary-font-btn" data-summary-font="small" title="A−">A−</button>
+                    <button type="button" class="summary-font-btn" data-summary-font="normal" title="A">A</button>
+                    <button type="button" class="summary-font-btn" data-summary-font="large" title="A+">A+</button>
+                </div>
+            </div>
 
             {% if needs_summary_request %}
             {% include 'includes/summary_request_form.html' %}
             {% elif summary_not_started %}
             <p class="app-meta-line">{% trans "아직 요약되지 않은 강의입니다." %}</p>
             {% else %}
+            <div id="summaryQueueI18n" hidden
+                     data-order-template="{% trans '현재 대기 순번: {n}번째' %}"
+                     data-ahead-template="{% trans '앞에 {n}개의 강의가 먼저 분석되고 있습니다.' %}"
+                     data-start-soon="{% trans '잠시 후 분석이 시작됩니다.' %}"
+                     data-auto-start="{% trans '차례가 되면 자동으로 음성 전사 및 요약이 진행됩니다.' %}"
+                     data-analysis-error="{% trans '분석 중 오류가 발생했습니다.' %}"
+                     data-stage-stt="{% trans '1/2 단계: 음성 텍스트 추출 중' %}"
+                     data-stage-summary="{% trans '2/2 단계: AI 요약 중' %}"
+                     data-stt-title="{% trans '강의 음성을 Whisper로 받아 적고 있습니다...' %}"
+                     data-summary-title="{% trans 'AI가 핵심 내용과 타임라인을 정리 중입니다...' %}"
+                     data-wait-message="{% trans '화면을 닫지 말고 잠시만 기다려주세요.' %}"></div>
             <div id="analysis-container">
                 <div id="loading-area" class="queue-progress-card">
-                    <div class="queue-badge" id="queueBadge">대기열 확인 중...</div>
+                    <div class="queue-badge" id="queueBadge">{% trans "대기열 확인 중..." %}</div>
                     <h3 id="queueTitle" style="margin: 16px 0 6px; font-size: 19px; color: var(--text-main);">
-                        대기열에 등록되었습니다.
+                        {% trans "대기열에 등록되었습니다." %}
                     </h3>
                     <p id="queueDesc" style="color: var(--text-sub); font-size: 14px; margin-bottom: 24px;">
-                        앞선 작업이 끝나면 자동으로 분석이 시작됩니다.
+                        {% trans "앞선 작업이 끝나면 자동으로 분석이 시작됩니다." %}
                     </p>
 
                     <!-- 4단계 진행 스텝바 -->
@@ -88,19 +106,19 @@
 
                         <div class="step-item active" id="step-1">
                             <div class="step-circle"><i class="fas fa-list-ol"></i></div>
-                            <div class="step-label">대기열 진입</div>
+                            <div class="step-label">{% trans "대기열 진입" %}</div>
                         </div>
                         <div class="step-item" id="step-2">
                             <div class="step-circle"><i class="fas fa-microphone-alt"></i></div>
-                            <div class="step-label">음성 전사(STT)</div>
+                            <div class="step-label">{% trans "음성 전사(STT)" %}</div>
                         </div>
                         <div class="step-item" id="step-3">
                             <div class="step-circle"><i class="fas fa-brain"></i></div>
-                            <div class="step-label">AI 핵심 요약</div>
+                            <div class="step-label">{% trans "AI 핵심 요약" %}</div>
                         </div>
                         <div class="step-item" id="step-4">
                             <div class="step-circle"><i class="fas fa-check"></i></div>
-                            <div class="step-label">완료</div>
+                            <div class="step-label">{% trans "완료" %}</div>
                         </div>
                     </div>
                 </div>
@@ -350,6 +368,102 @@
     .loader--video {
         width: 42px;
         height: 42px;
+    }
+
+    .summary-analysis-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+
+    .summary-analysis-header .summary-analysis-title {
+        margin: 0;
+    }
+
+    .summary-font-controls {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px;
+        border: 1px solid var(--border2);
+        border-radius: 10px;
+        background: var(--bg-inner);
+        flex-shrink: 0;
+    }
+
+    .summary-font-btn {
+        min-width: 36px;
+        height: 32px;
+        padding: 0 9px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--text-sub);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+    }
+
+    .summary-font-btn:hover {
+        background: var(--grad-soft);
+        color: var(--accent);
+    }
+
+    .summary-font-btn.is-active {
+        background: var(--accent);
+        color: #fff;
+    }
+
+    #result-text {
+        --summary-body-size: 17px;
+        --summary-heading-size: 20px;
+        font-size: var(--summary-body-size) !important;
+        line-height: 1.8 !important;
+    }
+
+    #result-text[data-summary-font-size="small"] {
+        --summary-body-size: 14px;
+        --summary-heading-size: 17px;
+    }
+
+    #result-text[data-summary-font-size="normal"] {
+        --summary-body-size: 17px;
+        --summary-heading-size: 20px;
+    }
+
+    #result-text[data-summary-font-size="large"] {
+        --summary-body-size: 20px;
+        --summary-heading-size: 24px;
+    }
+
+    #result-text h4 {
+        font-size: var(--summary-heading-size) !important;
+        line-height: 1.55 !important;
+    }
+
+    #result-text p,
+    #result-text li {
+        font-size: inherit !important;
+        line-height: inherit;
+    }
+
+    #result-text .timeline-image-wrapper p {
+        font-size: 0.9em !important;
+    }
+
+    @media (max-width: 640px) {
+        .summary-analysis-header {
+            align-items: flex-start;
+        }
+
+        .summary-font-btn {
+            min-width: 34px;
+            padding: 0 7px;
+        }
     }
 
     .summary-ts {
@@ -683,6 +797,54 @@ function renderSummaryHtml(text) {
             }
         }
 
+        function summaryQueueText(key, fallback) {
+            const el = document.getElementById('summaryQueueI18n');
+            return (el && el.dataset && el.dataset[key]) || fallback;
+        }
+
+        const SUMMARY_FONT_STORAGE_KEY = 'edumate-summary-font-size';
+        const SUMMARY_FONT_SIZES = new Set(['small', 'normal', 'large']);
+
+        function getSavedSummaryFontSize() {
+            try {
+                const saved = localStorage.getItem(SUMMARY_FONT_STORAGE_KEY);
+                return SUMMARY_FONT_SIZES.has(saved) ? saved : 'normal';
+            } catch (error) {
+                return 'normal';
+            }
+        }
+
+        function applySummaryFontSize(size, persist) {
+            const safeSize = SUMMARY_FONT_SIZES.has(size) ? size : 'normal';
+            const resultArea = document.getElementById('result-text');
+            if (resultArea) {
+                resultArea.setAttribute('data-summary-font-size', safeSize);
+            }
+
+            document.querySelectorAll('.summary-font-btn').forEach(function (button) {
+                const active = button.dataset.summaryFont === safeSize;
+                button.classList.toggle('is-active', active);
+                button.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+
+            if (persist !== false) {
+                try {
+                    localStorage.setItem(SUMMARY_FONT_STORAGE_KEY, safeSize);
+                } catch (error) {}
+            }
+        }
+
+        function initSummaryFontControls() {
+            applySummaryFontSize(getSavedSummaryFontSize(), false);
+
+            document.querySelectorAll('.summary-font-btn').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    applySummaryFontSize(button.dataset.summaryFont, true);
+                });
+            });
+        }
+
+
         function runAnalysis(lectureId, loadingArea, resultArea) {
             const pdfDownloadButton = document.getElementById('summary-pdf-download');
             const queueBadge = document.getElementById('queueBadge');
@@ -724,15 +886,17 @@ if (data.status === 'success' || data.state === 'completed') {
 
                             if (queueBadge) {
                                 queueBadge.className = 'queue-badge processing';
-                                queueBadge.innerText = currentStep === 2 ? '1/2 단계: 음성 텍스트 추출 중' : '2/2 단계: 멀티모달 AI 요약 중';
+                                queueBadge.innerText = currentStep === 2
+                                    ? summaryQueueText('stageStt', '1/2 단계: 음성 텍스트 추출 중')
+                                    : summaryQueueText('stageSummary', '2/2 단계: AI 요약 중');
                             }
                             if (queueTitle) {
                                 queueTitle.innerText = currentStep === 2
-                                    ? '강의 음성을 Whisper로 받아 적고 있습니다...'
-                                    : 'Gemini AI가 핵심 내용과 타임라인을 정리 중입니다...';
+                                    ? summaryQueueText('sttTitle', '강의 음성을 Whisper로 받아 적고 있습니다...')
+                                    : summaryQueueText('summaryTitle', 'AI가 핵심 내용과 타임라인을 정리 중입니다...');
                             }
                             if (queueDesc) {
-                                queueDesc.innerText = '화면을 닫지 말고 잠시만 기다려주세요.';
+                                queueDesc.innerText = summaryQueueText('waitMessage', '화면을 닫지 말고 잠시만 기다려주세요.');
                             }
                             setTimeout(checkQueueStatus, 2000);
                             return;
@@ -742,16 +906,16 @@ if (data.status === 'success' || data.state === 'completed') {
                             updateStepUI(1);
                             if (queueBadge) {
                                 queueBadge.className = 'queue-badge';
-                                queueBadge.innerText = '현재 대기 순번: ' + (data.queue_order || 1) + '번째';
+                                queueBadge.innerText = summaryQueueText('orderTemplate', '현재 대기 순번: {n}번째').replace('{n}', String(data.queue_order || 1));
                             }
                             if (queueTitle) {
                                 const ahead = data.ahead_count || 0;
                                 queueTitle.innerText = ahead > 0
-                                    ? '앞에 ' + ahead + '개의 강의가 먼저 분석되고 있습니다.'
-                                    : '잠시 후 분석이 시작됩니다.';
+                                    ? summaryQueueText('aheadTemplate', '앞에 {n}개의 강의가 먼저 분석되고 있습니다.').replace('{n}', String(ahead))
+                                    : summaryQueueText('startSoon', '잠시 후 분석이 시작됩니다.');
                             }
                             if (queueDesc) {
-                                queueDesc.innerText = '차례가 되면 자동으로 음성 전사 및 요약이 진행됩니다.';
+                                queueDesc.innerText = summaryQueueText('autoStart', '차례가 되면 자동으로 음성 전사 및 요약이 진행됩니다.');
                             }
                             setTimeout(checkQueueStatus, 2000);
                             return;
@@ -761,7 +925,7 @@ if (data.status === 'success' || data.state === 'completed') {
                             loadingArea.style.display = 'none';
                             resultArea.style.display = 'block';
                             resultArea.innerHTML = '<span class="signup-status signup-status--err">' +
-                                escapeHtml(data.message || '분석 중 오류가 발생했습니다.') + '</span>';
+                                escapeHtml(data.message || summaryQueueText('analysisError', '분석 중 오류가 발생했습니다.')) + '</span>';
                             return;
                         }
 
@@ -777,6 +941,8 @@ if (data.status === 'success' || data.state === 'completed') {
         }
 
         document.addEventListener('DOMContentLoaded', function () {
+            initSummaryFontControls();
+
             const lectureId = "{{ lecture_id }}";
             const loadingArea = document.getElementById('loading-area');
             const resultArea = document.getElementById('result-text');

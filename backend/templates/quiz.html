@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 
 {% block content %}
     <style>
@@ -85,9 +86,9 @@
         <div class="page-title-row">
             <h1>
                 <span class="title-icon"><i class="fa-solid fa-list-check"></i></span>
-                객관식 퀴즈
+                {% trans "객관식 퀴즈" %}
             </h1>
-            <p>강의 요약 내용을 바탕으로 생성된 4지선다 객관식 문제를 풀어보세요.</p>
+            <p>{% trans "강의 요약 내용을 바탕으로 생성된 4지선다 객관식 문제를 풀어보세요." %}</p>
         </div>
 
         <!-- 퀴즈 유형 전환 탭 (객관식 퀴즈 ↔ O/X 명제 퀴즈) -->
@@ -95,13 +96,13 @@
             <a href="{% url 'quiz' %}?lecture_id={{ lecture.id }}&generation={{ current_gen }}"
                class="btn-tab active"
                style="padding: 10px 20px; border-radius: 8px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #ffffff;">
-                <i class="fa-solid fa-list-check"></i> 객관식 퀴즈
+                <i class="fa-solid fa-list-check"></i> {% trans "객관식 퀴즈" %}
             </a>
 
             <a href="{% url 'tf_quiz' %}?lecture_id={{ lecture.id }}"
                class="btn-tab"
                style="padding: 10px 20px; border-radius: 8px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: var(--bg-card); color: var(--text-sub); border: 1px solid var(--border);">
-                <i class="fa-solid fa-file-signature"></i> O/X 명제 퀴즈
+                <i class="fa-solid fa-file-signature"></i> {% trans "O/X 명제 퀴즈" %}
             </a>
         </div>
 
@@ -121,31 +122,31 @@
                         <!-- 이전 회차 버튼 -->
                         {% if has_prev %}
                             <a href="?lecture_id={{ lecture.id }}&generation={{ prev_gen }}"
-                               class="btn-gen-nav" title="이전 회차로 이동"
+                               class="btn-gen-nav" title="{% trans '이전 회차로 이동' %}"
                                style="color: var(--text-main); text-decoration: none; padding: 2px 8px; border-radius: 4px; background: var(--bg-card); border: 1px solid var(--border2); font-size: 13px;">
-                                <i class="fa-solid fa-chevron-left"></i> 이전
+                                <i class="fa-solid fa-chevron-left"></i> {% trans "이전" %}
                             </a>
                         {% else %}
                             <span style="color: var(--text-muted); padding: 2px 8px; font-size: 13px; opacity: 0.5; cursor: not-allowed;">
-                                <i class="fa-solid fa-chevron-left"></i> 이전
+                                <i class="fa-solid fa-chevron-left"></i> {% trans "이전" %}
                             </span>
                         {% endif %}
 
                         <!-- 현재 회차 표시 -->
                         <span style="font-weight: 700; font-size: 14px; color: var(--accent); padding: 0 4px;">
-                            {{ current_gen }}회차
+                            {{ current_gen }}{% trans "회차" %}
                         </span>
 
                         <!-- 다음 회차 버튼 -->
                         {% if has_next %}
                             <a href="?lecture_id={{ lecture.id }}&generation={{ next_gen }}"
-                               class="btn-gen-nav" title="다음 회차로 이동"
+                               class="btn-gen-nav" title="{% trans '다음 회차로 이동' %}"
                                style="color: var(--text-main); text-decoration: none; padding: 2px 8px; border-radius: 4px; background: var(--bg-card); border: 1px solid var(--border2); font-size: 13px;">
-                                다음 <i class="fa-solid fa-chevron-right"></i>
+                                {% trans "다음" %} <i class="fa-solid fa-chevron-right"></i>
                             </a>
                         {% else %}
                             <span style="color: var(--text-muted); padding: 2px 8px; font-size: 13px; opacity: 0.5; cursor: not-allowed;">
-                                다음 <i class="fa-solid fa-chevron-right"></i>
+                                {% trans "다음" %} <i class="fa-solid fa-chevron-right"></i>
                             </span>
                         {% endif %}
                     </div>
@@ -156,7 +157,7 @@
                     {% csrf_token %}
                     <input type="hidden" name="generate_quiz" value="1">
                     <button type="submit" class="btn-secondary" style="padding: 8px 16px; font-weight: 600;">
-                        <i class="fa-solid fa-plus"></i> 새 회차 퀴즈 생성
+                        <i class="fa-solid fa-plus"></i> {% trans "새 회차 퀴즈 생성" %}
                     </button>
                 </form>
             </div>
@@ -218,7 +219,7 @@
                             <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
                                 <i class="fa-solid fa-circle-exclamation"
                                    style="font-size: 32px; margin-bottom: 12px; display: block;"></i>
-                                생성된 문제 문항이 없습니다. 상단의 '새 회차 퀴즈 생성' 버튼을 눌러주세요.
+                                {% trans "생성된 문제 문항이 없습니다. 상단의 새 회차 퀴즈 생성 버튼을 눌러주세요." %}
                             </div>
                         {% endfor %}
                     </div>
@@ -227,7 +228,7 @@
                     {% if quiz_items %}
                         <div class="btn-area" style="margin-top: 30px; text-align: right;">
                             <button type="submit" class="btn-primary" style="padding: 12px 24px; font-weight: 700;">
-                                <i class="fa-solid fa-paper-plane"></i> 답안 제출 및 채점하기
+                                <i class="fa-solid fa-paper-plane"></i> {% trans "답안 제출 및 채점하기" %}
                             </button>
                         </div>
                     {% endif %}

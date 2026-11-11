@@ -777,7 +777,7 @@ def analyze_video_api(request):
         status__in=[Lecture.STATUS_PENDING, Lecture.STATUS_PROCESSING],
     ).update(
         status=Lecture.STATUS_FAILED,
-        error_message="시간 초과로 자동 종료되었습니다.",
+        error_message=_("시간 초과로 자동 종료되었습니다."),
     )
 
     # 위 update가 현재 강의에 적용됐을 수도 있으므로 최신 상태를 다시 읽는다.
@@ -835,12 +835,12 @@ def analyze_video_api(request):
         is_processing = item.status == Lecture.STATUS_PROCESSING
         pending_idx = pending_list.index(item) if item in pending_list else -1
 
-        status_label = "분석 진행 중" if is_processing else f"대기 {pending_idx + 1}번"
+        status_label = _("분석 진행 중") if is_processing else _("대기 %(number)s번") % {"number": pending_idx + 1}
         status_color = "processing" if is_processing else "waiting"
         clean_title = re.sub(
             r"\s*\[\s*SUB\s*:\s*(?:auto|[1-4])\s*\]",
             "",
-            item.title or "제목 없음",
+            item.title or _("제목 없음"),
         ).strip()
 
         can_control = item.user_id == request.user.id and item.status == Lecture.STATUS_PENDING
@@ -879,9 +879,9 @@ def analyze_video_api(request):
             "status": "failed",
             "state": lecture.status,
             "message": lecture.error_message or (
-                "사용자에 의해 대기열에서 취소되었습니다."
+                _("사용자에 의해 대기열에서 취소되었습니다.")
                 if lecture.status == Lecture.STATUS_CANCELED
-                else "분석 중 오류가 발생했습니다."
+                else _("분석 중 오류가 발생했습니다.")
             ),
             "recent_tasks": my_tasks,
         })
@@ -917,7 +917,7 @@ def queue_status_api(request):
         status__in=[Lecture.STATUS_PENDING, Lecture.STATUS_PROCESSING],
     ).update(
         status=Lecture.STATUS_FAILED,
-        error_message="시간 초과로 자동 종료되었습니다.",
+        error_message=_("시간 초과로 자동 종료되었습니다."),
     )
 
     active_qs = (
@@ -964,12 +964,12 @@ def queue_status_api(request):
     for idx, item in enumerate(active_lectures):
         is_processing = item.status == Lecture.STATUS_PROCESSING
         pending_idx = pending_list.index(item) if item in pending_list else -1
-        status_label = "분석 진행 중" if is_processing else f"대기 {pending_idx + 1}번"
+        status_label = _("분석 진행 중") if is_processing else _("대기 %(number)s번") % {"number": pending_idx + 1}
         status_color = "processing" if is_processing else "waiting"
         clean_title = re.sub(
             r"\s*\[\s*SUB\s*:\s*(?:auto|[1-4])\s*\]",
             "",
-            item.title or "제목 없음",
+            item.title or _("제목 없음"),
         ).strip()
 
         can_control = item.status == Lecture.STATUS_PENDING
@@ -1020,14 +1020,14 @@ def cancel_queue_task_api(request):
             )
 
         lecture.status = Lecture.STATUS_CANCELED
-        lecture.error_message = "사용자에 의해 대기열에서 취소되었습니다."
+        lecture.error_message = _("사용자에 의해 대기열에서 취소되었습니다.")
         lecture.save(update_fields=["status", "error_message"])
 
     # 메모리 대기열에서도 제거한다. 이미 워커가 가져갔더라도 워커가 DB 상태를 다시 확인해 취소 작업을 건너뛴다.
     from .queue_worker import remove_lecture_from_queue
     remove_lecture_from_queue(lecture.id)
 
-    return JsonResponse({"ok": True, "message": "대기열에서 취소되었습니다."})
+    return JsonResponse({"ok": True, "message": _("대기열에서 취소되었습니다.")})
 
 
 @login_required(login_url="home")
@@ -1247,22 +1247,31 @@ def quiz_page(request):
 
         return redirect(f"/quiz/?lecture_id={lecture.id}&generation={next_generation}")
 
-    if not quizzes.exists():
+    has_objective_questions = QuizQuestion.objects.filter(quiz__in=quizzes).exists()
+    if not quizzes.exists() or not has_objective_questions:
+        # 이전 다국어 생성 실패로 0문항 Quiz만 남아 있어도 같은 회차를 자동 복구한다.
+        first_quiz = quizzes.order_by("generation_number", "id").first()
+        if first_quiz is None:
+            first_quiz = Quiz.objects.create(
+                lecture=lecture,
+                generation_number=1,
+                question="",
+                answer="",
+                explanation=OBJECTIVE_QUIZ_TYPE,
+                quiz_text="",
+            )
+
         quiz_text = generate_objective_quiz(
             summary_text=lecture.summary_text,
             question_count=20,
             previous_quiz_texts="",
         )
-        first_quiz = Quiz.objects.create(
-            lecture=lecture,
-            generation_number=1,
-            question="",
-            answer="",
-            explanation=OBJECTIVE_QUIZ_TYPE,
-            quiz_text=quiz_text,
-        )
+        first_quiz.quiz_text = quiz_text
+        first_quiz.save(update_fields=["quiz_text"])
         save_objective_questions_from_text(first_quiz, quiz_text)
-        return redirect(f"/quiz/?lecture_id={lecture.id}&generation=1")
+        return redirect(
+            f"/quiz/?lecture_id={lecture.id}&generation={first_quiz.generation_number}"
+        )
 
     selected_generation = request.GET.get("generation") or request.POST.get("generation")
     selected_quiz = None
@@ -1479,18 +1488,25 @@ def tf_quiz_page(request):
         return redirect(f"/tf-quiz/?lecture_id={lecture.id}&generation={next_generation}")
 
     # 2. 최초 진입 시 O/X 퀴즈가 없는 경우 자동 생성
-    if not quizzes.exists():
-        first_quiz = Quiz.objects.create(
-            lecture=lecture,
-            generation_number=1,
-            question="",
-            answer="",
-            explanation=TF_QUIZ_TYPE,  # explanation="tf"로 지정
-            quiz_text="",
-        )
+    has_tf_questions = QuizQuestion.objects.filter(quiz__in=quizzes).exists()
+    if not quizzes.exists() or not has_tf_questions:
+        # 이전 다국어 생성 실패로 0문항 Quiz만 남아 있어도 같은 회차를 자동 복구한다.
+        first_quiz = quizzes.order_by("generation_number", "id").first()
+        if first_quiz is None:
+            first_quiz = Quiz.objects.create(
+                lecture=lecture,
+                generation_number=1,
+                question="",
+                answer="",
+                explanation=TF_QUIZ_TYPE,
+                quiz_text="",
+            )
+
         items = generate_tf_quiz_items(lecture.summary_text, question_count=20)
         save_tf_questions(first_quiz, items)
-        return redirect(f"/tf-quiz/?lecture_id={lecture.id}&generation=1")
+        return redirect(
+            f"/tf-quiz/?lecture_id={lecture.id}&generation={first_quiz.generation_number}"
+        )
 
     # 3. 요청된 회차(generation) 선택
     selected_generation = request.GET.get("generation") or request.GET.get("gen")
@@ -1707,7 +1723,7 @@ def feedback_page(request):
         quiz_text = create_feedback_quiz_from_objective(next_generation)
 
         if not _valid_feedback_quiz_text(quiz_text):
-            messages.error(request, "서술형 문제를 생성하지 못했습니다. 다시 시도해주세요.")
+            messages.error(request, _("서술형 문제를 생성하지 못했습니다. 다시 시도해주세요."))
             return redirect(f"/feedback/?lecture_id={lecture.id}")
 
         new_quiz = Quiz.objects.create(
@@ -1741,7 +1757,7 @@ def feedback_page(request):
             )
 
         if not _valid_feedback_quiz_text(quiz_text):
-            messages.error(request, "서술형 문제를 생성하지 못했습니다. 다시 시도해주세요.")
+            messages.error(request, _("서술형 문제를 생성하지 못했습니다. 다시 시도해주세요."))
             return redirect(f"/feedback/?lecture_id={lecture.id}")
 
         new_quiz = Quiz.objects.create(

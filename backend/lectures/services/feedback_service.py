@@ -6,6 +6,7 @@ from kiwipiepy import Kiwi
 from .objective_quiz_service import build_objective_items_for_display
 from .summary_service import extract_concept_entries_from_summary, gemini_generate_text
 from ..utils.text_utils import clean_summary_text
+from ..utils.quiz_language import LANG_KO, LANG_EN, LANG_ZH, detect_quiz_language
 
 kiwi = Kiwi()
 
@@ -410,6 +411,63 @@ def is_duplicate_feedback_concept(concept_key, seen_concept_keys):
 
     return False
 
+
+def _feedback_language(summary_text):
+    return detect_quiz_language(summary_text or "")
+
+
+def _non_ko_feedback_concept(item, language):
+    """영어/중국어 객관식 오답에서 서술형으로 이어갈 실제 개념명을 고른다."""
+    values = [
+        clean_choice_text_for_feedback(item.get("correct_text") or ""),
+        clean_choice_text_for_feedback(item.get("keyword") or ""),
+    ]
+    if language == LANG_EN:
+        bad = {"none", "unselected", "key concept", "concept", "answer", "question", "result"}
+    else:
+        bad = {"未选择", "核心概念", "概念", "答案", "问题", "结果"}
+    for value in values:
+        if not value:
+            continue
+        if value.casefold() in {item.casefold() for item in bad}:
+            continue
+        if re.search(r"(?:font-size|timeline-image-wrapper|https?://)", value, re.IGNORECASE):
+            continue
+        return value
+    return "key concept" if language == LANG_EN else "核心概念"
+
+
+def _non_ko_feedback_question(keyword, language, variant=1):
+    if language == LANG_EN:
+        templates = [
+            "Explain the key meaning of '{keyword}'.",
+            "Explain why '{keyword}' is important in this lecture.",
+            "Describe the key feature of '{keyword}'.",
+        ]
+    else:
+        templates = [
+            "请说明“{keyword}”的核心含义。",
+            "请说明“{keyword}”在本课程中为什么重要。",
+            "请说明“{keyword}”的核心特点。",
+        ]
+    return templates[(variant - 1) % len(templates)].format(keyword=keyword)
+
+
+def _objective_reference_label(number, language):
+    if language == LANG_EN:
+        return f"Objective Q{number}"
+    if language == LANG_ZH:
+        return f"选择题第{number}题"
+    return f"객관식 {number}번"
+
+
+def _feedback_no_evidence(language):
+    if language == LANG_EN:
+        return "No source"
+    if language == LANG_ZH:
+        return "无依据"
+    return "근거 없음"
+
 def build_feedback_quiz_text_from_wrong_items(wrong_items, generation_number=1, summary_text=""):
     """객관식 오답 문항을 기반으로 짧은 서술형 피드백 문제를 생성한다.
 
@@ -421,7 +479,22 @@ def build_feedback_quiz_text_from_wrong_items(wrong_items, generation_number=1, 
     - 문제와 모범 답안은 짧게 생성한다.
     - 화면 표시를 위해 '관련 키워드' 필드에는 '객관식 n번' 정보를 저장한다.
     """
+    language = _feedback_language(summary_text)
+    no_evidence = _feedback_no_evidence(language)
+
     if not wrong_items:
+        if language == LANG_EN:
+            return f"""1. 문제: Explain the meaning of one key concept from the lecture in one or two sentences.
+관련 키워드: No objective errors
+관련 타임라인: {no_evidence}
+모범 답안: A key concept is a central idea needed to understand the lecture. The answer should explain its meaning and role in the lecture.
+"""
+        if language == LANG_ZH:
+            return f"""1. 문제: 请用一到两句话说明课程中一个核心概念的含义。
+관련 키워드: 无选择题错题
+관련 타임라인: {no_evidence}
+모범 답안: 核心概念是理解课程内容所需的中心知识。答案应说明该概念的含义及其在课程中的作用。
+"""
         return """1. 문제: 강의에서 가장 중요한 핵심 개념 하나의 의미를 한두 문장으로 서술하시오.
 관련 키워드: 객관식 오답 없음
 관련 타임라인: 근거 없음
@@ -444,7 +517,7 @@ def build_feedback_quiz_text_from_wrong_items(wrong_items, generation_number=1, 
 
     # 1차 선택: 서로 다른 핵심 개념을 우선 선택
     for item in ranked_wrong_items:
-        concept = choose_feedback_concept(item)
+        concept = (choose_feedback_concept(item) if language == LANG_KO else _non_ko_feedback_concept(item, language))
         concept_key = normalize_feedback_concept_key(concept)
         objective_number = item.get("objective_number") or item.get("question_number")
 
@@ -471,7 +544,7 @@ def build_feedback_quiz_text_from_wrong_items(wrong_items, generation_number=1, 
         concept_count = {}
 
         for selected in selected_items:
-            selected_concept = selected.get("_feedback_concept") or choose_feedback_concept(selected)
+            selected_concept = selected.get("_feedback_concept") or (choose_feedback_concept(selected) if language == LANG_KO else _non_ko_feedback_concept(selected, language))
             selected_key = normalize_feedback_concept_key(selected_concept)
             concept_count[selected_key] = concept_count.get(selected_key, 0) + 1
 
@@ -484,7 +557,7 @@ def build_feedback_quiz_text_from_wrong_items(wrong_items, generation_number=1, 
             if objective_number in selected_objective_numbers:
                 continue
 
-            concept = choose_feedback_concept(item)
+            concept = (choose_feedback_concept(item) if language == LANG_KO else _non_ko_feedback_concept(item, language))
             concept_key = normalize_feedback_concept_key(concept)
 
             next_variant = concept_count.get(concept_key, 0) + 1
@@ -505,7 +578,7 @@ def build_feedback_quiz_text_from_wrong_items(wrong_items, generation_number=1, 
     # 그래도 비어 있으면 최소 1개 생성
     if not selected_items and ranked_wrong_items:
         first_item = dict(ranked_wrong_items[0])
-        first_item["_feedback_concept"] = choose_feedback_concept(first_item)
+        first_item["_feedback_concept"] = (choose_feedback_concept(first_item) if language == LANG_KO else _non_ko_feedback_concept(first_item, language))
         first_item["_feedback_variant"] = 1
         selected_items = [first_item]
 
@@ -532,8 +605,8 @@ def build_feedback_quiz_text_from_wrong_items(wrong_items, generation_number=1, 
         correct_choice = str(item.get("correct_choice") or "").strip()
         correct_text = (item.get("correct_text") or "").strip()
         explanation = (item.get("explanation") or "").strip()
-        keyword = (item.get("_feedback_concept") or choose_feedback_concept(item)).strip()
-        timeline = (item.get("timeline") or "근거 없음").strip()
+        keyword = (item.get("_feedback_concept") or (choose_feedback_concept(item) if language == LANG_KO else _non_ko_feedback_concept(item, language))).strip()
+        timeline = (item.get("timeline") or no_evidence).strip()
 
         choices = item.get("choices") or []
         choices_text_list = []
@@ -574,7 +647,22 @@ def build_feedback_quiz_text_from_wrong_items(wrong_items, generation_number=1, 
 
     wrong_context = "\n\n".join(wrong_context_blocks)
 
+    if language == LANG_EN:
+        target_language_instruction = (
+            "Write every question and model-answer content in English. "
+            "Keep only the parser labels '문제:', '관련 키워드:', '관련 타임라인:', '모범 답안:' exactly as written."
+        )
+    elif language == LANG_ZH:
+        target_language_instruction = (
+            "所有问题正文和参考答案使用简体中文。"
+            "仅解析标签'문제:', '관련 키워드:', '관련 타임라인:', '모범 답안:'保持原样。"
+        )
+    else:
+        target_language_instruction = "문제와 모범 답안을 한국어로 작성한다."
+
     prompt = f"""너는 대학 강의 복습용 서술형 피드백 문제를 만드는 출제자다.
+[출력 언어]
+{target_language_instruction}
 아래는 학습자가 객관식 문제에서 틀린 문항 목록이다.
 
 객관식 오답 문항을 바탕으로, 학습자가 틀린 핵심 개념을 짧게 설명하도록 서술형 피드백 문제를 생성하라.
@@ -618,27 +706,27 @@ def build_feedback_quiz_text_from_wrong_items(wrong_items, generation_number=1, 
 - 모든 문장은 '~했다', '~이다', '~하다' 형식의 평어체로 작성할 것.
 
 [관련 정보 작성 조건]
-- 관련 키워드에는 실제 키워드를 쓰지 말고 반드시 '객관식 n번' 형식으로 작성할 것.
-- 예: 관련 키워드: 객관식 3번
+- 관련 키워드에는 실제 키워드를 쓰지 말고 원문 객관식 번호를 식별할 수 있게 작성할 것.
+- 한국어는 '객관식 n번', 영어는 'Objective Qn', 중국어는 '选择题第n题' 형식을 사용할 것.
 - 관련 타임라인은 오답 문항에 제공된 값을 그대로 사용할 것.
-- 타임라인이 없으면 '근거 없음'이라고 작성할 것.
+- 타임라인이 없으면 한국어 '근거 없음', 영어 'No source', 중국어 '无依据'를 사용할 것.
 
 [출력 형식]
 반드시 아래 형식을 그대로 지켜라.
 '문제:', '관련 키워드:', '관련 타임라인:', '모범 답안:'이라는 표현을 반드시 그대로 사용하라.
 
 1. 문제: ...
-관련 키워드: 객관식 n번
+관련 키워드: ...
 관련 타임라인: ...
 모범 답안: ...
 
 2. 문제: ...
-관련 키워드: 객관식 n번
+관련 키워드: ...
 관련 타임라인: ...
 모범 답안: ...
 
 3. 문제: ...
-관련 키워드: 객관식 n번
+관련 키워드: ...
 관련 타임라인: ...
 모범 답안: ...
 
@@ -664,31 +752,37 @@ def build_feedback_quiz_text_from_wrong_items(wrong_items, generation_number=1, 
 
     for index, item in enumerate(selected_items, start=1):
         objective_number = item.get("objective_number") or item.get("question_number") or index
-        keyword = (item.get("_feedback_concept") or choose_feedback_concept(item)).strip()
-        timeline = (item.get("timeline") or "근거 없음").strip()
+        keyword = (item.get("_feedback_concept") or (choose_feedback_concept(item) if language == LANG_KO else _non_ko_feedback_concept(item, language))).strip()
+        timeline = (item.get("timeline") or no_evidence).strip()
         explanation = (item.get("explanation") or "").strip()
         question_text = (item.get("question_text") or "").strip()
         variant = item.get("_feedback_variant", 1)
 
-        question = build_feedback_question_by_context(
-            keyword=keyword,
-            explanation=explanation,
-            question_text=question_text,
-            index=index,
-            variant=variant,
-        )
-
-        # 질문 문장이 완전히 중복되면 variant를 증가시켜 다시 생성
-        retry_variant = variant
-        while question in used_question_texts and retry_variant <= 5:
-            retry_variant += 1
+        if language == LANG_KO:
             question = build_feedback_question_by_context(
                 keyword=keyword,
                 explanation=explanation,
                 question_text=question_text,
                 index=index,
-                variant=retry_variant,
+                variant=variant,
             )
+        else:
+            question = _non_ko_feedback_question(keyword, language, variant=variant)
+
+        # 질문 문장이 완전히 중복되면 variant를 증가시켜 다시 생성
+        retry_variant = variant
+        while question in used_question_texts and retry_variant <= 5:
+            retry_variant += 1
+            if language == LANG_KO:
+                question = build_feedback_question_by_context(
+                    keyword=keyword,
+                    explanation=explanation,
+                    question_text=question_text,
+                    index=index,
+                    variant=retry_variant,
+                )
+            else:
+                question = _non_ko_feedback_question(keyword, language, variant=retry_variant)
 
         used_question_texts.add(question)
 
@@ -705,19 +799,32 @@ def build_feedback_quiz_text_from_wrong_items(wrong_items, generation_number=1, 
             if parts:
                 short_explanation = parts[0]
 
-        if short_explanation:
-            model_answer = f"{keyword}는 객관식 {objective_number}번의 핵심 개념이다. {short_explanation}"
-        else:
+        reference_label = _objective_reference_label(objective_number, language)
+        if language == LANG_EN:
             model_answer = (
-                f"{keyword}는 객관식 {objective_number}번의 정답 개념이다. "
-                f"답안에는 {keyword}의 의미와 핵심 특징이 포함되어야 한다."
+                f"{keyword} is the key concept behind {reference_label}. "
+                f"{short_explanation}" if short_explanation else
+                f"{keyword} is the correct concept for {reference_label}. The answer should explain its meaning and key feature."
             )
+        elif language == LANG_ZH:
+            model_answer = (
+                f"{keyword}是{reference_label}涉及的核心概念。{short_explanation}" if short_explanation else
+                f"{keyword}是{reference_label}的正确概念。答案应说明其含义和核心特点。"
+            )
+        else:
+            if short_explanation:
+                model_answer = f"{keyword}는 객관식 {objective_number}번의 핵심 개념이다. {short_explanation}"
+            else:
+                model_answer = (
+                    f"{keyword}는 객관식 {objective_number}번의 정답 개념이다. "
+                    f"답안에는 {keyword}의 의미와 핵심 특징이 포함되어야 한다."
+                )
 
-        if len(model_answer) > 160:
-            model_answer = model_answer[:160].rstrip() + "."
+        if len(model_answer) > 220:
+            model_answer = model_answer[:220].rstrip() + ("。" if language == LANG_ZH else ".")
 
         block = f"""{index}. 문제: {question}
-관련 키워드: 객관식 {objective_number}번
+관련 키워드: {reference_label}
 관련 타임라인: {timeline}
 모범 답안: {model_answer}"""
 

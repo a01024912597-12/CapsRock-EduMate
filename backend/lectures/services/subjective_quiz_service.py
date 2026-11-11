@@ -9,6 +9,7 @@ from ..models import QuizQuestion, QuizAnswer, QuizAnswerAttempt
 from .answer_feedback_generator import build_feedback_rubric, build_learning_feedback, compare_attempts, prepare_feedback_rubric, feedback_rule_signature
 from .summary_service import gemini_generate_text, extract_concept_entries_from_summary
 from .grading_service import calculate_grading_score, predict_answer_label
+from ..utils.quiz_language import LANG_KO, LANG_EN, LANG_ZH, detect_quiz_language
 
 # "gemini"  : Gemini API로 서술형 문제 생성
 # "template": Gemini 없이 요약문의 핵심 개념 사전을 기반으로 템플릿 문제 생성
@@ -27,49 +28,148 @@ _QUIZ_KEYWORD_TIME_PAIR_RE = re.compile(
 )
 
 
-def generate_quiz_with_gemini(summary_text, generation_number=1, previous_quiz_texts=""):
-    """Gemini API로 짧은 서술형 예상문제 3개와 짧은 모범답안을 생성한다."""
+
+def _subjective_language(summary_text, language=None):
+    language = (language or "").strip().lower()
+    if language in {LANG_KO, LANG_EN, LANG_ZH}:
+        return language
+    return detect_quiz_language(summary_text)
+
+
+def _subjective_text(language, key, **kwargs):
+    table = {
+        LANG_KO: {
+            "error": "퀴즈 생성 중 오류가 발생했습니다.",
+            "no_evidence": "근거 없음",
+            "default_keyword": "핵심 개념",
+            "model_default": "{keyword}는 강의에서 다룬 핵심 개념이다. 답안에는 {keyword}의 의미와 특징이 포함되어야 한다.",
+            "model_first": "{keyword}는 강의에서 다룬 핵심 개념이다.",
+            "model_second": "답안에는 {keyword}의 의미와 핵심 특징이 포함되어야 한다.",
+            "q_meaning": "'{keyword}'의 의미를 서술하시오.",
+            "q_feature": "'{keyword}'의 핵심 특징을 서술하시오.",
+            "q_importance": "'{keyword}'가 중요한 이유를 서술하시오.",
+            "fallback_1_q": "강의에서 다룬 핵심 개념 하나를 선택하고 그 의미와 중요성을 서술하시오.",
+            "fallback_1_a": "이 강의의 핵심 개념은 전체 내용을 이해하는 데 중요한 역할을 한다. 해당 개념의 의미와 중요성을 설명해야 한다.",
+            "fallback_2_q": "강의에서 나타난 중요한 사건의 원인과 결과를 서술하시오.",
+            "fallback_2_a": "강의에서 다룬 중요한 사건은 특정한 배경과 원인 속에서 발생했다. 이 사건의 전개 과정과 결과를 함께 설명해야 한다.",
+            "fallback_3_q": "강의 전체 흐름에서 가장 중요하다고 생각되는 내용을 정리하고 그 이유를 서술하시오.",
+            "fallback_3_a": "강의 전체 흐름에서 중요한 내용은 여러 개념과 사건을 연결해 이해하는 기준이 된다. 해당 내용을 중심으로 배경, 전개, 결과를 정리해야 한다.",
+        },
+        LANG_EN: {
+            "error": "An error occurred while generating the quiz.",
+            "no_evidence": "No source",
+            "default_keyword": "key concept",
+            "model_default": "{keyword} is a key concept covered in the lecture. The answer should explain the meaning and main features of {keyword}.",
+            "model_first": "{keyword} is a key concept covered in the lecture.",
+            "model_second": "The answer should explain the meaning and main features of {keyword}.",
+            "q_meaning": "Explain the meaning of '{keyword}'.",
+            "q_feature": "Describe the key features of '{keyword}'.",
+            "q_importance": "Explain why '{keyword}' is important.",
+            "fallback_1_q": "Choose one key concept from the lecture and explain its meaning and importance.",
+            "fallback_1_a": "A key concept helps organize and understand the lecture. The answer should explain the concept and why it matters in the lecture.",
+            "fallback_2_q": "Explain the cause and result of one important event or process from the lecture.",
+            "fallback_2_a": "The important event or process occurred in a specific context and produced identifiable results. The answer should connect the cause with the result.",
+            "fallback_3_q": "Summarize the most important idea in the lecture and explain why it matters.",
+            "fallback_3_a": "The central idea connects the lecture's major concepts and examples. The answer should state that idea and explain its importance.",
+        },
+        LANG_ZH: {
+            "error": "生成测验时发生错误。",
+            "no_evidence": "无依据",
+            "default_keyword": "核心概念",
+            "model_default": "{keyword}是课程中讲解的核心概念。答案应说明{keyword}的含义和主要特点。",
+            "model_first": "{keyword}是课程中讲解的核心概念。",
+            "model_second": "答案应说明{keyword}的含义和主要特点。",
+            "q_meaning": "请说明“{keyword}”的含义。",
+            "q_feature": "请说明“{keyword}”的核心特点。",
+            "q_importance": "请说明“{keyword}”为什么重要。",
+            "fallback_1_q": "请选择课程中的一个核心概念，并说明其含义和重要性。",
+            "fallback_1_a": "核心概念有助于理解课程整体内容。答案应说明该概念的含义以及它在课程中的重要性。",
+            "fallback_2_q": "请说明课程中一个重要事件或过程的原因和结果。",
+            "fallback_2_a": "重要事件或过程发生在特定背景下，并产生相应结果。答案应把原因与结果联系起来说明。",
+            "fallback_3_q": "请概括课程中最重要的内容，并说明其重要性。",
+            "fallback_3_a": "核心内容能够连接课程中的主要概念与案例。答案应概括该内容并说明其重要性。",
+        },
+    }
+    return table.get(language, table[LANG_KO]).get(key, "").format(**kwargs)
+
+
+def _subjective_output_instruction(language):
+    if language == LANG_EN:
+        return (
+            "Write all question text and model-answer content in English. "
+            "For parser compatibility, keep only the structural labels exactly as Korean: "
+            "'문제:', '관련 키워드:', '관련 타임라인:', '모범 답안:'. "
+            "Use 'No source' when no keyword/timeline evidence exists."
+        )
+    if language == LANG_ZH:
+        return (
+            "所有问题正文和参考答案内容都使用简体中文。"
+            "为了兼容解析器，仅结构标签必须保持以下韩文原样："
+            "'문제:', '관련 키워드:', '관련 타임라인:', '모범 답안:'。"
+            "找不到关键词或时间依据时写'无依据'。"
+        )
+    return (
+        "문제와 모범 답안을 한국어로 작성하고, 구조 라벨은 "
+        "'문제:', '관련 키워드:', '관련 타임라인:', '모범 답안:'을 그대로 사용하라."
+    )
+
+def generate_quiz_with_gemini(summary_text, generation_number=1, previous_quiz_texts="", language=None):
+    """Gemini API로 요약 언어에 맞는 짧은 서술형 문제 3개와 모범답안을 생성한다."""
+    language = _subjective_language(summary_text, language)
     try:
         previous_instruction = ""
-
         if previous_quiz_texts:
-            previous_instruction = (
-                "\n\n이미 생성된 이전 차수의 문제는 아래와 같다. "
-                "새 문제는 이전 문제와 최대한 겹치지 않게 출제하라.\n"
-                f"{previous_quiz_texts}"
-            )
+            if language == LANG_EN:
+                previous_instruction = (
+                    "\n\nPreviously generated questions are listed below. "
+                    "Create new questions that overlap as little as possible.\n"
+                    f"{previous_quiz_texts}"
+                )
+            elif language == LANG_ZH:
+                previous_instruction = (
+                    "\n\n下面是之前已经生成的问题。请尽量避免与这些问题重复。\n"
+                    f"{previous_quiz_texts}"
+                )
+            else:
+                previous_instruction = (
+                    "\n\n이미 생성된 이전 차수의 문제는 아래와 같다. "
+                    "새 문제는 이전 문제와 최대한 겹치지 않게 출제하라.\n"
+                    f"{previous_quiz_texts}"
+                )
+
+        output_language_instruction = _subjective_output_instruction(language)
+        no_evidence = _subjective_text(language, "no_evidence")
 
         prompt = f"""너는 대학 강의 복습용 짧은 서술형 문제를 만드는 출제자다.
 주어진 강의 요약을 바탕으로 짧은 서술형 예상 문제 3개와 각 문제의 짧은 모범 답안을 만들어라.
 
 이번 출력은 {generation_number}차 예상 문제이다.
 
+[출력 언어]
+{output_language_instruction}
+
 [문제 작성 조건]
 - 문제는 반드시 1문장으로 작성할 것.
-- 문제 길이는 35자 이내로 작성할 것.
 - 한 문제는 핵심 개념 1개만 물을 것.
 - 문제마다 서로 다른 핵심 개념을 다룰 것.
 - 문제는 자동 채점이 가능하도록 명확하게 작성할 것.
-- '전체 흐름', '배경과 결과를 모두'처럼 범위가 넓은 문제는 금지한다.
+- 너무 넓은 범위를 한 번에 묻지 말 것.
 
 [모범 답안 작성 조건]
 - 모범 답안은 반드시 2문장으로 작성할 것.
-- 전체 길이는 120자 이내로 작성할 것.
 - 첫 문장은 해당 개념의 의미를 직접 설명할 것.
 - 둘째 문장은 강의에서 중요한 이유나 핵심 특징만 설명할 것.
 - 핵심 키워드를 반드시 포함할 것.
 - 불필요한 배경 설명과 여러 사건 나열은 금지한다.
-- 모든 문장은 '~했다', '~이다', '~하다' 형식의 평어체로 작성할 것.
 
 [타임라인 근거 작성 조건]
-- 각 문제는 강의 요약의 '3. 꼭 알아야 할 필수 개념'에 있는 키워드와 (분:초)를 근거로 작성할 것.
+- 각 문제는 강의 요약의 핵심 개념 섹션에 있는 키워드와 (분:초)를 근거로 작성할 것.
 - 관련 키워드에는 해당 문제와 직접 관련 있는 핵심 개념 1개만 작성할 것.
 - 관련 타임라인에는 (분:초) 형식의 시간만 작성할 것.
-- 요약문에서 근거를 찾을 수 없으면 관련 키워드와 관련 타임라인 모두 '근거 없음'이라고 작성할 것.
+- 요약문에서 근거를 찾을 수 없으면 관련 키워드와 관련 타임라인 모두 '{no_evidence}'라고 작성할 것.
 
 [출력 형식]
-반드시 아래 형식을 그대로 지켜라.
-'문제:', '관련 키워드:', '관련 타임라인:', '모범 답안:'이라는 표현을 반드시 그대로 사용하라.
+구조 라벨은 반드시 아래처럼 한국어 라벨을 그대로 유지한다. 라벨 뒤의 실제 문제와 답안 내용만 위에서 지정한 출력 언어로 작성한다.
 
 1. 문제: ...
 관련 키워드: ...
@@ -93,150 +193,113 @@ def generate_quiz_with_gemini(summary_text, generation_number=1, previous_quiz_t
 """
 
         result = gemini_generate_text(prompt)
-
         if not result:
-            return "퀴즈 생성 중 오류가 발생했습니다."
+            return _subjective_text(language, "error")
 
-        print(f"[Gemini 짧은 서술형 문제 생성] {generation_number}차 문제 생성 완료")
+        print(f"[Gemini 짧은 서술형 문제 생성] language={language}, {generation_number}차 문제 생성 완료")
         return result
 
     except Exception as e:
         print("[Gemini 서술형 문제 생성 에러]", e)
-        return "퀴즈 생성 중 오류가 발생했습니다."
+        return _subjective_text(language, "error")
 
 
-def make_short_model_answer(keyword, description):
-    """개념 설명을 기반으로 짧은 모범 답안을 만든다.
-
-    채점 기준을 명확하게 하기 위해 2문장, 160자 이내로 제한한다.
-    """
+def make_short_model_answer(keyword, description, language=LANG_KO):
+    """개념 설명을 기반으로 요약 언어에 맞는 짧은 모범 답안을 만든다."""
     keyword = (keyword or "").strip()
     description = (description or "").strip()
+    language = _subjective_language(description or keyword, language)
 
     if not description:
-        return f"{keyword}는 강의에서 다룬 핵심 개념이다. 답안에는 {keyword}의 의미와 특징이 포함되어야 한다."
+        return _subjective_text(language, "model_default", keyword=keyword)
 
     parts = re.split(r"(?<=[.!?。다])\s+", description)
-    parts = [
-        part.strip(" -•\n\t")
-        for part in parts
-        if part.strip(" -•\n\t")
-    ]
-
+    parts = [part.strip(" -•\n\t") for part in parts if part.strip(" -•\n\t")]
     if not parts:
         parts = [description]
 
     first_sentence = parts[0]
+    if keyword and keyword.casefold() not in first_sentence.casefold():
+        first_sentence = _subjective_text(language, "model_first", keyword=keyword)
 
-    if keyword and keyword not in first_sentence:
-        first_sentence = f"{keyword}는 강의에서 다룬 핵심 개념이다."
-
-    second_sentence = ""
-
-    for part in parts:
-        if part != first_sentence:
-            second_sentence = part
-            break
-
+    second_sentence = next((part for part in parts if part != first_sentence), "")
     if not second_sentence:
-        second_sentence = f"답안에는 {keyword}의 의미와 핵심 특징이 포함되어야 한다."
+        second_sentence = _subjective_text(language, "model_second", keyword=keyword)
 
     answer = f"{first_sentence} {second_sentence}".strip()
-
-    if len(answer) > 160:
-        answer = answer[:160].rstrip() + "."
-
+    if len(answer) > 220:
+        answer = answer[:220].rstrip() + ("。" if language == LANG_ZH else ".")
     return answer
 
 
-def build_template_question(keyword, index):
-    """키워드와 번호를 바탕으로 짧고 명확한 서술형 문제를 만든다."""
-    keyword = (keyword or "핵심 개념").strip()
-
-    templates = [
-        "'{keyword}'의 의미를 서술하시오.",
-        "'{keyword}'의 핵심 특징을 서술하시오.",
-        "'{keyword}'가 중요한 이유를 서술하시오.",
-    ]
-
-    template = templates[index % len(templates)]
-    return template.format(keyword=keyword)
+def build_template_question(keyword, index, language=LANG_KO):
+    """키워드와 번호를 바탕으로 요약 언어에 맞는 짧고 명확한 서술형 문제를 만든다."""
+    language = _subjective_language(keyword, language)
+    keyword = (keyword or _subjective_text(language, "default_keyword")).strip()
+    keys = ["q_meaning", "q_feature", "q_importance"]
+    return _subjective_text(language, keys[index % len(keys)], keyword=keyword)
 
 
-def generate_quiz_with_template(summary_text, generation_number=1, previous_quiz_texts=""):
+def generate_quiz_with_template(summary_text, generation_number=1, previous_quiz_texts="", language=None):
     """Gemini API 없이 요약문 기반 템플릿 서술형 문제 3개를 생성한다."""
+    language = _subjective_language(summary_text, language)
     entries = extract_concept_entries_from_summary(summary_text)
+    no_evidence = _subjective_text(language, "no_evidence")
 
     if not entries:
-        print("[템플릿 문제 생성] 핵심 개념 추출 실패, fallback 문제 생성")
-
-        return """1. 문제: 강의에서 다룬 핵심 개념 하나를 선택하고 그 의미와 중요성을 서술하시오.
-관련 키워드: 근거 없음
-관련 타임라인: 근거 없음
-모범 답안: 이 강의의 핵심 개념은 전체 내용을 이해하는 데 중요한 역할을 한다. 해당 개념의 의미와 중요성을 설명해야 한다.
-
-2. 문제: 강의에서 나타난 중요한 사건의 원인과 결과를 서술하시오.
-관련 키워드: 근거 없음
-관련 타임라인: 근거 없음
-모범 답안: 강의에서 다룬 중요한 사건은 특정한 배경과 원인 속에서 발생했다. 이 사건의 전개 과정과 결과를 함께 설명해야 한다.
-
-3. 문제: 강의 전체 흐름에서 가장 중요하다고 생각되는 내용을 정리하고 그 이유를 서술하시오.
-관련 키워드: 근거 없음
-관련 타임라인: 근거 없음
-모범 답안: 강의 전체 흐름에서 중요한 내용은 여러 개념과 사건을 연결해 이해하는 기준이 된다. 해당 내용을 중심으로 배경, 전개, 결과를 정리해야 한다.
-"""
+        print(f"[템플릿 문제 생성] language={language}, 핵심 개념 추출 실패, fallback 문제 생성")
+        blocks = []
+        for idx in range(1, 4):
+            blocks.append(
+                f"{idx}. 문제: {_subjective_text(language, f'fallback_{idx}_q')}\n"
+                f"관련 키워드: {no_evidence}\n"
+                f"관련 타임라인: {no_evidence}\n"
+                f"모범 답안: {_subjective_text(language, f'fallback_{idx}_a')}"
+            )
+        return "\n\n".join(blocks)
 
     start_index = ((generation_number - 1) * 3) % len(entries)
-
-    selected_entries = []
-    for i in range(min(3, len(entries))):
-        selected_entries.append(entries[(start_index + i) % len(entries)])
-
+    selected_entries = [entries[(start_index + i) % len(entries)] for i in range(min(3, len(entries)))]
     while len(selected_entries) < 3:
         selected_entries.append(entries[len(selected_entries) % len(entries)])
 
     quiz_blocks = []
-
     for idx, entry in enumerate(selected_entries, start=1):
         keyword = entry["keyword"]
-        timeline = entry["timeline"]
+        timeline = entry["timeline"] or no_evidence
         description = entry["description"]
-
-        question = build_template_question(keyword, idx - 1)
-        answer = make_short_model_answer(keyword, description)
-
+        question = build_template_question(keyword, idx - 1, language=language)
+        answer = make_short_model_answer(keyword, description, language=language)
         block = f"""{idx}. 문제: {question}
 관련 키워드: {keyword}
 관련 타임라인: {timeline}
 모범 답안: {answer}"""
-
         quiz_blocks.append(block)
 
     quiz_text = "\n\n".join(quiz_blocks)
-
-    print(f"[템플릿 서술형 문제 생성] {generation_number}차 문제 생성 완료")
-    print(quiz_text)
-
+    print(f"[템플릿 서술형 문제 생성] language={language}, {generation_number}차 문제 생성 완료")
     return quiz_text
 
 
-def generate_quiz(summary_text, generation_number=1, previous_quiz_texts=""):
-    """설정값에 따라 Gemini 방식 또는 템플릿 방식으로 서술형 문제를 생성한다."""
+def generate_quiz(summary_text, generation_number=1, previous_quiz_texts="", language=None):
+    """설정값에 따라 요약 언어에 맞는 Gemini 또는 템플릿 서술형 문제를 생성한다."""
     mode = (QUIZ_GENERATION_MODE or "gemini").lower().strip()
-
-    print(f"[퀴즈 생성 모드 확인] QUIZ_GENERATION_MODE={mode}")
+    language = _subjective_language(summary_text, language)
+    print(f"[퀴즈 생성 모드 확인] QUIZ_GENERATION_MODE={mode}, language={language}")
 
     if mode == "template":
         return generate_quiz_with_template(
             summary_text=summary_text,
             generation_number=generation_number,
             previous_quiz_texts=previous_quiz_texts,
+            language=language,
         )
 
     return generate_quiz_with_gemini(
         summary_text=summary_text,
         generation_number=generation_number,
         previous_quiz_texts=previous_quiz_texts,
+        language=language,
     )
 
 
@@ -251,7 +314,7 @@ def split_quiz_reference(keywords_text="", timeline_text="", combined=""):
 
     raw = combined or timeline_text or keywords_text
 
-    if not raw or raw == "근거 없음":
+    if not raw or raw in {"근거 없음", "No source", "无依据"}:
         return "", raw
 
     timelines = [

@@ -9,6 +9,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from django.conf import settings
 
 from ..utils.text_utils import normalize_text_for_keyword
+from ..utils.quiz_language import LANG_KO, LANG_EN, LANG_ZH, detect_quiz_language
 
 # Reranker 기반 채점 모델 설정
 RERANKER_MODEL_NAME = getattr(
@@ -22,6 +23,94 @@ _reranker_model = None
 _reranker_lock = threading.Lock()
 
 kiwi = Kiwi()
+
+
+
+def _grading_language(*texts):
+    return detect_quiz_language("\n".join(str(text or "") for text in texts))
+
+
+def _grading_text(language, key, **kwargs):
+    table = {
+        LANG_KO: {
+            "required_missing": "문제의 핵심 개념 '{term}'이(가) 답안에 명시되지 않았습니다.",
+            "empty": "답안이 작성되지 않았거나 성의가 부족합니다. 모범 답안을 확인하고 다시 작성해보세요.",
+            "reference": "💡 **모범 답안 참조**: {model_answer}",
+            "exact": "모범 답안과 정확히 일치하는 완벽한 답안입니다!",
+            "exact_detail": "모범 답안의 모든 요소를 완벽하게 포함하여 감점 요소가 없습니다.",
+            "unavailable": "자동 채점 모델을 사용할 수 없어 점수 판정을 보류했습니다. 답안은 저장되었으며 검토가 필요합니다.",
+            "short": "답안이 너무 짧아 모범 답안의 핵심 개념을 충분히 설명하지 못했습니다.",
+            "missing_some": "모범 답안의 필수 키워드({keywords} 등)가 누락되어 설명의 완성도가 떨어집니다.",
+            "missing_many": "모범 답안의 핵심 키워드가 다수 누락되었습니다.",
+            "good_keywords": "모범 답안의 핵심 개념과 키워드를 대부분 잘 활용하여 작성했습니다.",
+            "covered": "✅ **잘 서술된 부분**:\n모범 답안의 주요 내용인 '{text}' 관련 개념을 잘 언급했습니다.",
+            "uncovered": "⚠️ **보완이 필요한 부분 (모범 답안 대비)**:\n모범 답안의 핵심 설명인 '{text}' 내용이 다소 부족합니다.",
+            "missing_terms": "🔑 **추가해야 할 핵심 용어**: {keywords}",
+            "query": "질문: {question} 정답: {answer}",
+        },
+        LANG_EN: {
+            "required_missing": "The key concept '{term}' from the question is not stated in the answer.",
+            "empty": "The answer is empty or too limited to grade reliably. Review the model answer and try again.",
+            "reference": "💡 **Model answer reference**: {model_answer}",
+            "exact": "The answer exactly matches the model answer.",
+            "exact_detail": "The answer contains all elements of the model answer with no deduction needed.",
+            "unavailable": "The automatic grading model is unavailable, so the score was withheld. The answer was saved for review.",
+            "short": "The answer is too short to explain the key concept sufficiently.",
+            "missing_some": "Important terms from the model answer ({keywords}, etc.) are missing, so the explanation is incomplete.",
+            "missing_many": "Several key terms from the model answer are missing.",
+            "good_keywords": "The answer uses most of the key concepts and terms from the model answer well.",
+            "covered": "✅ **Well explained**:\nThe answer covers the model-answer idea '{text}'.",
+            "uncovered": "⚠️ **Needs improvement**:\nThe model-answer point '{text}' is not sufficiently explained.",
+            "missing_terms": "🔑 **Key terms to add**: {keywords}",
+            "query": "Question: {question} Answer: {answer}",
+        },
+        LANG_ZH: {
+            "required_missing": "答案中没有明确写出问题的核心概念“{term}”。",
+            "empty": "答案为空或内容过少，无法可靠评分。请参考标准答案后重新作答。",
+            "reference": "💡 **标准答案参考**：{model_answer}",
+            "exact": "答案与标准答案完全一致。",
+            "exact_detail": "答案完整包含标准答案的全部要点，无需扣分。",
+            "unavailable": "自动评分模型当前不可用，因此暂不判定分数。答案已保存，可供后续复核。",
+            "short": "答案过短，未能充分说明核心概念。",
+            "missing_some": "标准答案中的重要关键词（{keywords}等）缺失，说明不够完整。",
+            "missing_many": "标准答案中的多个核心关键词缺失。",
+            "good_keywords": "答案较好地使用了标准答案中的大部分核心概念和关键词。",
+            "covered": "✅ **说明较好的部分**：\n答案涉及了标准答案中的“{text}”。",
+            "uncovered": "⚠️ **需要补充的部分**：\n标准答案中的“{text}”说明得还不充分。",
+            "missing_terms": "🔑 **建议补充的核心词**：{keywords}",
+            "query": "问题：{question} 答案：{answer}",
+        },
+    }
+    return table.get(language, table[LANG_KO]).get(key, "").format(**kwargs)
+
+
+def _extract_grading_keywords_non_ko(text, language):
+    text = text or ""
+    if language == LANG_EN:
+        stop = {
+            "the", "and", "for", "that", "with", "from", "this", "into", "than", "then", "which",
+            "what", "why", "how", "are", "was", "were", "is", "be", "been", "being", "have", "has",
+            "had", "can", "could", "should", "would", "may", "might", "must", "answer", "question",
+            "explain", "describe", "meaning", "feature", "important", "lecture", "model",
+        }
+        values = re.findall(r"\b[A-Za-z][A-Za-z0-9.+#'/-]{2,}\b", text)
+        result = []
+        for value in values:
+            if value.casefold() in stop:
+                continue
+            if value.casefold() not in {item.casefold() for item in result}:
+                result.append(value)
+        return result[:20]
+
+    stop = {"答案", "问题", "课程", "概念", "含义", "特点", "重要", "说明", "核心", "标准答案"}
+    values = re.findall(r"[\u4e00-\u9fff]{2,8}|\b[A-Za-z][A-Za-z0-9.+#'/-]{1,}\b", text)
+    result = []
+    for value in values:
+        if value in stop:
+            continue
+        if value not in result:
+            result.append(value)
+    return result[:20]
 
 
 def get_reranker_model():
@@ -83,11 +172,15 @@ KEYWORD_STOPWORDS = {
 
 
 def extract_grading_keywords(text):
-    """채점 보조용 핵심 키워드를 추출한다 (일반 명사 및 추상어 필터링 대폭 강화)."""
+    """채점 보조용 핵심 키워드를 추출한다. 한국어는 기존 Kiwi 로직을 그대로 사용한다."""
     text = (text or "").strip()
 
     if not text:
         return []
+
+    language = _grading_language(text)
+    if language != LANG_KO:
+        return _extract_grading_keywords_non_ko(text, language)
 
     keywords = []
 
@@ -152,7 +245,7 @@ def is_meaningless_answer(user_answer):
         "모르겠다", "모름", "몰라", "없음", "없다",
         "잘모르겠다", "잘모름", "패스", "pass",
         "ㅇㅇ", "ㄴㄴ", "ㅋㅋ", "ㅎㅎ",
-        "test", "테스트",
+        "test", "테스트", "i don't know", "dont know", "unknown", "skip", "不知道", "不清楚", "跳过",
     }
 
     if compact.lower() in meaningless_values:
@@ -196,7 +289,7 @@ def detect_factual_conflicts_generic(question_text, model_answer, user_answer):
         if norm_term not in norm_user:
             conflicts.append({
                 "type": "required_term_missing",
-                "message": f"문제의 핵심 개념 '{term}'이(가) 답안에 명시되지 않았습니다.",
+                "message": _grading_text(_grading_language(question_text, model_answer, user_answer), "required_missing", term=term),
                 "cap": 0.70,
             })
 
@@ -252,7 +345,8 @@ def calculate_reranker_score(question_text, model_answer, user_answer):
     if not model_answer or not user_answer:
         return 0.0
 
-    query_reference = f"질문: {question_text} 정답: {model_answer}"
+    language = _grading_language(question_text, model_answer)
+    query_reference = _grading_text(language, "query", question=question_text, answer=model_answer)
 
     try:
         tokenizer, reranker = get_reranker_model()
@@ -287,33 +381,27 @@ def calculate_reranker_score(question_text, model_answer, user_answer):
 
 
 def generate_detailed_analysis(model_answer, user_answer, matched_kw, missing_kw, conflicts):
-    """모범 답안과 학생 답안을 비교하여 상세 분석 문구 및 총평을 생성합니다."""
+    """모범 답안과 학생 답안을 비교하여 요약 언어에 맞는 상세 분석 문구를 생성한다."""
+    language = _grading_language(model_answer, user_answer)
     analysis_parts = []
-
-    model_sentences = [s.strip() for s in re.split(r'(?<=[.?!])\s+|\n+', model_answer) if s.strip()]
-
+    model_sentences = [s.strip() for s in re.split(r'(?<=[.?!。])\s+|\n+', model_answer) if s.strip()]
     covered_sentences = []
     uncovered_sentences = []
 
     for sent in model_sentences:
-        sent_kw = [kw for kw in matched_kw if kw in sent]
-        if sent_kw or any(kw in user_answer for kw in matched_kw if kw in sent):
+        sent_kw = [kw for kw in matched_kw if kw.casefold() in sent.casefold()]
+        if sent_kw or any(kw.casefold() in user_answer.casefold() for kw in matched_kw if kw.casefold() in sent.casefold()):
             covered_sentences.append(sent)
         else:
             uncovered_sentences.append(sent)
 
     if covered_sentences:
-        analysis_parts.append(f"✅ **잘 서술된 부분**:\n모범 답안의 주요 내용인 '{' / '.join(covered_sentences[:2])}' 관련 개념을 잘 언급했습니다.")
-
+        analysis_parts.append(_grading_text(language, "covered", text=" / ".join(covered_sentences[:2])))
     if uncovered_sentences:
-        analysis_parts.append(
-            f"⚠️ **보완이 필요한 부분 (모범 답안 대비)**:\n모범 답안의 핵심 설명인 '{' / '.join(uncovered_sentences[:2])}' 내용이 다소 부족합니다.")
-
+        analysis_parts.append(_grading_text(language, "uncovered", text=" / ".join(uncovered_sentences[:2])))
     if missing_kw:
-        analysis_parts.append(f"🔑 **추가해야 할 핵심 용어**: {', '.join(missing_kw)}")
-
-    detail_analysis_text = "\n\n".join(analysis_parts)
-    return detail_analysis_text
+        analysis_parts.append(_grading_text(language, "missing_terms", keywords=", ".join(missing_kw)))
+    return "\n\n".join(analysis_parts)
 
 
 def calculate_grading_score(question_text, model_answer, user_answer):
@@ -322,8 +410,11 @@ def calculate_grading_score(question_text, model_answer, user_answer):
     model_answer = (model_answer or "").strip()
     user_answer = (user_answer or "").strip()
 
+    language = _grading_language(question_text, model_answer, user_answer)
+
     feedback = {
         "score": 0.0,
+        "language": language,
         "matched_keywords": [],
         "missing_keywords": [],
         "messages": [],
@@ -331,16 +422,16 @@ def calculate_grading_score(question_text, model_answer, user_answer):
     }
 
     if not user_answer or is_meaningless_answer(user_answer):
-        feedback["messages"].append("답안이 작성되지 않았거나 성의가 부족합니다. 모범 답안을 확인하고 다시 작성해보세요.")
-        feedback["detail_analysis"] = f"💡 **모범 답안 참조**: {model_answer}"
+        feedback["messages"].append(_grading_text(language, "empty"))
+        feedback["detail_analysis"] = _grading_text(language, "reference", model_answer=model_answer)
         return 0.0, feedback
 
     norm_model = re.sub(r"\s+", "", model_answer).lower()
     norm_user = re.sub(r"\s+", "", user_answer).lower()
     if norm_model and norm_model == norm_user:
         feedback["score"] = 1.0
-        feedback["messages"].append("모범 답안과 정확히 일치하는 완벽한 답안입니다!")
-        feedback["detail_analysis"] = "모범 답안의 모든 요소를 완벽하게 포함하여 감점 요소가 없습니다."
+        feedback["messages"].append(_grading_text(language, "exact"))
+        feedback["detail_analysis"] = _grading_text(language, "exact_detail")
         return 1.0, feedback
 
     reranker_score = calculate_reranker_score(question_text, model_answer, user_answer) if model_answer else None
@@ -355,7 +446,7 @@ def calculate_grading_score(question_text, model_answer, user_answer):
     if reranker_score is None:
         feedback["score"] = None
         feedback["grading_status"] = "review_required"
-        feedback["messages"].append("자동 채점 모델을 사용할 수 없어 점수 판정을 보류했습니다. 답안은 저장되었으며 검토가 필요합니다.")
+        feedback["messages"].append(_grading_text(language, "unavailable"))
         return None, feedback
     else:
         final_score = (reranker_score * 0.55) + (keyword_score * 0.35) + (
@@ -364,16 +455,16 @@ def calculate_grading_score(question_text, model_answer, user_answer):
     user_len = len(user_answer)
     if user_len < 15:
         final_score = min(final_score, 0.30)
-        feedback["messages"].append("답안이 너무 짧아 모범 답안의 핵심 개념을 충분히 설명하지 못했습니다.")
+        feedback["messages"].append(_grading_text(language, "short"))
 
     if keyword_score < 0.30:
         final_score = min(final_score, 0.60)
         if missing_kw:
-            feedback["messages"].append(f"모범 답안의 필수 키워드({', '.join(missing_kw[:3])} 등)가 누락되어 설명의 완성도가 떨어집니다.")
+            feedback["messages"].append(_grading_text(language, "missing_some", keywords=", ".join(missing_kw[:3])))
         else:
-            feedback["messages"].append("모범 답안의 핵심 키워드가 다수 누락되었습니다.")
+            feedback["messages"].append(_grading_text(language, "missing_many"))
     elif keyword_score >= 0.80:
-        feedback["messages"].append("모범 답안의 핵심 개념과 키워드를 대부분 잘 활용하여 작성했습니다.")
+        feedback["messages"].append(_grading_text(language, "good_keywords"))
 
     # 질문 용어의 반복 여부는 사실 오류나 필수 답안 요소의 근거가 아니다.
     conflicts = []

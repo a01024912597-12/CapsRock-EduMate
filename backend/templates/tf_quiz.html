@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 
 {% block content %}
     <style>
@@ -109,9 +110,9 @@
         <div class="page-title-row">
             <h1>
                 <span class="title-icon"><i class="fa-solid fa-file-signature"></i></span>
-                O/X 명제 검증 퀴즈
+                {% trans "O/X 명제 검증 퀴즈" %}
             </h1>
-            <p>강의 스크립트에서 추출된 주요 명제의 참/거짓을 판별해 보세요.</p>
+            <p>{% trans "강의 스크립트에서 추출된 주요 명제의 참/거짓을 판별해 보세요." %}</p>
         </div>
 
         <!-- 퀴즈 유형 전환 탭 (객관식/주관식 퀴즈 ↔ O/X 명제 퀴즈) -->
@@ -119,13 +120,13 @@
             <a href="{% url 'quiz' %}?lecture_id={{ lecture.id }}"
                class="btn-tab"
                style="padding: 10px 20px; border-radius: 8px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: var(--bg-card); color: var(--text-sub); border: 1px solid var(--border);">
-                <i class="fa-solid fa-list-check"></i> 객관식 퀴즈
+                <i class="fa-solid fa-list-check"></i> {% trans "객관식 퀴즈" %}
             </a>
 
             <a href="{% url 'tf_quiz' %}?lecture_id={{ lecture.id }}"
                class="btn-tab active"
                style="padding: 10px 20px; border-radius: 8px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #ffffff;">
-                <i class="fa-solid fa-file-signature"></i> O/X 명제 퀴즈
+                <i class="fa-solid fa-file-signature"></i> {% trans "O/X 명제 퀴즈" %}
             </a>
         </div>
 
@@ -145,31 +146,31 @@
                         <!-- 이전 회차 버튼 -->
                         {% if has_prev %}
                             <a href="?lecture_id={{ lecture.id }}&gen={{ prev_gen }}"
-                               class="btn-gen-nav" title="이전 회차로 이동"
+                               class="btn-gen-nav" title="{% trans '이전 회차로 이동' %}"
                                style="color: var(--text-main); text-decoration: none; padding: 2px 8px; border-radius: 4px; background: var(--bg-card); border: 1px solid var(--border2); font-size: 13px;">
-                                <i class="fa-solid fa-chevron-left"></i> 이전
+                                <i class="fa-solid fa-chevron-left"></i> {% trans "이전" %}
                             </a>
                         {% else %}
                             <span style="color: var(--text-muted); padding: 2px 8px; font-size: 13px; opacity: 0.5; cursor: not-allowed;">
-                    <i class="fa-solid fa-chevron-left"></i> 이전
+                    <i class="fa-solid fa-chevron-left"></i> {% trans "이전" %}
                 </span>
                         {% endif %}
 
                         <!-- 현재 회차 표시 -->
                         <span style="font-weight: 700; font-size: 14px; color: var(--accent); padding: 0 4px;">
-                {{ current_gen }}회차
+                {{ current_gen }}{% trans "회차" %}
             </span>
 
                         <!-- 다음 회차 버튼 -->
                         {% if has_next %}
                             <a href="?lecture_id={{ lecture.id }}&gen={{ next_gen }}"
-                               class="btn-gen-nav" title="다음 회차로 이동"
+                               class="btn-gen-nav" title="{% trans '다음 회차로 이동' %}"
                                style="color: var(--text-main); text-decoration: none; padding: 2px 8px; border-radius: 4px; background: var(--bg-card); border: 1px solid var(--border2); font-size: 13px;">
-                                다음 <i class="fa-solid fa-chevron-right"></i>
+                                {% trans "다음" %} <i class="fa-solid fa-chevron-right"></i>
                             </a>
                         {% else %}
                             <span style="color: var(--text-muted); padding: 2px 8px; font-size: 13px; opacity: 0.5; cursor: not-allowed;">
-                    다음 <i class="fa-solid fa-chevron-right"></i>
+                    {% trans "다음" %} <i class="fa-solid fa-chevron-right"></i>
                 </span>
                         {% endif %}
                     </div>
@@ -180,7 +181,7 @@
                     {% csrf_token %}
                     <input type="hidden" name="generate_quiz" value="1">
                     <button type="submit" class="btn-secondary" style="padding: 8px 16px; font-weight: 600;">
-                        <i class="fa-solid fa-plus"></i> 새 회차 퀴즈 생성
+                        <i class="fa-solid fa-plus"></i> {% trans "새 회차 퀴즈 생성" %}
                     </button>
                 </form>
             </div>
@@ -205,14 +206,14 @@
                                         <input type="radio" name="question_{{ item.id }}" value="O"
                                                {% if item.user_answer == 'O' %}checked{% endif %} required>
                                         <span class="ox-symbol">O</span>
-                                        <span class="ox-label">참 (True)</span>
+                                        <span class="ox-label">{% trans "참 (True)" %}</span>
                                     </label>
 
                                     <label class="ox-option x-card">
                                         <input type="radio" name="question_{{ item.id }}" value="X"
                                                {% if item.user_answer == 'X' %}checked{% endif %}>
                                         <span class="ox-symbol">X</span>
-                                        <span class="ox-label">거짓 (False)</span>
+                                        <span class="ox-label">{% trans "거짓 (False)" %}</span>
                                     </label>
                                 </div>
 
@@ -221,21 +222,21 @@
                                     <div style="margin-top: 16px; padding: 14px; border-radius: 8px; background: {% if item.is_correct %}rgba(34, 197, 94, 0.1){% else %}rgba(239, 68, 68, 0.1){% endif %}; border: 1px solid {% if item.is_correct %}var(--green){% else %}var(--accent3){% endif %};">
                                         <div style="font-weight: 700; color: {% if item.is_correct %}var(--green){% else %}var(--accent3){% endif %};">
                                             {% if item.is_correct %}
-                                                <i class="fa-solid fa-circle-check"></i> 정답입니다! (정답:
+                                                <i class="fa-solid fa-circle-check"></i> {% trans "정답입니다!" %} ({% trans "정답" %}:
                                                 {{ item.model_answer }})
                                             {% else %}
-                                                <i class="fa-solid fa-circle-xmark"></i> 오답입니다. (제출:
-                                                {{ item.user_answer|default:"미제출" }} / 정답: {{ item.model_answer }})
+                                                <i class="fa-solid fa-circle-xmark"></i> {% trans "오답입니다." %} ({% trans "제출" %}:
+                                                {% if item.user_answer %}{{ item.user_answer }}{% else %}{% trans "미제출" %}{% endif %} / {% trans "정답" %}: {{ item.model_answer }})
                                             {% endif %}
                                         </div>
 
                                         <div style="font-size: 13px; color: var(--text-sub); margin-top: 6px;">
-                                            <strong>해설:</strong> {{ item.explanation }}
+                                            <strong>{% trans "해설:" %}</strong> {{ item.explanation }}
                                         </div>
 
                                         {% if item.original_sentence and item.model_answer == 'X' %}
                                             <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
-                                                <strong>원문:</strong> {{ item.original_sentence }}
+                                                <strong>{% trans "원문:" %}</strong> {{ item.original_sentence }}
                                             </div>
                                         {% endif %}
                                     </div>
@@ -248,7 +249,7 @@
                     <!-- 제출 버튼 -->
                     <div class="btn-area" style="margin-top: 30px; text-align: right;">
                         <button type="submit" class="btn-primary" style="padding: 12px 24px; font-weight: 700;">
-                            <i class="fa-solid fa-paper-plane"></i> 답안 제출 및 채점하기
+                            <i class="fa-solid fa-paper-plane"></i> {% trans "답안 제출 및 채점하기" %}
                         </button>
                     </div>
                 </form>

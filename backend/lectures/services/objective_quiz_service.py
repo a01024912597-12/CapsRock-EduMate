@@ -13,6 +13,15 @@ from django.conf import settings
 from ..models import Quiz, QuizQuestion, QuizAnswer
 from ..utils.text_utils import strip_html_tags, clean_summary_text
 from .summary_service import extract_concept_entries_from_summary
+from ..utils.quiz_language import (
+    LANG_KO,
+    LANG_EN,
+    LANG_ZH,
+    detect_quiz_language,
+    split_sentences_multilingual,
+    extract_non_korean_keywords,
+    localized_quiz_text,
+)
 
 OBJECTIVE_QUIZ_TYPE = "objective"
 FEEDBACK_QUIZ_TYPE = "feedback"
@@ -269,7 +278,7 @@ def _clean_text_for_objective(text):
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
-def generate_objective_quiz_items(summary_text, question_count=20, previous_quiz_texts=""):
+def _generate_objective_quiz_items_ko(summary_text, question_count=20, previous_quiz_texts=""):
     """요약문을 기반으로 Kiwi + SBERT 객관식 문제 목록을 생성한다.
 
     1차로 실제 요약 문장 기반 빈칸 문제를 만들고,
@@ -419,6 +428,201 @@ def generate_objective_quiz_items(summary_text, question_count=20, previous_quiz
         used_answers.add(keyword)
 
     return quiz_items
+
+
+def _clean_objective_text_multilingual(text):
+    """영어/중국어 객관식 생성 전용 전처리."""
+    text = clean_summary_text(text) if "clean_summary_text" in globals() else (text or "")
+    text = strip_html_tags(text)
+    text = re.sub(r"\[IMG:\s*\d{1,3}:\d{2}\]", " ", text)
+    text = text.replace("**", "").replace("__", "")
+    text = re.sub(
+        r"\([^)]*?(?:key lecture frame|核心画面)[^)]*?\)",
+        " ",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _generate_objective_quiz_items_non_ko(
+    summary_text,
+    question_count=20,
+    previous_quiz_texts="",
+    language=LANG_EN,
+):
+    """영어/중국어 요약 전용 객관식 생성기. 한국어 기존 로직과 분리한다."""
+    clean_text = _clean_objective_text_multilingual(summary_text)
+    if not clean_text or len(clean_text) < 30:
+        return []
+
+    raw_sentences = split_sentences_multilingual(clean_text, language)
+    if not raw_sentences:
+        return []
+
+    concept_keywords = []
+    try:
+        concept_keywords = [
+            (entry.get("keyword") or "").strip()
+            for entry in extract_concept_entries_from_summary(summary_text)
+            if (entry.get("keyword") or "").strip()
+        ]
+    except Exception:
+        concept_keywords = []
+
+    all_keywords = extract_non_korean_keywords(
+        summary_text,
+        language,
+        concept_keywords=concept_keywords,
+    )
+    if len(all_keywords) < 4:
+        return []
+
+    filtered_sentences = []
+    en_meta_prefixes = (
+        "type:", "basis:", "meaning:", "context:", "exam point:", "exam points:",
+        "short answer:", "comparison:", "sequence:", "essay:", "one-line final summary:",
+        "one line final summary:",
+    )
+    zh_meta_prefixes = (
+        "类型：", "依据：", "含义：", "语境：", "考点：", "简答：", "比较：",
+        "顺序：", "论述：", "一句话总结：",
+    )
+
+    for sent in raw_sentences:
+        sent = re.sub(r"\s+", " ", str(sent).strip(" -•"))
+        lowered = sent.casefold()
+        if not sent:
+            continue
+        if any(token in lowered for token in ("font-size", "timeline-image-wrapper", "http://", "https://")):
+            continue
+        if language == LANG_EN:
+            if lowered.startswith(en_meta_prefixes):
+                continue
+            if len(sent) < 24 or len(sent) > 320:
+                continue
+            if len(re.findall(r"[A-Za-z]{2,}", sent)) < 5:
+                continue
+        else:
+            if sent.startswith(zh_meta_prefixes):
+                continue
+            if len(sent) < 12 or len(sent) > 180:
+                continue
+            if len(re.findall(r"[\u4e00-\u9fff]", sent)) < 6:
+                continue
+        filtered_sentences.append(sent)
+
+    if not filtered_sentences:
+        return []
+
+    used_answers = set()
+    used_sentences = set()
+
+    for match in re.finditer(r"정답\s*단어\s*:\s*([^\n]+)", previous_quiz_texts or ""):
+        used_answers.add(match.group(1).strip())
+
+    random.shuffle(filtered_sentences)
+    quiz_items = []
+
+    def choose_distractors(answer):
+        candidates = [
+            keyword for keyword in all_keywords
+            if keyword.casefold() != answer.casefold()
+            and keyword.casefold() not in answer.casefold()
+            and answer.casefold() not in keyword.casefold()
+            and keyword not in used_answers
+        ]
+        candidates.sort(key=lambda value: (abs(len(value) - len(answer)), value.casefold()))
+        return candidates[:3]
+
+    def make_item(answer_word, source_sentence):
+        distractors = choose_distractors(answer_word)
+        if len(distractors) < 3:
+            return None
+
+        question_sentence = source_sentence.replace(answer_word, "( ____ )", 1)
+        options = distractors[:3] + [answer_word]
+        random.shuffle(options)
+        correct_choice = str(options.index(answer_word) + 1)
+
+        return {
+            "number": len(quiz_items) + 1,
+            "question_text": localized_quiz_text(
+                language,
+                "blank_prompt",
+                sentence=question_sentence,
+            ),
+            "choices": [
+                {"c_num": str(index + 1), "choice_text": option}
+                for index, option in enumerate(options)
+            ],
+            "correct_choice": correct_choice,
+            "answer_word": answer_word,
+            "keyword": answer_word,
+            "timeline": find_timeline_for_keyword(summary_text, answer_word),
+            "explanation": localized_quiz_text(
+                language,
+                "explanation",
+                answer=answer_word,
+            ),
+            "source_sentence": source_sentence,
+        }
+
+    for sent in filtered_sentences:
+        if len(quiz_items) >= question_count:
+            break
+        if sent in used_sentences:
+            continue
+
+        sentence_keywords = [
+            keyword for keyword in all_keywords
+            if keyword not in used_answers
+            and len(keyword) > 1
+            and keyword in sent
+        ]
+        if not sentence_keywords:
+            continue
+
+        item = None
+        for answer_word in sentence_keywords:
+            item = make_item(answer_word, sent)
+            if item:
+                used_answers.add(answer_word)
+                break
+
+        if not item:
+            continue
+
+        quiz_items.append(item)
+        used_sentences.add(sent)
+
+    print(
+        f"[객관식 퀴즈 생성] language={language}, "
+        f"sentences={len(filtered_sentences)}, keywords={len(all_keywords)}, "
+        f"generated={len(quiz_items)}"
+    )
+    return quiz_items
+
+
+def generate_objective_quiz_items(summary_text, question_count=20, previous_quiz_texts=""):
+    """요약 언어에 따라 기존 한국어 생성기 또는 다국어 생성기를 선택한다."""
+    language = detect_quiz_language(summary_text)
+
+    if language == LANG_KO:
+        return _generate_objective_quiz_items_ko(
+            summary_text=summary_text,
+            question_count=question_count,
+            previous_quiz_texts=previous_quiz_texts,
+        )
+
+    return _generate_objective_quiz_items_non_ko(
+        summary_text=summary_text,
+        question_count=question_count,
+        previous_quiz_texts=previous_quiz_texts,
+        language=language,
+    )
+
 
 def objective_items_to_text(items):
     """객관식 문제 목록을 사람이 읽을 수 있는 원본 텍스트로 변환한다."""

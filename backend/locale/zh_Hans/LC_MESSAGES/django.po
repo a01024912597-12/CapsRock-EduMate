@@ -1348,7 +1348,6 @@ msgstr "关键画面"
 msgid "학습 점검"
 msgstr "学习检查"
 
-
 msgid "강의실"
 msgstr "教室"
 
@@ -1595,6 +1594,7 @@ msgstr "请重新选择评分结果。"
 msgid "점수는 0~100 사이의 숫자로 입력해 주세요."
 msgstr "请输入 0~100 之间的分数。"
 
+#, python-format
 msgid "%(name)s님의 답안 채점 결과를 저장했습니다."
 msgstr "已保存 %(name)s 的答案评分。"
 
@@ -1658,6 +1658,7 @@ msgstr "未评分"
 msgid "아직 학생이 제출한 답안이 없습니다. 학생이 강의를 요약하고 문제를 풀면 여기에 표시됩니다."
 msgstr "学生还没有提交答案。学生生成课程摘要并答题后，答案会显示在这里。"
 
+#, python-format
 msgid "학생 %(counter)s명 요약"
 msgid_plural "학생 %(counter)s명 요약"
 msgstr[0] "%(counter)s 名学生已摘要"
@@ -1727,3 +1728,271 @@ msgstr "要按自动判定和自动评分为所有题目评分吗？手动输入
 
 msgid "평균"
 msgstr "平均"
+
+msgid "분석 작업"
+msgstr "分析任务"
+
+msgid "강의 분석 대기열"
+msgstr "课程分析队列"
+
+msgid "진행 중인 분석과 대기 순서를 확인하고 관리할 수 있습니다."
+msgstr "可查看并管理正在进行的分析和排队顺序。"
+
+msgid "대기열 닫기"
+msgstr "关闭队列"
+
+msgid "실시간 상태"
+msgstr "实时状态"
+
+msgid "현재 진행 중인 작업이 없습니다."
+msgstr "当前没有正在进行的任务。"
+
+msgid "대기 중인 분석이 없습니다."
+msgstr "当前没有等待中的分析。"
+
+msgid "새 강의를 등록하면 이곳에서 진행 상태를 확인할 수 있습니다."
+msgstr "添加新课程后，可在此查看分析进度。"
+
+msgid "대기열 작업 관리"
+msgstr "管理队列任务"
+
+msgid "한 단계 위로"
+msgstr "上移一位"
+
+msgid "한 단계 아래로"
+msgstr "下移一位"
+
+msgid "대기 취소"
+msgstr "取消排队"
+
+msgid "AI 분석을 진행하고 있습니다."
+msgstr "正在进行 AI 分析。"
+
+msgid "앞선 작업 완료 후 자동으로 시작됩니다."
+msgstr "前面的任务完成后将自动开始。"
+
+msgid "결과 보기"
+msgstr "查看结果"
+
+msgid "대기열 상태를 불러오지 못했습니다."
+msgstr "无法加载队列状态。"
+
+msgid "이 강의의 분석 대기열을 취소하시겠습니까?"
+msgstr "确定要取消该课程的分析排队吗？"
+
+msgid "분석 진행 중"
+msgstr "分析进行中"
+
+#, python-format
+msgid "대기 %(number)s번"
+msgstr "等待第 %(number)s 位"
+
+msgid "제목 없음"
+msgstr "无标题"
+
+msgid "시간 초과로 자동 종료되었습니다."
+msgstr "因超时，分析已自动终止。"
+
+msgid "사용자에 의해 대기열에서 취소되었습니다."
+msgstr "该分析已由用户取消排队。"
+
+msgid "대기열에서 취소되었습니다."
+msgstr "已从队列中取消。"
+
+msgid "대기열 확인 중..."
+msgstr "正在确认队列..."
+
+msgid "대기열에 등록되었습니다."
+msgstr "已加入分析队列。"
+
+msgid "앞선 작업이 끝나면 자동으로 분석이 시작됩니다."
+msgstr "前面的任务完成后将自动开始分析。"
+
+msgid "대기열 진입"
+msgstr "进入队列"
+
+msgid "음성 전사(STT)"
+msgstr "语音转写（STT）"
+
+msgid "AI 핵심 요약"
+msgstr "AI 核心摘要"
+
+#, python-brace-format
+msgid "현재 대기 순번: {n}번째"
+msgstr "当前排队序号：第 {n} 位"
+
+#, python-brace-format
+msgid "앞에 {n}개의 강의가 먼저 분석되고 있습니다."
+msgstr "前面还有 {n} 个课程正在等待分析。"
+
+msgid "잠시 후 분석이 시작됩니다."
+msgstr "分析即将开始。"
+
+msgid "차례가 되면 자동으로 음성 전사 및 요약이 진행됩니다."
+msgstr "轮到该课程后，将自动进行语音转写和摘要。"
+
+msgid "1/2 단계: 음성 텍스트 추출 중"
+msgstr "第 1/2 步：正在转写音频"
+
+msgid "2/2 단계: AI 요약 중"
+msgstr "第 2/2 步：正在生成 AI 摘要"
+
+msgid "강의 음성을 Whisper로 받아 적고 있습니다..."
+msgstr "Whisper 正在转写课程音频..."
+
+msgid "AI가 핵심 내용과 타임라인을 정리 중입니다..."
+msgstr "AI 正在整理核心内容和时间线..."
+
+msgid "화면을 닫지 말고 잠시만 기다려주세요."
+msgstr "请保持此页面打开并稍候。"
+
+msgid "대기열"
+msgstr "队列"
+
+msgid "분석 대기열 보기"
+msgstr "查看分析队列"
+
+msgid "base-빠른 분석"
+msgstr "base — 快速分析"
+
+msgid "small-균형 분석"
+msgstr "small — 均衡分析"
+
+msgid "medium-정확한 분석"
+msgstr "medium — 精确分析"
+
+msgid "large-고정밀 분석"
+msgstr "large — 高精度分析"
+
+msgid "large 모델은 가장 높은 정확도를 제공하지만 처리 속도와 메모리 사용량 부담이 가장 큽니다. 짧은 영상이나 고성능 PC에서만 권장합니다."
+msgstr "large 模型提供最高的识别准确度，但处理时间和内存占用也最高，仅建议用于较短视频或高性能电脑。"
+
+msgid "3개는 고성능 병렬 처리용입니다. CPU 사용량은 늘어나지만 여러 구간을 동시에 처리할 수 있습니다."
+msgstr "3 个工作线程用于高性能并行处理。CPU 占用会增加，但可以同时处理多个片段。"
+
+msgid "AI 자동 생성은 API가 강의 내용을 보고 과목 성격을 판단한 뒤, 시험 대비에 적합한 구조로 요약합니다."
+msgstr "AI 自动判断会分析课程内容与学科特征，并采用适合备考的结构进行总结。"
+
+msgid "객관식 퀴즈"
+msgstr "选择题测验"
+
+msgid "강의 요약 내용을 바탕으로 생성된 4지선다 객관식 문제를 풀어보세요."
+msgstr "请完成根据课程摘要生成的四选一选择题。"
+
+msgid "O/X 명제 퀴즈"
+msgstr "判断题测验"
+
+msgid "이전 회차로 이동"
+msgstr "前往上一轮"
+
+msgid "회차"
+msgstr "轮"
+
+msgid "다음 회차로 이동"
+msgstr "前往下一轮"
+
+msgid "새 회차 퀴즈 생성"
+msgstr "生成新一轮测验"
+
+msgid "생성된 문제 문항이 없습니다. 상단의 새 회차 퀴즈 생성 버튼을 눌러주세요."
+msgstr "尚未生成题目，请点击上方的“生成新一轮测验”按钮。"
+
+msgid "답안 제출 및 채점하기"
+msgstr "提交答案并评分"
+
+msgid "O/X 명제 검증 퀴즈"
+msgstr "判断题验证测验"
+
+msgid "강의 스크립트에서 추출된 주요 명제의 참/거짓을 판별해 보세요."
+msgstr "请判断从课程内容中提取的主要陈述是否正确。"
+
+msgid "참 (True)"
+msgstr "正确（True）"
+
+msgid "거짓 (False)"
+msgstr "错误（False）"
+
+msgid "정답입니다!"
+msgstr "回答正确！"
+
+msgid "오답입니다."
+msgstr "回答错误。"
+
+msgid "제출"
+msgstr "已提交"
+
+msgid "미제출"
+msgstr "未提交"
+
+msgid "해설:"
+msgstr "解析："
+
+msgid "원문:"
+msgstr "原文："
+
+msgid "자동 채점 결과 및 피드백"
+msgstr "自动评分结果与反馈"
+
+msgid "모범 답안 보기"
+msgstr "查看参考答案"
+
+msgid "채점 상세 분석 및 피드백"
+msgstr "评分详细分析与反馈"
+
+msgid "내 답안 문장별 피드백"
+msgstr "我的答案逐句反馈"
+
+msgid "다시 생각해보기"
+msgstr "再想一想"
+
+msgid "답안 수정하기"
+msgstr "修改答案"
+
+msgid "이전 답안과 비교"
+msgstr "与上一次答案比较"
+
+msgid "번째 제출"
+msgstr "次提交"
+
+msgid "개선된 항목:"
+msgstr "已改进项目："
+
+msgid "확인된 개선 항목이 없습니다. 아래 평가와 이전 답안을 함께 확인해주세요."
+msgstr "未检测到明确的改进项目，请结合下方评价和之前的答案一起确认。"
+
+msgid "이렇게 보완해 보세요"
+msgstr "可以这样补充"
+
+msgid "이전 답안 보기"
+msgstr "查看上一次答案"
+
+msgid "반복 오개념 기록"
+msgstr "重复误解记录"
+
+msgid "이 문항의 같은 평가 기준에서 반복된 오류 유형입니다. 동일 답안의 재전송은 횟수에 포함하지 않습니다."
+msgstr "这是该题在相同评分标准下重复出现的错误类型。重复提交完全相同的答案不会计入次数。"
+
+msgid "회"
+msgstr "次"
+
+msgid "최근 답안에서 미검출"
+msgstr "最近一次答案中未检测到"
+
+msgid "제출 이력"
+msgstr "提交记录"
+
+msgid "포함된 핵심 키워드 :"
+msgstr "已包含的核心关键词："
+
+msgid "누락된 핵심 키워드 :"
+msgstr "缺少的核心关键词："
+
+msgid "서술형 문제를 생성하지 못했습니다. 다시 시도해주세요."
+msgstr "未能生成简答题，请重试。"
+
+msgid "메뉴 열기"
+msgstr "打开菜单"
+
+msgid "메뉴 닫기"
+msgstr "关闭菜单"
+

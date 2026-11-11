@@ -1354,7 +1354,6 @@ msgstr "Key scenes"
 msgid "학습 점검"
 msgstr "Learning check"
 
-
 msgid "강의실"
 msgstr "Classrooms"
 
@@ -1520,8 +1519,7 @@ msgid "대기 중"
 msgstr "Queued"
 
 msgid "이 강의를 강의실에서 내릴까요? 내 학습 기록에는 남아 있습니다."
-msgstr ""
-"Remove this lecture from the classroom? It stays in your learning history."
+msgstr "Remove this lecture from the classroom? It stays in your learning history."
 
 msgid "강의실에서 내리기"
 msgstr "Remove from classroom"
@@ -1553,8 +1551,7 @@ msgid "강의를 올렸습니다. AI 요약이 끝나면 학생들도 요약을 
 msgstr "Lecture posted. Students can view the summary once the AI finishes."
 
 msgid "강의를 강의실에서 내렸습니다. 내 학습 기록에는 그대로 남아 있습니다."
-msgstr ""
-"Lecture removed from the classroom. It is still in your learning history."
+msgstr "Lecture removed from the classroom. It is still in your learning history."
 
 msgid "이미 강의실에 없는 강의입니다."
 msgstr "This lecture is no longer in the classroom."
@@ -1573,16 +1570,14 @@ msgstr "This lecture hasn't been summarized yet."
 
 msgid "분석 설정을 고른 뒤 요약하기를 누르면 AI 요약이 시작됩니다. 요약 결과는 강의실의 모든 참여자가 함께 봅니다."
 msgstr ""
-"Choose the analysis settings and press Summarize to start the AI summary. "
-"Everyone in the classroom will see the result."
+"Choose the analysis settings and press Summarize to start the AI summary. Everyone in the classroom will see the "
+"result."
 
 msgid "이전 요약에 실패했습니다."
 msgstr "The previous summary failed."
 
 msgid "올린 뒤 '요약하기'를 누르면 분석 설정을 골라 AI 요약을 시작할 수 있습니다."
-msgstr ""
-"After posting, press 'Summarize' to pick analysis settings and start the AI "
-"summary."
+msgstr "After posting, press 'Summarize' to pick analysis settings and start the AI summary."
 
 msgid "강의를 올렸습니다. '요약하기'를 누르면 AI 요약이 시작됩니다."
 msgstr "Lecture posted. Press 'Summarize' to start the AI summary."
@@ -1608,6 +1603,7 @@ msgstr "Please choose a grading result again."
 msgid "점수는 0~100 사이의 숫자로 입력해 주세요."
 msgstr "Enter a score between 0 and 100."
 
+#, python-format
 msgid "%(name)s님의 답안 채점 결과를 저장했습니다."
 msgstr "Saved the grade for %(name)s's answer."
 
@@ -1616,9 +1612,8 @@ msgstr "Learning management · Grading"
 
 msgid "요약은 각자 진행되며 내 학습 기록에 저장됩니다. 요약 후 문제를 풀면 강의자가 답안을 확인하고 채점합니다."
 msgstr ""
-"Each student creates their own summary, which is saved to their learning "
-"history. After summarizing, solve the questions and the instructor will "
-"review and grade your answers."
+"Each student creates their own summary, which is saved to their learning history. After summarizing, solve the "
+"questions and the instructor will review and grade your answers."
 
 msgid "내 채점 결과"
 msgstr "My grades"
@@ -1672,10 +1667,9 @@ msgid "미채점"
 msgstr "Not graded"
 
 msgid "아직 학생이 제출한 답안이 없습니다. 학생이 강의를 요약하고 문제를 풀면 여기에 표시됩니다."
-msgstr ""
-"No answers submitted yet. They will appear here once students summarize a "
-"lecture and solve its questions."
+msgstr "No answers submitted yet. They will appear here once students summarize a lecture and solve its questions."
 
+#, python-format
 msgid "학생 %(counter)s명 요약"
 msgid_plural "학생 %(counter)s명 요약"
 msgstr[0] "%(counter)s student summarized"
@@ -1699,9 +1693,7 @@ msgid "학생 선택"
 msgstr "Student's choice"
 
 msgid "자동 채점 결과(정답 100점, 오답 0점)로 모든 문항을 채점할까요? 직접 입력한 값은 덮어씁니다."
-msgstr ""
-"Grade every question with the auto result (correct 100, wrong 0)? Values you"
-" entered will be overwritten."
+msgstr "Grade every question with the auto result (correct 100, wrong 0)? Values you entered will be overwritten."
 
 msgid "자동 결과로 일괄 채점"
 msgstr "Grade all with auto result"
@@ -1718,8 +1710,7 @@ msgstr "Graded %(count)d questions with the auto result."
 
 #, python-format
 msgid "%(number)d번 문항의 채점 값이 올바르지 않습니다. 점수는 0~100 사이로 입력해 주세요."
-msgstr ""
-"Question %(number)d has an invalid grade. Enter a score between 0 and 100."
+msgstr "Question %(number)d has an invalid grade. Enter a score between 0 and 100."
 
 msgid "답안 검수로"
 msgstr "Back to answer review"
@@ -1745,9 +1736,281 @@ msgid "학생 답안"
 msgstr "Student answer"
 
 msgid "자동 판정과 자동 점수로 모든 문항을 채점할까요? 직접 입력한 값은 덮어씁니다."
-msgstr ""
-"Grade every question with the auto verdict and auto score? Values you "
-"entered will be overwritten."
+msgstr "Grade every question with the auto verdict and auto score? Values you entered will be overwritten."
 
 msgid "평균"
 msgstr "Avg."
+
+msgid "분석 작업"
+msgstr "Analysis tasks"
+
+msgid "강의 분석 대기열"
+msgstr "Lecture analysis queue"
+
+msgid "진행 중인 분석과 대기 순서를 확인하고 관리할 수 있습니다."
+msgstr "Check and manage active analyses and their queue order."
+
+msgid "대기열 닫기"
+msgstr "Close queue"
+
+msgid "실시간 상태"
+msgstr "Live status"
+
+msgid "현재 진행 중인 작업이 없습니다."
+msgstr "There are no active tasks."
+
+msgid "대기 중인 분석이 없습니다."
+msgstr "There are no analyses waiting."
+
+msgid "새 강의를 등록하면 이곳에서 진행 상태를 확인할 수 있습니다."
+msgstr "Add a new lecture to track its analysis status here."
+
+msgid "대기열 작업 관리"
+msgstr "Manage queue task"
+
+msgid "한 단계 위로"
+msgstr "Move up one"
+
+msgid "한 단계 아래로"
+msgstr "Move down one"
+
+msgid "대기 취소"
+msgstr "Cancel queue"
+
+msgid "AI 분석을 진행하고 있습니다."
+msgstr "AI analysis is in progress."
+
+msgid "앞선 작업 완료 후 자동으로 시작됩니다."
+msgstr "It will start automatically after the earlier task finishes."
+
+msgid "결과 보기"
+msgstr "View result"
+
+msgid "대기열 상태를 불러오지 못했습니다."
+msgstr "Could not load the queue status."
+
+msgid "이 강의의 분석 대기열을 취소하시겠습니까?"
+msgstr "Cancel this lecture analysis request?"
+
+msgid "분석 진행 중"
+msgstr "Analysis in progress"
+
+#, python-format
+msgid "대기 %(number)s번"
+msgstr "Waiting %(number)s"
+
+msgid "제목 없음"
+msgstr "Untitled"
+
+msgid "시간 초과로 자동 종료되었습니다."
+msgstr "The analysis was stopped automatically due to a timeout."
+
+msgid "사용자에 의해 대기열에서 취소되었습니다."
+msgstr "The analysis was canceled by the user."
+
+msgid "대기열에서 취소되었습니다."
+msgstr "Canceled from the queue."
+
+msgid "대기열 확인 중..."
+msgstr "Checking queue..."
+
+msgid "대기열에 등록되었습니다."
+msgstr "Added to the analysis queue."
+
+msgid "앞선 작업이 끝나면 자동으로 분석이 시작됩니다."
+msgstr "Analysis will start automatically after earlier tasks finish."
+
+msgid "대기열 진입"
+msgstr "Queued"
+
+msgid "음성 전사(STT)"
+msgstr "Speech transcription (STT)"
+
+msgid "AI 핵심 요약"
+msgstr "AI summary"
+
+#, python-brace-format
+msgid "현재 대기 순번: {n}번째"
+msgstr "Current queue position: {n}"
+
+#, python-brace-format
+msgid "앞에 {n}개의 강의가 먼저 분석되고 있습니다."
+msgstr "{n} lecture(s) are ahead in the queue."
+
+msgid "잠시 후 분석이 시작됩니다."
+msgstr "Analysis will start shortly."
+
+msgid "차례가 되면 자동으로 음성 전사 및 요약이 진행됩니다."
+msgstr "Speech transcription and summarization will start automatically when it is your turn."
+
+msgid "1/2 단계: 음성 텍스트 추출 중"
+msgstr "Step 1/2: Transcribing audio"
+
+msgid "2/2 단계: AI 요약 중"
+msgstr "Step 2/2: Generating AI summary"
+
+msgid "강의 음성을 Whisper로 받아 적고 있습니다..."
+msgstr "Whisper is transcribing the lecture audio..."
+
+msgid "AI가 핵심 내용과 타임라인을 정리 중입니다..."
+msgstr "AI is organizing the key content and timeline..."
+
+msgid "화면을 닫지 말고 잠시만 기다려주세요."
+msgstr "Please keep this page open while the analysis finishes."
+
+msgid "대기열"
+msgstr "Queue"
+
+msgid "분석 대기열 보기"
+msgstr "View analysis queue"
+
+msgid "base-빠른 분석"
+msgstr "base — Fast analysis"
+
+msgid "small-균형 분석"
+msgstr "small — Balanced analysis"
+
+msgid "medium-정확한 분석"
+msgstr "medium — Accurate analysis"
+
+msgid "large-고정밀 분석"
+msgstr "large — High-precision analysis"
+
+msgid "large 모델은 가장 높은 정확도를 제공하지만 처리 속도와 메모리 사용량 부담이 가장 큽니다. 짧은 영상이나 고성능 PC에서만 권장합니다."
+msgstr ""
+"The large model provides the highest accuracy, but requires the most processing time and memory. It is recommended "
+"only for short videos or high-performance PCs."
+
+msgid "3개는 고성능 병렬 처리용입니다. CPU 사용량은 늘어나지만 여러 구간을 동시에 처리할 수 있습니다."
+msgstr ""
+"Three workers enable high-performance parallel processing. CPU usage increases, but multiple segments can be "
+"processed at the same time."
+
+msgid "AI 자동 생성은 API가 강의 내용을 보고 과목 성격을 판단한 뒤, 시험 대비에 적합한 구조로 요약합니다."
+msgstr "AI auto-detection analyzes the lecture and chooses a subject structure suitable for exam preparation."
+
+msgid "객관식 퀴즈"
+msgstr "Multiple-choice Quiz"
+
+msgid "강의 요약 내용을 바탕으로 생성된 4지선다 객관식 문제를 풀어보세요."
+msgstr "Answer the four-choice questions generated from the lecture summary."
+
+msgid "O/X 명제 퀴즈"
+msgstr "True/False Quiz"
+
+msgid "이전 회차로 이동"
+msgstr "Go to previous set"
+
+msgid "회차"
+msgstr " set"
+
+msgid "다음 회차로 이동"
+msgstr "Go to next set"
+
+msgid "새 회차 퀴즈 생성"
+msgstr "Generate new quiz set"
+
+msgid "생성된 문제 문항이 없습니다. 상단의 새 회차 퀴즈 생성 버튼을 눌러주세요."
+msgstr "No quiz questions have been generated. Use the Generate new quiz set button above."
+
+msgid "답안 제출 및 채점하기"
+msgstr "Submit answers and grade"
+
+msgid "O/X 명제 검증 퀴즈"
+msgstr "True/False Verification Quiz"
+
+msgid "강의 스크립트에서 추출된 주요 명제의 참/거짓을 판별해 보세요."
+msgstr "Determine whether the key statements extracted from the lecture are true or false."
+
+msgid "참 (True)"
+msgstr "True"
+
+msgid "거짓 (False)"
+msgstr "False"
+
+msgid "정답입니다!"
+msgstr "Correct!"
+
+msgid "오답입니다."
+msgstr "Incorrect."
+
+msgid "제출"
+msgstr "Submitted"
+
+msgid "미제출"
+msgstr "Not submitted"
+
+msgid "해설:"
+msgstr "Explanation:"
+
+msgid "원문:"
+msgstr "Original:"
+
+msgid "자동 채점 결과 및 피드백"
+msgstr "Automatic Grading Results and Feedback"
+
+msgid "모범 답안 보기"
+msgstr "View model answer"
+
+msgid "채점 상세 분석 및 피드백"
+msgstr "Detailed grading analysis and feedback"
+
+msgid "내 답안 문장별 피드백"
+msgstr "Sentence-by-sentence feedback"
+
+msgid "다시 생각해보기"
+msgstr "Think again"
+
+msgid "답안 수정하기"
+msgstr "Revise answer"
+
+msgid "이전 답안과 비교"
+msgstr "Compare with previous answer"
+
+msgid "번째 제출"
+msgstr " submission"
+
+msgid "개선된 항목:"
+msgstr "Improved:"
+
+msgid "확인된 개선 항목이 없습니다. 아래 평가와 이전 답안을 함께 확인해주세요."
+msgstr "No specific improvement was detected. Review the evaluation below together with your previous answer."
+
+msgid "이렇게 보완해 보세요"
+msgstr "How to improve"
+
+msgid "이전 답안 보기"
+msgstr "View previous answer"
+
+msgid "반복 오개념 기록"
+msgstr "Recurring misconception history"
+
+msgid "이 문항의 같은 평가 기준에서 반복된 오류 유형입니다. 동일 답안의 재전송은 횟수에 포함하지 않습니다."
+msgstr ""
+"These are error types repeated under the same grading criteria for this question. Resubmitting the same answer is not"
+" counted again."
+
+msgid "회"
+msgstr " times"
+
+msgid "최근 답안에서 미검출"
+msgstr "Not detected in the latest answer"
+
+msgid "제출 이력"
+msgstr "Submission history"
+
+msgid "포함된 핵심 키워드 :"
+msgstr "Included key terms:"
+
+msgid "누락된 핵심 키워드 :"
+msgstr "Missing key terms:"
+
+msgid "서술형 문제를 생성하지 못했습니다. 다시 시도해주세요."
+msgstr "Could not generate the written-response questions. Please try again."
+
+msgid "메뉴 열기"
+msgstr "Open menu"
+
+msgid "메뉴 닫기"
+msgstr "Close menu"
+

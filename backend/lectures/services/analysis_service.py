@@ -1,6 +1,7 @@
 # C:\CapsRock-EduMate\backend\lectures\services\analysis_service.py
 
 import os
+import re
 import time
 import concurrent.futures
 
@@ -22,13 +23,12 @@ from .stt_service import (
 )
 from .media_service import (
     download_low_res_video,
-    capture_frame_at_timestamp,
 )
+from .image_relevance_service import select_relevant_timeline_frames
 from .summary_service import (
     get_summary_model_label,
     summarize_chunk,
     make_final_summary,
-    replace_image_markers_with_html,
     extract_summary_timeline,
     parse_summary_timeline_items,
     inject_core_timeline_images,
@@ -158,7 +158,8 @@ def analyze_video_request(request):
 
     segments = []
     timeline_frames = []
-    temp_video_path = os.path.join(settings.BASE_DIR, "temp_video.mp4")
+    # 강의별 임시 경로를 사용해 동시 사용자 다운로드 충돌을 방지한다.
+    temp_video_path = os.path.join(settings.BASE_DIR, f"temp_video_{lecture.id}.mp4")
 
     try:
         # =========================
@@ -458,10 +459,13 @@ def analyze_video_request(request):
 
         postprocess_start_time = time.time()
 
-        final_summary = replace_image_markers_with_html(
-            ai_summary_text=final_summary,
-            lecture_id=lecture.id,
-            summary_language=selected_summary_language,
+        # 기존 [IMG: ..]는 실제 영상 화면 검증을 거치지 않은 마커이므로 제거한다.
+        # 이미지 삽입은 5단계에서 시각적 관련성이 검증된 프레임에 대해서만 수행한다.
+        final_summary = re.sub(
+            r"\*{0,2}\[IMG:\s*\d{1,3}:\d{1,2}(?::\d{1,2})?\s*\]\*{0,2}",
+            "",
+            final_summary,
+            flags=re.IGNORECASE,
         )
 
         summary_text_postprocess_duration = time.time() - postprocess_start_time
@@ -471,10 +475,14 @@ def analyze_video_request(request):
         # =========================
         image_processing_start_time = time.time()
 
-        core_timeline_items = parse_summary_timeline_items(
-            final_summary,
-            max_items=4,
-        )
+        # 앞쪽 4개만 고르면 긴 강의 뒷부분의 시각 자료가 누락되므로
+        # 전체 타임라인에서 강의 전반에 걸쳐 최대 4개를 고른다.
+        all_timeline_items = parse_summary_timeline_items(final_summary, max_items=0)
+        if len(all_timeline_items) > 4:
+            selected_indices = [round(i * (len(all_timeline_items) - 1) / 3) for i in range(4)]
+            core_timeline_items = [all_timeline_items[i] for i in selected_indices]
+        else:
+            core_timeline_items = all_timeline_items
 
         if core_timeline_items:
             print(
@@ -502,22 +510,16 @@ def analyze_video_request(request):
             else:
                 print("[핵심 이미지 캡처] 유튜브 영상 다운로드 실패, 이미지 없이 요약을 저장합니다.")
 
-        core_timeline_frames = []
-
-        if frame_video_path and os.path.exists(frame_video_path):
-            for item in core_timeline_items:
-                captured_frame = capture_frame_at_timestamp(
-                    video_path=frame_video_path,
-                    lecture_id=lecture.id,
-                    seconds=item.get("seconds"),
-                    keyword=item.get("keyword", ""),
-                    output_prefix="core",
-                )
-
-                if captured_frame:
-                    core_timeline_frames.append(captured_frame)
-
-        timeline_frames = core_timeline_frames
+        # 주변 장면 중 개념과 실제로 연관된 장면만 비전 모델로 검증한다.
+        # 검증 실패 또는 관련 이미지 없음 -> 0장 (요약은 정상 저장).
+        timeline_frames = select_relevant_timeline_frames(
+            video_path=frame_video_path,
+            lecture_id=lecture.id,
+            timeline_items=core_timeline_items,
+            summary_text=final_summary,
+            summary_api=selected_summary_api,
+            max_images=4,
+        )
 
         final_summary = inject_core_timeline_images(
             summary_text=final_summary,

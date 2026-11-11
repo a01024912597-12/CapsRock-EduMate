@@ -8,17 +8,31 @@ from ..utils.youtube_utils import extract_youtube_video_id
 
 
 def download_low_res_video(video_url, output_path):
-    """프레임 캡처를 위해 가장 파일 크기가 작고 가벼운 mp4 영상을 다운로드합니다.
+    """이미지 프레임 추출용 영상을 최대 1080p로 다운로드한다.
 
-    재생목록 URL이 들어오더라도 video_id만 추출해 단일 영상만 다운로드한다.
+    이전 메서드명을 유지하여 기존 호출부를 건드리지 않는다.
+    음성은 STT 작업에서 별도로 처리하므로 video-only mp4도 허용한다.
+    환경변수 EDUMATE_IMAGE_VIDEO_HEIGHT=720 설정 시 다운로드 용량을 줄일 수 있다.
     """
     video_id = extract_youtube_video_id(video_url)
-
     if video_id:
         video_url = f"https://www.youtube.com/watch?v={video_id}"
 
+    try:
+        max_height = int(os.environ.get("EDUMATE_IMAGE_VIDEO_HEIGHT", "1080"))
+    except (TypeError, ValueError):
+        max_height = 1080
+    max_height = min(1080, max(360, max_height))
+
+    # MP4를 선택해 output_path(.mp4)와 실제 컨테이너 포맷이 일치하게 한다.
+    # 가능한 최대 해상도를 사용하되 1080p 이상은 우선 제외한다.
+    format_selector = (
+        f"bestvideo[ext=mp4][height<={max_height}]/"
+        f"best[ext=mp4][height<={max_height}]/"
+        "bestvideo[ext=mp4]/best[ext=mp4]"
+    )
     ydl_opts = {
-        "format": "worstvideo[ext=mp4]/worst[ext=mp4]/worst",
+        "format": format_selector,
         "outtmpl": output_path,
         "quiet": True,
         "noplaylist": True,
@@ -26,12 +40,16 @@ def download_low_res_video(video_url, output_path):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([video_url])
-
+            info = ydl.extract_info(video_url, download=True)
+        if not os.path.isfile(output_path) or os.path.getsize(output_path) <= 0:
+            print(f"[고화질 프레임 영상] 파일이 생성되지 않음: {output_path}")
+            return False
+        resolution = (info or {}).get("height", "unknown")
+        print(f"[고화질 프레임 영상] 다운로드 완료: {resolution}p, "
+              f"{os.path.getsize(output_path) / (1024 * 1024):.1f} MB")
         return True
-
-    except Exception as e:
-        print(f"[판서 비디오 다운로드 에러] {e}")
+    except Exception as exc:
+        print(f"[고화질 프레임 영상] 다운로드 실패: {exc}")
         return False
 
 

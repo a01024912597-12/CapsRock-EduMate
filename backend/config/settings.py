@@ -25,8 +25,15 @@ SECRET_KEY = 'django-insecure-l%1wxnbx51mb&)rt0i=wg3j21it6i(eja=8^-edu2&0fk)8=72
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    "desktop-5r79ud5.taild143e6.ts.net",
+]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://desktop-5r79ud5.taild143e6.ts.net",
+]
 
 # Application definition
 
@@ -164,3 +171,17 @@ CSRF_TRUSTED_ORIGINS = [
 # Cloudflare 프록시를 통해 들어온 HTTPS 요청을 Django가 HTTPS로 인식
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+
+# EDUMATE_TAILSCALE_SETTINGS
+DEBUG = False
+
+ALLOWED_HOSTS = list(ALLOWED_HOSTS) + [
+    "desktop-5r79ud5.taild143e6.ts.net",
+]
+
+CSRF_TRUSTED_ORIGINS = list(CSRF_TRUSTED_ORIGINS) + [
+    "https://desktop-5r79ud5.taild143e6.ts.net",
+]
+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True

@@ -166,13 +166,26 @@
         </div>
     </aside>
 
+    <div id="globalQueueI18n" hidden
+         data-empty-title="{% trans '대기 중인 분석이 없습니다.' %}"
+         data-empty-desc="{% trans '새 강의를 등록하면 이곳에서 진행 상태를 확인할 수 있습니다.' %}"
+         data-controls-label="{% trans '대기열 작업 관리' %}"
+         data-move-up="{% trans '한 단계 위로' %}"
+         data-move-down="{% trans '한 단계 아래로' %}"
+         data-cancel="{% trans '대기 취소' %}"
+         data-processing="{% trans 'AI 분석을 진행하고 있습니다.' %}"
+         data-waiting="{% trans '앞선 작업 완료 후 자동으로 시작됩니다.' %}"
+         data-result="{% trans '결과 보기' %}"
+         data-load-failed="{% trans '대기열 상태를 불러오지 못했습니다.' %}"
+         data-cancel-confirm="{% trans '이 강의의 분석 대기열을 취소하시겠습니까?' %}"></div>
+
     <div class="page-wrapper">
         <header class="topbar">
             <button type="button" class="sidebar-menu-toggle" id="sidebarMenuToggle"
                     aria-controls="appSidebar" aria-expanded="false"
-                    aria-label="{% trans '硫붾돱 ?닿린' %}"
-                    data-label-open="{% trans '硫붾돱 ?닿린' %}"
-                    data-label-close="{% trans '硫붾돱 ?リ린' %}">
+                    aria-label="{% trans '메뉴 열기' %}"
+                    data-label-open="{% trans '메뉴 열기' %}"
+                    data-label-close="{% trans '메뉴 닫기' %}">
                 <i class="fas fa-bars" aria-hidden="true"></i>
             </button>
             <div class="topbar-breadcrumb">
@@ -347,8 +360,8 @@
             menuToggle.setAttribute(
                 'aria-label',
                 shouldOpen
-                    ? (menuToggle.dataset.labelClose || '硫붾돱 ?リ린')
-                    : (menuToggle.dataset.labelOpen || '硫붾돱 ?닿린')
+                    ? (menuToggle.dataset.labelClose || '메뉴 닫기')
+                    : (menuToggle.dataset.labelOpen || '메뉴 열기')
             );
 
             const icon = menuToggle.querySelector('i');
@@ -403,6 +416,7 @@
         const taskList = document.getElementById('globalQueueTaskList');
         const countBadge = document.getElementById('globalQueueCount');
         const drawerCount = document.getElementById('globalQueueDrawerCount');
+        const i18n = document.getElementById('globalQueueI18n')?.dataset || {};
 
         if (!openButton || !drawer || !closeButton || !drawerBackdrop || !taskList) return;
 
@@ -472,8 +486,8 @@
             if (!items.length) {
                 taskList.innerHTML = '<div class="global-queue-empty">' +
                     '<i class="fas fa-check-circle" aria-hidden="true"></i>' +
-                    '<strong>대기 중인 분석이 없습니다.</strong>' +
-                    '<p>새 강의를 등록하면 이곳에서 진행 상태를 확인할 수 있습니다.</p></div>';
+                    '<strong>' + escapeQueueHtml(i18n.emptyTitle || '대기 중인 분석이 없습니다.') + '</strong>' +
+                    '<p>' + escapeQueueHtml(i18n.emptyDesc || '새 강의를 등록하면 이곳에서 진행 상태를 확인할 수 있습니다.') + '</p></div>';
                 return;
             }
 
@@ -485,12 +499,12 @@
 
                 let controls = '';
                 if (task.can_cancel) {
-                    controls = '<div class="global-queue-controls" aria-label="대기열 작업 관리">' +
-                        '<button type="button" title="한 단계 위로" aria-label="한 단계 위로" ' + (task.can_move_up ? '' : 'disabled ') +
+                    controls = '<div class="global-queue-controls" aria-label="' + escapeQueueHtml(i18n.controlsLabel || '대기열 작업 관리') + '">' +
+                        '<button type="button" title="' + escapeQueueHtml(i18n.moveUp || '한 단계 위로') + '" aria-label="' + escapeQueueHtml(i18n.moveUp || '한 단계 위로') + '" ' + (task.can_move_up ? '' : 'disabled ') +
                             'data-queue-action="up" data-lecture-id="' + task.id + '"><i class="fas fa-arrow-up"></i></button>' +
-                        '<button type="button" title="한 단계 아래로" aria-label="한 단계 아래로" ' + (task.can_move_down ? '' : 'disabled ') +
+                        '<button type="button" title="' + escapeQueueHtml(i18n.moveDown || '한 단계 아래로') + '" aria-label="' + escapeQueueHtml(i18n.moveDown || '한 단계 아래로') + '" ' + (task.can_move_down ? '' : 'disabled ') +
                             'data-queue-action="down" data-lecture-id="' + task.id + '"><i class="fas fa-arrow-down"></i></button>' +
-                        '<button type="button" class="is-cancel" title="대기 취소" aria-label="대기 취소" ' +
+                        '<button type="button" class="is-cancel" title="' + escapeQueueHtml(i18n.cancel || '대기 취소') + '" aria-label="' + escapeQueueHtml(i18n.cancel || '대기 취소') + '" ' +
                             'data-queue-action="cancel" data-lecture-id="' + task.id + '"><i class="fas fa-xmark"></i></button>' +
                         '</div>';
                 }
@@ -508,11 +522,11 @@
                     '<div class="global-queue-progress"><span style="width:' + progressWidth + '"></span></div>' +
                     '<div class="global-queue-task-meta">' +
                         '<span><i class="fas ' + (isProcessing ? 'fa-spinner fa-spin' : 'fa-clock') + '"></i> ' +
-                            (isProcessing ? 'AI 분석을 진행하고 있습니다.' : '앞선 작업 완료 후 자동으로 시작됩니다.') + '</span>' +
+                            (isProcessing ? (i18n.processing || 'AI 분석을 진행하고 있습니다.') : (i18n.waiting || '앞선 작업 완료 후 자동으로 시작됩니다.')) + '</span>' +
                     '</div>' +
                     '<div class="global-queue-task-actions">' +
                         controls +
-                        '<a class="global-queue-result-link" href="/summary/?lecture_id=' + task.id + '">결과 보기 <i class="fas fa-arrow-right"></i></a>' +
+                        '<a class="global-queue-result-link" href="/summary/?lecture_id=' + task.id + '">' + escapeQueueHtml(i18n.result || '결과 보기') + ' <i class="fas fa-arrow-right"></i></a>' +
                     '</div>' +
                 '</article>';
             }).join('');
@@ -528,7 +542,7 @@
                     renderGlobalQueue(data.tasks || []);
                 })
                 .catch(function () {
-                    taskList.innerHTML = '<div class="global-queue-empty"><p>대기열 상태를 불러오지 못했습니다.</p></div>';
+                    taskList.innerHTML = '<div class="global-queue-empty"><p>' + escapeQueueHtml(i18n.loadFailed || '대기열 상태를 불러오지 못했습니다.') + '</p></div>';
                 });
         }
 
@@ -552,7 +566,7 @@
             const action = button.dataset.queueAction;
 
             if (action === 'cancel') {
-                if (!window.confirm('이 강의의 분석 대기열을 취소하시겠습니까?')) return;
+                if (!window.confirm(i18n.cancelConfirm || '이 강의의 분석 대기열을 취소하시겠습니까?')) return;
                 postQueueAction('/analyze-api/cancel/', {lecture_id: lectureId})
                     .then(function (data) {
                         if (!data.ok && data.message) window.alert(data.message);

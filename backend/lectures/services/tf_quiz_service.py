@@ -10,6 +10,15 @@ from django.conf import settings
 
 from ..models import Quiz, QuizQuestion, QuizAnswer
 from .objective_quiz_service import extract_keywords_with_kiwi_for_objective
+from ..utils.quiz_language import (
+    LANG_KO,
+    LANG_EN,
+    LANG_ZH,
+    detect_quiz_language,
+    split_sentences_multilingual,
+    extract_non_korean_keywords,
+    localized_quiz_text,
+)
 
 TF_QUIZ_TYPE = "tf"
 SBERT_MODEL_NAME = getattr(
@@ -117,7 +126,7 @@ def filter_valid_sentences(summary_text):
     return list(dict.fromkeys(valid_sentences))
 
 
-def generate_tf_quiz_items(summary_text, question_count=20):
+def _generate_tf_quiz_items_ko(summary_text, question_count=20):
     """
     정제된 문장으로 O/X 퀴즈 항목을 생성합니다.
     """
@@ -198,6 +207,203 @@ def generate_tf_quiz_items(summary_text, question_count=20):
             })
 
     return quiz_items
+
+
+
+def _clean_tf_text_multilingual(text):
+    """영어/중국어 O/X 생성 전용 전처리. 섹션 라벨·이미지·HTML을 제거한다."""
+    if not text:
+        return ""
+
+    language = detect_quiz_language(text)
+    cleaned = re.sub(r"<style\b[^>]*>.*?</style>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+    cleaned = re.sub(r"<script\b[^>]*>.*?</script>", " ", cleaned, flags=re.IGNORECASE | re.DOTALL)
+    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+    cleaned = re.sub(r"\[[^\]]*\]\((?:https?://|/)[^)]+\)", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"▶\s*\d{1,3}:\d{2}[^\n]*", " ", cleaned)
+    cleaned = re.sub(r"(AI\s*Lecture\s*Summary|Lecture\s*Summary|课程摘要|AI课程摘要)", "", cleaned, flags=re.IGNORECASE)
+
+    en_meta = {
+        "type", "basis", "meaning", "context", "exam point", "exam points",
+        "short answer", "comparison", "sequence", "essay", "one-line final summary",
+        "one line final summary",
+    }
+    zh_meta = {"类型", "依据", "含义", "语境", "考点", "简答", "比较", "顺序", "论述", "一句话总结"}
+
+    kept_lines = []
+    for raw_line in cleaned.splitlines():
+        line = re.sub(r"^[\s#>*\-•]+", "", raw_line).strip()
+        line = re.sub(r"[*_`~]+", "", line).strip()
+        if not line:
+            continue
+        if re.search(r"(?:font-size|timeline-image-wrapper|https?://|\.jpg|\.png)", line, re.IGNORECASE):
+            continue
+        head = re.split(r"[:：]", line, maxsplit=1)[0].strip().casefold()
+        if language == LANG_EN and head in en_meta:
+            continue
+        if language == LANG_ZH and re.split(r"[:：]", line, maxsplit=1)[0].strip() in zh_meta:
+            continue
+        # 숫자만 있는 섹션 제목 또는 '1. ...' 식 제목은 제외한다.
+        if re.fullmatch(r"\d+\.?\s*", line):
+            continue
+        kept_lines.append(line)
+
+    return " ".join(kept_lines)
+
+
+def _filter_valid_sentences_non_ko(summary_text, language):
+    """영어/중국어 요약에서 O/X용 서술문만 추출한다."""
+    text_clean = _clean_tf_text_multilingual(summary_text)
+    raw_sentences = split_sentences_multilingual(text_clean, language)
+
+    exclude_keywords = (
+        (
+            "lecture type",
+            "overall flow",
+            "detailed lecture",
+            "essential concepts",
+            "key exam points",
+            "exam point",
+        )
+        if language == LANG_EN
+        else (
+            "课程类型",
+            "整体流程",
+            "详细讲义",
+            "核心概念",
+            "考试重点",
+            "关键考点",
+        )
+    )
+
+    valid = []
+    for sent in raw_sentences:
+        sent = re.sub(r"\s+", " ", sent).strip(" -•:")
+        if not sent:
+            continue
+        if any(keyword.casefold() in sent.casefold() for keyword in exclude_keywords):
+            continue
+        if sent.endswith("?") or sent.endswith("？"):
+            continue
+
+        if language == LANG_EN:
+            if len(sent) < 25 or len(sent) > 320:
+                continue
+            if len(re.findall(r"[A-Za-z]{2,}", sent)) < 5:
+                continue
+        else:
+            if len(sent) < 12 or len(sent) > 180:
+                continue
+            if len(re.findall(r"[\u4e00-\u9fff]", sent)) < 6:
+                continue
+
+        valid.append(sent)
+
+    return list(dict.fromkeys(valid))
+
+
+def _generate_tf_quiz_items_non_ko(summary_text, question_count=20, language=LANG_EN):
+    """영어/중국어 요약 전용 O/X 생성기. 한국어 기존 로직과 분리한다."""
+    sentences = _filter_valid_sentences_non_ko(summary_text, language)
+    if not sentences:
+        return []
+
+    concept_keywords = []
+    try:
+        from .summary_service import extract_concept_entries_from_summary
+        concept_keywords = [
+            (entry.get("keyword") or "").strip()
+            for entry in extract_concept_entries_from_summary(summary_text)
+            if (entry.get("keyword") or "").strip()
+        ]
+    except Exception:
+        concept_keywords = []
+
+    all_keywords = extract_non_korean_keywords(
+        summary_text,
+        language,
+        concept_keywords=concept_keywords,
+    )
+
+    quiz_items = []
+    for sent in sentences:
+        if len(quiz_items) >= question_count:
+            break
+
+        item_number = len(quiz_items) + 1
+        make_true = item_number % 2 != 0
+
+        if make_true:
+            quiz_items.append({
+                "number": item_number,
+                "question_text": sent,
+                "correct_answer": "O",
+                "explanation": localized_quiz_text(language, "tf_true"),
+                "original_sentence": sent,
+            })
+            continue
+
+        sentence_terms = [
+            term for term in all_keywords
+            if len(term) > 1 and term in sent
+        ]
+        target_word = sentence_terms[0] if sentence_terms else None
+        candidates = [
+            term for term in all_keywords
+            if target_word
+            and term.casefold() != target_word.casefold()
+            and term not in sent
+            and len(term) > 1
+        ]
+
+        if not target_word or not candidates:
+            continue
+
+        candidates.sort(
+            key=lambda value: (abs(len(value) - len(target_word)), value.casefold())
+        )
+        new_word = candidates[0]
+        distorted_sent = sent.replace(target_word, new_word, 1)
+
+        if distorted_sent == sent:
+            continue
+
+        quiz_items.append({
+            "number": item_number,
+            "question_text": distorted_sent,
+            "correct_answer": "X",
+            "explanation": localized_quiz_text(
+                language,
+                "tf_false",
+                old=target_word,
+                new=new_word,
+            ),
+            "original_sentence": sent,
+        })
+
+    print(
+        f"[OX 퀴즈 생성] language={language}, "
+        f"sentences={len(sentences)}, keywords={len(all_keywords)}, "
+        f"generated={len(quiz_items)}"
+    )
+    return quiz_items
+
+
+def generate_tf_quiz_items(summary_text, question_count=20):
+    """요약 언어에 따라 기존 한국어 생성기 또는 다국어 생성기를 선택한다."""
+    language = detect_quiz_language(summary_text)
+
+    if language == LANG_KO:
+        return _generate_tf_quiz_items_ko(
+            summary_text=summary_text,
+            question_count=question_count,
+        )
+
+    return _generate_tf_quiz_items_non_ko(
+        summary_text=summary_text,
+        question_count=question_count,
+        language=language,
+    )
 
 
 def save_tf_questions(quiz, quiz_items):
